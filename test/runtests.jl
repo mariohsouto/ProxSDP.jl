@@ -4,4 +4,8 @@ datapath = joinpath(dirname(@__FILE__),"data")
 
 using ProxSDP
 
-ProxSDP.runpsdp(datapath)
+# ProxSDP.runpsdp(datapath)
+
+# include("moitest.jl")
+
+include("jumptest.jl")

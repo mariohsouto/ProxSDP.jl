@@ -1,9 +1,9 @@
 module ProxSDP
 
-using TimerOutputs
-using PyCall
+using MathOptInterface, PyCall, TimerOutputs
 @pyimport scipy.linalg as sp
-# const TO = TimerOutputs
+
+include("mathoptinterface.jl")
 
 immutable Dims
     m::Int
@@ -16,6 +16,18 @@ type AffineSets
     b::AbstractVector
     h::AbstractVector
     c::AbstractVector
+
+    sdpcone::Vector{Tuple{Vector{Int},Vector{Int}}}
+end
+
+struct CPResult
+    status::Int
+    primal::Vector{Float64}
+    dual::Vector{Float64}
+    slack::Vector{Float64}
+    primal_residual::Float64
+    dual_residual::Float64
+    objval::Float64
 end
 
 function chambolle_pock(
@@ -41,11 +53,12 @@ function chambolle_pock(
     sizehint!(comb_residual, max_iter)
     sizehint!(dual_residual, max_iter)
     sizehint!(primal_residual, max_iter)
-    x, x_old = zeros(n^2), zeros(n^2)
+    # x, x_old = zeros(n^2), zeros(n^2)
+    x, x_old = zeros(n*(n+1)/2), zeros(n*(n+1)/2)
     u, u_old = zeros(m), zeros(m)
 
     # Step size
-    rho = 0.999999 / svds(affine_sets.A, nsv=1)[1][:S][1]
+    rho = 0.99 / svds(affine_sets.A, nsv=1)[1][:S][1]
 
     # Diagonal scaling
     K = affine_sets.A
@@ -67,7 +80,7 @@ function chambolle_pock(
     @timeit "CP loop" for k in 1:max_iter
         # Projetion onto sdp cone
         @timeit "primal" begin
-            x = sdp_cone_projection(x - rho * TKt * u - affine_sets.c / rho, dims)::Vector{Float64}
+            x = sdp_cone_projection(x - rho * TKt * u - affine_sets.c / rho, dims, affine_sets)::Vector{Float64}
         end
         # Projection onto the affine set
         @timeit "dual" begin
@@ -100,46 +113,54 @@ function chambolle_pock(
     time = toq()
     println("Time = $time")
 
-    return converged, evaluate(x, affine_sets), x, primal_residual[end], dual_residual[end]
+    ret = CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], evaluate(x, affine_sets))
+    return ret
+    # return converged, evaluate(x, affine_sets), x, primal_residual[end], dual_residual[end]
 end
 
 function evaluate(x, affine_sets)
     return dot(affine_sets.c, x)
 end
 
-function sdp_cone_projection(v::Vector{Float64}, dims::Dims)::Vector{Float64}
-    D, V = @timeit "py" sp.eigh(reshape(v, (dims.n, dims.n)))
-    D = diagm(max.(D, 0.0))
-    return vec(V * D * V')
+function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff)::Vector{Float64}
+
+    M = zeros(dims.n, dims.n)
+    iv = aff.sdpcone[1][1]
+    im = aff.sdpcone[1][2]
+    for i in eachindex(iv)
+        M[im[i]] = v[iv[i]]
+    end
+    X = Symmetric(M,:U)
+    # @show X
+
+    # D, V = @timeit "py" sp.eigh(reshape(v, (dims.n, dims.n)))
+    # D = diagm(max.(D, 0.0))
+    # return vec(V * D * V')
     # X = @timeit "reshape" Symmetric(reshape(v, (dims.n, dims.n)))
-    # # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-    # # D = diagm(max.(fact[:values], 0.0))
-    # # @show typeof(fact[:values])
-    # # @show typeof(fact[:vectors])
-    # # @show fact[:values]
-    # # if length(fact[:values])>0
-    # #     return vec(fact[:vectors] * diagm(fact[:values]) * fact[:vectors]')
-    # # else
-    # #     return zeros(dims.n^2)
-    # # end
-    # fact = @timeit "eig" eigfact!(X)
-    # D = diagm(max.(fact[:values], 0.0))
-    # return vec(fact[:vectors] * D * fact[:vectors]')
+    fact = @timeit "eig" eigfact!(X)
+    D = diagm(max.(fact[:values], 0.0))
+    M2 = fact[:vectors] * D * fact[:vectors]'
+
+    for i in eachindex(iv)
+        v[iv[i]] = M2[im[i]]
+    end
+
+    return v
 end
 
 function print_progress(k, primal_res, dual_res)
     @printf("%d %.4f %.4f %.4f \n", k, primal_res + dual_res, primal_res, dual_res)
 end
 
-function load_data(path)
+function load_data(path::String)
     A = sparse(readcsv(path*"/A.csv"))
     b = vec(readcsv(path*"/b.csv"))
     c = vec(readcsv(path*"/C.csv"))
     return AffineSets(A, A, b, b, c), Dims(size(A)[1], sqrt(size(A)[2]))
 end
 
-function runpsdp(path)
-    BLAS.set_num_threads(2)
+function runpsdp(path::String)
+    # BLAS.set_num_threads(2)
     TimerOutputs.reset_timer!()
     @timeit "load data" begin
         aff, dims = load_data(path)
@@ -156,5 +177,6 @@ function runpsdp(path)
     close(f)
     return ret
 end
+
 
 end
