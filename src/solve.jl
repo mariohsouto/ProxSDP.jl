@@ -210,22 +210,22 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     # aff = AffineSets(A, G, b, h, c)
 
     Asdp = preA[cone.f+cone.l+1:end,:]
-    @show indices_sdp = Asdp.rowval
+    indices_sdp = Asdp.rowval
 
-    aff = AffineSets(A, G, b, h, c, Tuple{Vector{Int},Vector{Int}}[(indices_sdp, matindices(sympackeddim(length(indices_sdp))) )])
-    @show aff
+    aff = AffineSets(A, G, b, h, c, Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
+    # @show aff
 
 
-    @show size(A)
-    @show size(preA)
-    @show cone.sa
+    # @show size(A)
+    # @show size(preA)
+    # @show cone.sa
 
-    Apython = readcsv("/Users/mariosouto/Dropbox/proxsdp/A.csv")
-    bpython = readcsv("/Users/mariosouto/Dropbox/proxsdp/b.csv")
+    # Apython = readcsv("/Users/mariosouto/Dropbox/proxsdp/A.csv")
+    # bpython = readcsv("/Users/mariosouto/Dropbox/proxsdp/b.csv")
     # @show norm(vec(Apython - A))
     # @show norm(vec(bpython - b))
-    writecsv("/Users/mariosouto/Dropbox/proxsdp/b_jl.csv", b)
-    writecsv("/Users/mariosouto/Dropbox/proxsdp/c_jl.csv", c)
+    # writecsv("/Users/mariosouto/Dropbox/proxsdp/b_jl.csv", b)
+    # writecsv("/Users/mariosouto/Dropbox/proxsdp/c_jl.csv", c)
 
     dims = Dims(size(A)[1], sympackeddim(size(A)[2]))
     # sol = ProxSDP_solve(ProxSDP.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
@@ -236,13 +236,19 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     instance.slack = sol.slack
     instance.objval = sol.objval + f.constant
 
-    TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
-    TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
-    f = open("time.log","w")
-    TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
-    TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
-    close(f)
+    if true
+        TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
+        print("\n")
+        TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+        print("\n")
+        f = open("time.log","w")
+        TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
+        print(f,"\n")
+        TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+        print(f,"\n")
+        close(f)
+    end
 end
 
-matindices(n::Integer) = find(triu(trues(n,n)))
+matindices(n::Integer) = find(tril(trues(n,n)))
 sympackeddim(n) = div(isqrt(1+8n) - 1, 2)

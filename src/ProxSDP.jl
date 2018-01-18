@@ -1,7 +1,8 @@
 module ProxSDP
 
-using MathOptInterface, PyCall, TimerOutputs
-@pyimport scipy.linalg as sp
+using MathOptInterface, TimerOutputs
+# using PyCall
+# @pyimport scipy.linalg as sp
 
 include("mathoptinterface.jl")
 
@@ -37,9 +38,9 @@ function chambolle_pock(
     tic()
     @timeit "print" if verbose
         println(" Starting Chambolle-Pock algorithm")
-        println("-----------------------------------------------------------")
-        println("|  iter  | comb. res | prim. res |  dual res  |    rho    |")
-        println("-----------------------------------------------------------")
+        println("----------------------------------------------------------")
+        println("|  iter  | comb. res | prim. res |  dual res |    rho    |")
+        println("----------------------------------------------------------")
     end
 
     @timeit "Init" begin
@@ -53,12 +54,11 @@ function chambolle_pock(
     sizehint!(comb_residual, max_iter)
     sizehint!(dual_residual, max_iter)
     sizehint!(primal_residual, max_iter)
-    # x, x_old = zeros(n^2), zeros(n^2)
     x, x_old = zeros(n*(n+1)/2), zeros(n*(n+1)/2)
     u, u_old = zeros(m), zeros(m)
 
     # Step size
-    rho = 0.99 / svds(affine_sets.A, nsv=1)[1][:S][1]
+    rho = 0.999999 / svds(affine_sets.A, nsv=1)[1][:S][1]
 
     # Diagonal scaling
     K = affine_sets.A
@@ -71,7 +71,7 @@ function chambolle_pock(
     S = sparse(diagm(1.0 ./ div))
 
     # Cache matrix multiplications
-    TKt = T * affine_sets.A'
+    TKt = T * Kt
     SK = S * K
     Sb = S * affine_sets.b
     end
@@ -130,8 +130,7 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff)::Vector{Float6
     for i in eachindex(iv)
         M[im[i]] = v[iv[i]]
     end
-    X = Symmetric(M,:U)
-    # @show X
+    X = Symmetric(M,:L)
 
     # D, V = @timeit "py" sp.eigh(reshape(v, (dims.n, dims.n)))
     # D = diagm(max.(D, 0.0))
@@ -149,7 +148,25 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff)::Vector{Float6
 end
 
 function print_progress(k, primal_res, dual_res)
-    @printf("%d %.4f %.4f %.4f \n", k, primal_res + dual_res, primal_res, dual_res)
+    s_k = @sprintf("%d",k)
+    s_k *= " |"
+    s_s = @sprintf("%.4f",primal_res + dual_res)
+    s_s *= " |"
+    s_p = @sprintf("%.4f",primal_res)
+    s_p *= " |"
+    s_d = @sprintf("%.4f",dual_res)
+    s_d *= " |"
+    a = "|"
+    a *= " "^max(0,9-length(s_k))
+    a *= s_k
+    a *= " "^max(0,12-length(s_s))
+    a *= s_s
+    a *= " "^max(0,12-length(s_p))
+    a *= s_p
+    a *= " "^max(0,12-length(s_d))
+    a *= s_d
+    println(a)
+
 end
 
 function load_data(path::String)
@@ -170,10 +187,14 @@ function runpsdp(path::String)
     end
 
     TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
+    print("\n")
     TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+    print("\n")
     f = open("time.log","w")
     TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
+    print(f,"\n")
     TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+    print(f,"\n")
     close(f)
     return ret
 end

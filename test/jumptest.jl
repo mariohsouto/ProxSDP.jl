@@ -4,6 +4,17 @@ using Base.Test
 using MathOptInterface
 const MOI = MathOptInterface
 
+@testset "LP0" begin
+    m = Model()
+    @variable(m,x[1:4,1:4],PSD)
+    @constraint(m, 1x[1,1]+2x[2,2]+x[3,3]==4)
+    @constraint(m, 2x[1,1]+1x[2,2]+x[4,4]==4)
+    @objective(m, Min, 1x[1,1]+2x[2,2])
+    JuMP.attach(m, ProxSDPSolverInstance())
+    JuMP.solve(m)
+end
+
+
 @testset "Linear Programming" begin
     @testset "LP1" begin
         # simple 2 variable, 1 constraint problem
@@ -12,7 +23,7 @@ const MOI = MathOptInterface
         #       x, y >= 0   (x, y ∈ Nonnegatives)
 
         m = Model()
-        n = 3
+        n = 30
 
         # Channel
         H = randn((n, n))
