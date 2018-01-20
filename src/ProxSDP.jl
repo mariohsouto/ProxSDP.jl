@@ -39,7 +39,7 @@ end
 function chambolle_pock(
     affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-4, dual_tol=1e-4
 )   
-    opt = CPOptions(false,verbose)
+    opt = CPOptions(false, verbose)
     # use algorithm in full square matrix mode or triangular mode
     if opt.fullmat
         M = zeros(Int, dims.n, dims.n)
@@ -119,7 +119,7 @@ function chambolle_pock(
     @timeit "CP loop" for k in 1:max_iter
         # Update primal variable
         @timeit "primal" begin
-            x = sdp_cone_projection(x - alpha * (affine_sets.A' * u + affine_sets.c), dims, affine_sets)::Vector{Float64}
+            x = sdp_cone_projection(x - alpha * (affine_sets.A' * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
             # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets)::Vector{Float64}
         end
         # Update dual variable

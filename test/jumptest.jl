@@ -1,5 +1,5 @@
 using JuMP
-using Mosek
+# using Mosek
 using Base.Test
 
 using MathOptInterface
@@ -43,7 +43,7 @@ const MOI = MathOptInterface
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
         @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
 
-        # JuMP.attach(m, ProxSDPSolverInstance())
+        JuMP.attach(m, ProxSDPSolverInstance())
         teste = JuMP.solve(m)
         println("Objective value: ", getobjectivevalue(m))
 
