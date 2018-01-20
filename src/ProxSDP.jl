@@ -32,7 +32,7 @@ struct CPResult
 end
 
 function chambolle_pock(
-    affine_sets, dims, verbose=true, max_iter=Int(1e+3), primal_tol=1e-4, dual_tol=1e-4
+    affine_sets, dims, verbose=true, max_iter=Int(1e+6), primal_tol=1e-4, dual_tol=1e-4
 )
     converged = false
     tic()
@@ -57,40 +57,49 @@ function chambolle_pock(
     x, x_old = zeros(n*(n+1)/2), zeros(n*(n+1)/2)
     u, u_old = zeros(m), zeros(m)
 
-    # Step size
-    rho = 0.999999 / svds(affine_sets.A, nsv=1)[1][:S][1]
+    @show typeof(affine_sets.A)
+    @show affine_sets.G
 
-    # Diagonal scaling
-    K = affine_sets.A
-    Kt = affine_sets.A'
-    div = vec(sum(abs.(K), 1))
-    div[find(x-> x == 0.0, div)] = 1.0
-    T = sparse(diagm(1.0 ./ div))
-    div = vec(sum(abs.(K), 2))
-    div[find(x-> x == 0.0, div)] = 1.0
-    S = sparse(diagm(1.0 ./ div))
+    # # Diagonal scaling
+    # K = affine_sets.A
+    # Kt = affine_sets.A'
+    # div = vec(sum(abs.(K), 1))
+    # div[find(x-> x == 0.0, div)] = 1.0
+    # T = sparse(diagm(1.0 ./ div))
+    # div = vec(sum(abs.(K), 2))
+    # div[find(x-> x == 0.0, div)] = 1.0
+    # S = sparse(diagm(1.0 ./ div))
 
-    # Cache matrix multiplications
-    TKt = T * Kt
-    SK = S * K
-    Sb = S * affine_sets.b
+    # # Cache matrix multiplications
+    # TKt = T * Kt
+    # SK = S * K
+    # Sb = S * affine_sets.b
     end
+
+    adaptive_iter = 0
+    delta = 1.01
+    alpha_max = 1.0 / norm(full(affine_sets.A), 2)
+    alpha = 0.99 * alpha_max
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
-        # Projetion onto sdp cone
+        # Update primal variable
         @timeit "primal" begin
-            x = sdp_cone_projection(x - rho * TKt * u - affine_sets.c / rho, dims, affine_sets)::Vector{Float64}
+            x = sdp_cone_projection(x - alpha * (affine_sets.A' * u + affine_sets.c), dims, affine_sets)::Vector{Float64}
+            # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets)::Vector{Float64}
         end
-        # Projection onto the affine set
+        # Update dual variable
         @timeit "dual" begin
-            u += rho * (SK * (2.0 * x - x_old) - Sb)::Vector{Float64}
+            u += alpha * affine_sets.A * (2.0 * x - x_old)::Vector{Float64}
+            u -= alpha * affine_sets.b::Vector{Float64}
+            # u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
+            # u -= alpha * Sb::Vector{Float64}
         end
 
         # Compute residuals
         @timeit "logging" begin
             push!(primal_residual, norm(x - x_old))
-            push!(dual_residual, rho * norm(u - u_old))
+            push!(dual_residual, alpha * norm(u - u_old))
             push!(comb_residual, primal_residual[end] + dual_residual[end])
 
             if mod(k, 100) == 0
@@ -109,13 +118,25 @@ function chambolle_pock(
             converged = true
             break
         end
+
+        # # Adaptive step-size (alpha) update
+        # adaptive_iter += 1
+        # if primal_residual[end] < primal_tol && dual_residual[end] > 10 * dual_tol && adaptive_iter > 200
+        #     alpha /= delta
+        #     adaptive_iter = 0
+        #     println(alpha)
+        # elseif dual_residual[end] < dual_tol && primal_residual[end] > 10 * primal_tol && adaptive_iter > 200
+        #     alpha_old = alpha
+        #     alpha = min(alpha * delta, alpha_max)
+        #     adaptive_iter = 0
+        #     println(alpha)
+        # end
     end
     time = toq()
     println("Time = $time")
-
-    ret = CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], evaluate(x, affine_sets))
-    return ret
-    # return converged, evaluate(x, affine_sets), x, primal_residual[end], dual_residual[end]
+    println("Solution = $(evaluate(x, affine_sets))")
+    
+    return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], evaluate(x, affine_sets))
 end
 
 function evaluate(x, affine_sets)

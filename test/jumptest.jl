@@ -1,30 +1,28 @@
 using JuMP
+using Mosek
 using Base.Test
 
 using MathOptInterface
 const MOI = MathOptInterface
 
-@testset "LP0" begin
-    m = Model()
-    @variable(m,x[1:4,1:4],PSD)
-    @constraint(m, 1x[1,1]+2x[2,2]+x[3,3]==4)
-    @constraint(m, 2x[1,1]+1x[2,2]+x[4,4]==4)
-    @objective(m, Min, 1x[1,1]+2x[2,2])
-    JuMP.attach(m, ProxSDPSolverInstance())
-    JuMP.solve(m)
-end
+# @testset "LP0" begin
+#     m = Model()
+#     @variable(m,x[1:4,1:4],PSD)
+#     @constraint(m, 1x[1,1]+2x[2,2]+x[3,3]==4)
+#     @constraint(m, 2x[1,1]+1x[2,2]+x[4,4]==4)
+#     @objective(m, Min, 1x[1,1]+2x[2,2])
+#     JuMP.attach(m, ProxSDPSolverInstance())
+#     JuMP.solve(m)
+# end
 
 
 @testset "Linear Programming" begin
     @testset "LP1" begin
-        # simple 2 variable, 1 constraint problem
-        # min -x
-        # st   x + y <= 1   (x + y - 1 ∈ Nonpositives)
-        #       x, y >= 0   (x, y ∈ Nonnegatives)
 
-        m = Model()
+        m = Model(solver=MOSEKSolver())
+
+        srand(0)
         n = 30
-
         # Channel
         H = randn((n, n))
         # Gaussian noise
@@ -35,17 +33,19 @@ end
         sigma = 0.01
         y = H * s + sigma * v
         L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
-        # L = [1 1 2; 1 3 2.5; 2 2.5 6]
-        # L = [1 1 1.5; 1 4 2.5; 1.5 2.5 6]
 
+        # n = 100
         # L = readcsv("/Users/mariosouto/Dropbox/proxsdp/L.csv")
 
         @variable(m, X[1:n+1, 1:n+1], PSD)
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
-        @constraint(m, ctr[i in 1:n+1], X[i,i]==1.0)
+        @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
 
-        JuMP.attach(m, ProxSDPSolverInstance())
-        JuMP.solve(m)
+        # JuMP.attach(m, ProxSDPSolverInstance())
+        teste = JuMP.solve(m)
+        println("Objective value: ", getobjectivevalue(m))
+
+        println(teste)
 
         # @test JuMP.isattached(m)
         # @test JuMP.hasvariableresult(m)
