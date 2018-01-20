@@ -19,7 +19,9 @@ const MOI = MathOptInterface
 @testset "Linear Programming" begin
     @testset "LP1" begin
 
-        m = Model(solver=MOSEKSolver())
+        srand(3)
+        m = Model()
+        n = 30
 
         srand(0)
         n = 30
