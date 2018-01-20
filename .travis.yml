@@ -1,0 +1,27 @@
+language: julia
+os:
+    - linux
+julia:
+    - 0.6
+matrix:
+    allow_failures:
+        - julia: nightly
+notifications:
+    email: false
+sudo: false
+addons:
+    apt_packages:
+        - gfortran
+        - liblapack-dev
+        - libgmp-dev
+        - libglpk-dev
+script:
+    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+    - julia -e 'Pkg.clone("https://github.com/JuliaOpt/MathOptInterface.jl.git")'
+    - julia -e 'Pkg.clone("https://github.com/JuliaOpt/MathOptInterfaceTests.jl.git")'
+    - julia -e 'Pkg.build("https://github.com/JuliaOpt/MathOptInterfaceUtilities.jl.git")'
+    - julia -e 'Pkg.clone(pwd())'
+    - julia -e 'Pkg.build("ProxSDP")'
+    - julia -e 'Pkg.test("ProxSDP")'
+after_success:
+- echo $TRAVIS_JULIA_VERSION
