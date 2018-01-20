@@ -22,6 +22,8 @@ end
         # st   x + y <= 1   (x + y - 1 ∈ Nonpositives)
         #       x, y >= 0   (x, y ∈ Nonnegatives)
 
+        srand(3)
+
         m = Model()
         n = 30
 
