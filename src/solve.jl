@@ -229,8 +229,7 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     # writecsv("/Users/mariosouto/Dropbox/proxsdp/b_jl.csv", b)
     # writecsv("/Users/mariosouto/Dropbox/proxsdp/c_jl.csv", c)
 
-    dims = Dims(size(A)[1], sympackeddim(size(A)[2]))
-    # sol = ProxSDP_solve(ProxSDP.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
+    dims = Dims(sympackeddim(size(A)[2]), size(A)[1], size(G)[1])
     sol = @timeit "Main" chambolle_pock(aff, dims)
     instance.ret_val = sol.status
     instance.primal = sol.primal

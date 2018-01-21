@@ -7,8 +7,9 @@ using MathOptInterface, TimerOutputs
 include("mathoptinterface.jl")
 
 immutable Dims
-    m::Int
-    n::Int
+    n::Int  # Size of primal variables
+    p::Int  # Number of linear equalities
+    m::Int  # Number of linear inequalities
 end
 
 type AffineSets
@@ -17,7 +18,6 @@ type AffineSets
     b::AbstractVector
     h::AbstractVector
     c::AbstractVector
-
     sdpcone::Vector{Tuple{Vector{Int},Vector{Int}}}
 end
 
@@ -69,9 +69,7 @@ function chambolle_pock(
 
     @timeit "Init" begin
     # Given
-    m, n = dims.m, dims.n
-
-    # Initialization
+    m, n, p = dims.m, dims.n, dims.p
 
     # logging
     best_comb_residual = Inf
@@ -89,10 +87,9 @@ function chambolle_pock(
         zeros(n*(n+1)/2), zeros(n*(n+1)/2)
     end
     # dual
-    u, u_old = zeros(m), zeros(m)
+    u, u_old = zeros(m+p), zeros(m+p)
 
-    @show typeof(affine_sets.A)
-    @show affine_sets.G
+    @show dims
 
     # # Diagonal scaling
     # K = affine_sets.A
@@ -115,17 +112,24 @@ function chambolle_pock(
     alpha_max = 1.0 / norm(full(affine_sets.A), 2)
     alpha = 0.99 * alpha_max
 
+    # @show A
+    # @show G
+    M = vcat(affine_sets.A, affine_sets.G)
+    Mt = M'
+    @show sizeof(M)
+
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
         # Update primal variable
         @timeit "primal" begin
-            x = sdp_cone_projection(x - alpha * (affine_sets.A' * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
+            x = sdp_cone_projection(x - alpha * (Mt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
             # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets)::Vector{Float64}
         end
         # Update dual variable
         @timeit "dual" begin
-            u += alpha * affine_sets.A * (2.0 * x - x_old)::Vector{Float64}
-            u -= alpha * affine_sets.b::Vector{Float64}
+            u += alpha * M * (2.0 * x - x_old)::Vector{Float64}
+            u-= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
+            # u -= alpha * affine_sets.b::Vector{Float64}
             # u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
             # u -= alpha * Sb::Vector{Float64}
         end
@@ -174,6 +178,18 @@ end
 
 function evaluate(x, affine_sets)
     return dot(affine_sets.c, x)
+end
+
+function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector{Float64}
+    # Projection onto =b
+    if !isempty(aff.b) 
+        v[1:dims.p] = aff.b
+    end
+    # Projection onto <= h
+    if !isempty(aff.h)
+        v[dims.p+1:end] = min.(v[dims.p+1:end], aff.h)
+    end
+    return v
 end
 
 function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions)::Vector{Float64}

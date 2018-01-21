@@ -42,6 +42,7 @@ const MOI = MathOptInterface
         @variable(m, X[1:n+1, 1:n+1], PSD)
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
         @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
+        @constraint(m, X[1, 1]<=1.0)
 
         JuMP.attach(m, ProxSDPSolverInstance())
         teste = JuMP.solve(m)
