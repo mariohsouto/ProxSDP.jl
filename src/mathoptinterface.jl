@@ -33,3 +33,5 @@ include("solve.jl")
 
 # Implements getter for result value and statuses
 include("attributes.jl")
+
+MOIU.isempty(::ProxSDPSolverInstance) = true

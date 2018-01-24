@@ -1,9 +1,17 @@
 using JuMP
 # using Mosek
 using Base.Test
+import Base.isempty
+# using MathOptInterfaceSCS
+# using MathOptInterfaceMosek
 
 using MathOptInterface
 const MOI = MathOptInterface
+using MathOptInterfaceUtilities
+const MOIU = MathOptInterfaceUtilities
+
+# using SemidefiniteOptInterface
+# using CSDP
 
 # @testset "LP0" begin
 #     m = Model()
@@ -19,12 +27,9 @@ const MOI = MathOptInterface
 @testset "Linear Programming" begin
     @testset "LP1" begin
 
-        srand(3)
-        m = Model()
-        n = 30
-
         srand(0)
-        n = 30
+        m = Model()
+        n = 100
         # Channel
         H = randn((n, n))
         # Gaussian noise
@@ -35,18 +40,26 @@ const MOI = MathOptInterface
         sigma = 0.01
         y = H * s + sigma * v
         L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
-
-        # n = 100
-        # L = readcsv("/Users/mariosouto/Dropbox/proxsdp/L.csv")
+        L = readcsv("/Users/mariosouto/Dropbox/proxsdp/L.csv")
 
         @variable(m, X[1:n+1, 1:n+1], PSD)
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
         @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
-        @constraint(m, X[1, 1]<=1.0)
+        @constraint(m, bla, X[1, 1] <= 1000.0)
 
+        # JuMP.attach(m, SCSInstance())
+        # JuMP.attach(m, MosekInstance())
+        # JuMP.attach(m, CSDP.CSDPInstance())
         JuMP.attach(m, ProxSDPSolverInstance())
+
         teste = JuMP.solve(m)
-        println("Objective value: ", getobjectivevalue(m))
+        println("Duals equal. : ", JuMP.resultdual.(ctr))
+        println("Duals inequal. : ", JuMP.resultdual(bla))
+        println("Objective value: ", JuMP.objectivevalue(m))
+        println("primal Status value: ", JuMP.primalstatus(m))
+        println("dual Status value: ", JuMP.dualstatus(m))
+        println("term Status value: ", JuMP.terminationstatus(m))
+        # println(JuMP.resultvalue.(X))
 
         println(teste)
 

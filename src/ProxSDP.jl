@@ -37,9 +37,10 @@ struct CPOptions
 end
 
 function chambolle_pock(
-    affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-4, dual_tol=1e-4
+    affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-5, dual_tol=1e-5
 )   
     opt = CPOptions(false, verbose)
+    c_orig = zeros(1)
     # use algorithm in full square matrix mode or triangular mode
     if opt.fullmat
         M = zeros(Int, dims.n, dims.n)
@@ -51,13 +52,45 @@ function chambolle_pock(
         X = Symmetric(M,:L)
         ids = vec(X)
 
+        offdiag_ids = setdiff(Set(ids),Set(diag(X)))
+        # off_ids = tril(X)-diag_ids
+        for i in offdiag_ids
+            affine_sets.c[i] /= 2.0
+        end
+        
         # modify A, G and c
         affine_sets.A = affine_sets.A[:,ids]
         affine_sets.G = affine_sets.G[:,ids]
         affine_sets.c = affine_sets.c[ids]
+        c_orig = copy(affine_sets.c)
+        
+
+        # writecsv("/Users/mariosouto/Dropbox/proxsdp/A_j.csv",affine_sets.A)
+        # writecsv("/Users/mariosouto/Dropbox/proxsdp/c_j.csv",affine_sets.c)
+        # writecsv("/Users/mariosouto/Dropbox/proxsdp/b_j.csv", affine_sets.b) 
+    else  
+        M = zeros(Int, dims.n, dims.n)
+        iv = affine_sets.sdpcone[1][1]
+        im = affine_sets.sdpcone[1][2]
+        for i in eachindex(iv)
+            M[im[i]] = iv[i]
+        end
+        X = Symmetric(M,:L)
+        ids = vec(X)
+
+        offdiag_ids = setdiff(Set(ids),Set(diag(X)))
+        # off_ids = tril(X)-diag_ids
+        c_orig = copy(affine_sets.c)
+        for i in offdiag_ids
+            affine_sets.c[i] /= 2.0
+        end  
     end
 
-    #
+
+    # M = readcsv("/Users/mariosouto/Dropbox/proxsdp/A.csv")
+    # affine_sets.c = readcsv("/Users/mariosouto/Dropbox/proxsdp/c.csv")[:,1]
+    # affine_sets.b = readcsv("/Users/mariosouto/Dropbox/proxsdp/b.csv")[:,1]
+
     converged = false
     tic()
     @timeit "print" if verbose
@@ -107,28 +140,33 @@ function chambolle_pock(
     # Sb = S * affine_sets.b
     end
 
-    adaptive_iter = 0
-    delta = 1.01
-    alpha_max = 1.0 / norm(full(affine_sets.A), 2)
-    alpha = 0.99 * alpha_max
+    # adaptive_iter = 0
+    # delta = 1.01
+    # alpha_max = 1.0 / norm(full(affine_sets.A), 2)
+    # alpha = 0.99 * alpha_max
+
+    alpha = 0.99
 
     # @show A
     # @show G
     M = vcat(affine_sets.A, affine_sets.G)
     Mt = M'
-    @show sizeof(M)
+    @show size(M)
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
         # Update primal variable
         @timeit "primal" begin
             x = sdp_cone_projection(x - alpha * (Mt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
-            # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets)::Vector{Float64}
+            # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
         end
         # Update dual variable
         @timeit "dual" begin
             u += alpha * M * (2.0 * x - x_old)::Vector{Float64}
-            u-= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
+            u -= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
+
+            # u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
+            # u -= alpha * Sb
             # u -= alpha * affine_sets.b::Vector{Float64}
             # u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
             # u -= alpha * Sb::Vector{Float64}
@@ -173,7 +211,9 @@ function chambolle_pock(
     time = toq()
     println("Time = $time")
 
-    return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], evaluate(x, affine_sets))
+    @show u
+    @show dot(c_orig, x)
+    return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
 end
 
 function evaluate(x, affine_sets)
@@ -215,8 +255,23 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         # D = diagm(max.(D, 0.0))
         # return vec(V * D * V')
         # X = @timeit "reshape" Symmetric(reshape(v, (dims.n, dims.n)))
-        fact = @timeit "eig" eigfact!(X)
-        D = diagm(max.(fact[:values], 0.0))
+        # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
+        # fact = @timeit "eig" eigfact!(X, 1:1)
+        # eigs(M, nev=1, which=:LR)
+        # try
+        #     D, V = @timeit "eig" eigs(X, nev=1, which=:LR)
+        #     M2 = V * D * V'
+        # catch
+        #     fact = @timeit "eig" eigfact!(X, 0.0, Inf)
+        #     D = diagm(fact[:values])
+        #     M2 = fact[:vectors] * D * fact[:vectors]'
+        # end
+
+        # D, V = @timeit "eig" eigs(X + I * 1e+2, nev=1, which=:LR)
+        # M2 = V * (diagm(D) - I * 1e+2) * V'
+
+        fact = @timeit "eig" eigfact!(X, 0.0, Inf)
+        D = diagm(fact[:values])
         M2 = fact[:vectors] * D * fact[:vectors]'
 
         for i in eachindex(iv)
