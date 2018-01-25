@@ -40,12 +40,12 @@ const MOIU = MathOptInterfaceUtilities
         sigma = 0.01
         y = H * s + sigma * v
         L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
-        L = readcsv("/Users/mariosouto/Dropbox/proxsdp/L.csv")
+        # L = readcsv("/Users/mariosouto/Dropbox/proxsdp/L.csv")
 
         @variable(m, X[1:n+1, 1:n+1], PSD)
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
         @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
-        @constraint(m, bla, X[1, 1] <= 1000.0)
+        # @constraint(m, bla, X[1, 1] <= 10.0)
 
         # JuMP.attach(m, SCSInstance())
         # JuMP.attach(m, MosekInstance())
@@ -60,21 +60,5 @@ const MOIU = MathOptInterfaceUtilities
         println("dual Status value: ", JuMP.dualstatus(m))
         println("term Status value: ", JuMP.terminationstatus(m))
         # println(JuMP.resultvalue.(X))
-
-        println(teste)
-
-        # @test JuMP.isattached(m)
-        # @test JuMP.hasvariableresult(m)
-
-        # @test JuMP.terminationstatus(m) == MOI.Success
-        # @test JuMP.primalstatus(m) == MOI.FeasiblePoint
-        # @test JuMP.dualstatus(m) == MOI.FeasiblePoint
-
-        # @test JuMP.resultvalue(x) ≈ 1.0 atol=1e-6
-        # @test JuMP.resultvalue(y) ≈ 0.0 atol=1e-6
-        # @test JuMP.resultvalue(x + y) ≈ 1.0 atol=1e-6
-        # @test JuMP.objectivevalue(m) ≈ -1.0 atol=1e-6
-
-        # @test JuMP.resultdual(c) ≈ -1 atol=1e-6
     end
 end

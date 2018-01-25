@@ -122,47 +122,42 @@ function chambolle_pock(
     # dual
     u, u_old = zeros(m+p), zeros(m+p)
 
-    @show dims
+    # Diagonal scaling
+    K = affine_sets.A
+    Kt = affine_sets.A'
+    div = vec(sum(abs.(K), 1))
+    div[find(x-> x == 0.0, div)] = 1.0
+    T = sparse(diagm(1.0 ./ div))
+    div = vec(sum(abs.(K), 2))
+    div[find(x-> x == 0.0, div)] = 1.0
+    S = sparse(diagm(1.0 ./ div))
 
-    # # Diagonal scaling
-    # K = affine_sets.A
-    # Kt = affine_sets.A'
-    # div = vec(sum(abs.(K), 1))
-    # div[find(x-> x == 0.0, div)] = 1.0
-    # T = sparse(diagm(1.0 ./ div))
-    # div = vec(sum(abs.(K), 2))
-    # div[find(x-> x == 0.0, div)] = 1.0
-    # S = sparse(diagm(1.0 ./ div))
-
-    # # Cache matrix multiplications
-    # TKt = T * Kt
-    # SK = S * K
-    # Sb = S * affine_sets.b
+    # Cache matrix multiplications
+    TKt = T * Kt
+    SK = S * K
+    Sb = S * affine_sets.b
+    affine_sets.b = Sb
     end
 
-    # adaptive_iter = 0
-    # delta = 1.01
-    # alpha_max = 1.0 / norm(full(affine_sets.A), 2)
-    # alpha = 0.99 * alpha_max
-
-    alpha = 0.99
-
-    # @show A
-    # @show G
     M = vcat(affine_sets.A, affine_sets.G)
     Mt = M'
-    @show size(M)
+
+    alpha_max = 1.0 / norm(full(M), 2)
+    alpha = (1.0 - 1e-5) * alpha_max
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
         # Update primal variable
         @timeit "primal" begin
-            x = sdp_cone_projection(x - alpha * (Mt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
-            # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
+            # x = sdp_cone_projection(x - alpha * (Mt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
+            x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
         end
         # Update dual variable
         @timeit "dual" begin
-            u += alpha * M * (2.0 * x - x_old)::Vector{Float64}
+            # u += alpha * M * (2.0 * x - x_old)::Vector{Float64}
+            # u -= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
+
+            u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
             u -= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
 
             # u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
@@ -175,7 +170,7 @@ function chambolle_pock(
         # Compute residuals
         @timeit "logging" begin
             push!(primal_residual, norm(x - x_old))
-            push!(dual_residual, alpha * norm(u - u_old))
+            push!(dual_residual, norm(u - u_old))
             push!(comb_residual, primal_residual[end] + dual_residual[end])
 
             if mod(k, 100) == 0 && opt.verbose
@@ -194,19 +189,6 @@ function chambolle_pock(
             converged = true
             break
         end
-
-        # # Adaptive step-size (alpha) update
-        # adaptive_iter += 1
-        # if primal_residual[end] < primal_tol && dual_residual[end] > 10 * dual_tol && adaptive_iter > 200
-        #     alpha /= delta
-        #     adaptive_iter = 0
-        #     println(alpha)
-        # elseif dual_residual[end] < dual_tol && primal_residual[end] > 10 * primal_tol && adaptive_iter > 200
-        #     alpha_old = alpha
-        #     alpha = min(alpha * delta, alpha_max)
-        #     adaptive_iter = 0
-        #     println(alpha)
-        # end
     end
     time = toq()
     println("Time = $time")
@@ -251,6 +233,7 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
             end
             X = Symmetric(M,:L)
         end
+
         # D, V = @timeit "py" sp.eigh(reshape(v, (dims.n, dims.n)))
         # D = diagm(max.(D, 0.0))
         # return vec(V * D * V')

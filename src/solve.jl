@@ -190,8 +190,6 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     c0 = full(sparsevec(_varmap(instance.varmap, f), f.coefficients, n))
 
     c = MOI.get(instance.data, MOI.ObjectiveSense()) == MOI.MaxSense ? -c0 : c0
-    @show c
-    @show size(c)
     # @show instance.varmap
     # # @show cone
     # # @show preA
