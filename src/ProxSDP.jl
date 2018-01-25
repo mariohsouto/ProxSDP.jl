@@ -53,7 +53,6 @@ function chambolle_pock(
         ids = vec(X)
 
         offdiag_ids = setdiff(Set(ids),Set(diag(X)))
-        # off_ids = tril(X)-diag_ids
         for i in offdiag_ids
             affine_sets.c[i] /= 2.0
         end
@@ -74,7 +73,7 @@ function chambolle_pock(
         X = Symmetric(M,:L)
         ids = vec(X)
 
-        offdiag_ids = setdiff(Set(ids),Set(diag(X)))
+        offdiag_ids = setdiff(Set(ids), Set(diag(X)))
         c_orig = copy(affine_sets.c)
         for i in offdiag_ids
             affine_sets.c[i] /= 2.0
@@ -223,9 +222,6 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         fact = @timeit "eig" eigfact!(X, 0.0, Inf)
         D = diagm(fact[:values])
         M2 = fact[:vectors] * D * fact[:vectors]'
-
-        # D, V = @timeit "eig" eigs(X, nev=1, which=:LR)
-        # M2 = V * D * V'
 
         for i in eachindex(iv)
             v[iv[i]] = M2[im[i]]

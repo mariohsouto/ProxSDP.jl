@@ -49,7 +49,7 @@ const MOIU = MathOptInterfaceUtilities
 
         # JuMP.attach(m, SCSInstance())
         # JuMP.attach(m, MosekInstance())
-        # JuMP.attach(m, CSDP.CSDPInstance())
+        # JuMP.attach(m, CSDP.CSDPInstance(maxiter=100000))
         JuMP.attach(m, ProxSDPSolverInstance())
 
         teste = JuMP.solve(m)
