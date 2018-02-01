@@ -109,56 +109,32 @@ function chambolle_pock(
     end
     # Dual variables
     u, u_old = zeros(m+p), zeros(m+p)
-
     end
 
-    # Build full problem matrices
-    M = vcat(affine_sets.A, affine_sets.G)
-    rhs = vcat(affine_sets.b, affine_sets.h)
-    Mt = M'
+    # Diagonal scaling
+    alpha = 1.0
+    affine_sets, TMt, Tc, S, SM, Sinv = diag_scaling(affine_sets, alpha, dims)
 
-    # # Diagonal scaling
-    # K = M
-    # Kt = M'
-    # div = vec(sum(abs.(M), 1))
-    # div[find(x-> x == 0.0, div)] = 1.0
-    # T = sparse(diagm(1.0 ./ div))
-    # div = vec(sum(abs.(M), 2))
-    # div[find(x-> x == 0.0, div)] = 1.0
-    # S = sparse(diagm(1.0 ./ div))
-
-    # # Cache matrix multiplications
-    # TKt = T * Kt
-    # SK = S * K
-    # Srhs = S * rhs
-    # affine_sets.b = rhs[1:dims.p]
-    # affine_sets.h = rhs[dims.p+1:end]
-
-    # Step-size
-    alpha_max = 1.0 / norm(full(M), 2)
-    alpha = (1.0 - 1e-8) * alpha_max
+    theta = 1.0
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
         # Update primal variable
         @timeit "primal" begin
-            x = sdp_cone_projection(x - alpha * (Mt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
-            # x = sdp_cone_projection(x - alpha * (TKt * u + affine_sets.c), dims, affine_sets, opt)::Vector{Float64}
+            x = sdp_cone_projection(x - TMt * u - Tc, dims, affine_sets, opt)::Vector{Float64}
         end
 
         # Update dual variable
         @timeit "dual" begin
-            u += alpha * M * (2.0 * x - x_old)::Vector{Float64}
-            u -= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
-            # u += alpha * SK * (2.0 * x - x_old)::Vector{Float64}
-            # u -= alpha * box_projection(u / alpha, dims, affine_sets)::Vector{Float64}
+            u += SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            u -= S * box_projection(Sinv .* u, dims, affine_sets)::Vector{Float64}
         end
 
         # Compute residuals
         @timeit "logging" begin
-            push!(primal_residual, norm(x - x_old) / norm(x_old))
-            push!(dual_residual, norm(u - u_old) / norm(u_old))
+            push!(primal_residual, norm(x - x_old))
+            push!(dual_residual, norm(u - u_old))
             push!(comb_residual, primal_residual[end] + dual_residual[end])
 
             if mod(k, 100) == 0 && opt.verbose
@@ -177,6 +153,7 @@ function chambolle_pock(
             converged = true
             break
         end
+
     end
 
     time = toq()
@@ -184,11 +161,38 @@ function chambolle_pock(
 
     @show u
     @show dot(c_orig, x)
+
     return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
 end
 
+function diag_scaling(affine_sets, alpha, dims)
+    # Build full problem matrices
+    M = vcat(affine_sets.A, affine_sets.G)
+    rhs = vcat(affine_sets.b, affine_sets.h)
+    Mt = M'
+
+    # Diagonal scaling
+    div = vec(sum(abs.(M).^(2.0-alpha), 1))
+    div[find(x-> x == 0.0, div)] = 1.0
+    T = sparse(diagm(1.0 ./ div))
+    div = vec(sum(abs.(M).^alpha, 2))
+    div[find(x-> x == 0.0, div)] = 1.0
+    S = sparse(diagm(1.0 ./ div))
+    Sinv = div
+
+    # Cache matrix multiplications
+    TMt = T * Mt
+    Tc = T * affine_sets.c
+    SM = S * M
+    Srhs = S * rhs
+    affine_sets.b = Srhs[1:dims.p]
+    affine_sets.h = Srhs[dims.p+1:end]
+
+    return affine_sets, TMt, Tc, S, SM, Sinv
+end
+
 function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector{Float64}
-    # Projection onto =b
+    # Projection onto = b
     if !isempty(aff.b) 
         v[1:dims.p] = aff.b
     end
@@ -203,9 +207,8 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
 
     if opt.fullmat
         X = @timeit "reshape" Symmetric(reshape(v, (dims.n, dims.n)))
-        fact = @timeit "eig" eigfact!(X)
-        D = diagm(max.(fact[:values], 0.0))
-        M2 = fact[:vectors] * D * fact[:vectors]'
+        fact = @timeit "eig" eigfact!(X, 0.0, Inf)
+        M2 = fact[:vectors] * diagm(fact[:values]) * fact[:vectors]'
 
         v = vec(M2)
     else
@@ -220,8 +223,7 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         end
 
         fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-        D = diagm(fact[:values])
-        M2 = fact[:vectors] * D * fact[:vectors]'
+        M2 = fact[:vectors] * diagm(fact[:values]) * fact[:vectors]'
 
         for i in eachindex(iv)
             v[iv[i]] = M2[im[i]]
