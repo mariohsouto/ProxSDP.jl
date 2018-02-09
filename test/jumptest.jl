@@ -25,6 +25,7 @@ const MOIU = MathOptInterfaceUtilities
 
 
 @testset "Linear Programming" begin
+
     @testset "LP1" begin
 
         srand(0)
@@ -45,7 +46,7 @@ const MOIU = MathOptInterfaceUtilities
         @variable(m, X[1:n+1, 1:n+1], PSD)
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
         @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
-        # @constraint(m, bla, X[1, 1] <= 10.0)
+        @constraint(m, bla, X[1, 1] <= 10.0)
 
         # JuMP.attach(m, SCSInstance())
         # JuMP.attach(m, MosekInstance())
