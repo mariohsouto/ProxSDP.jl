@@ -114,12 +114,12 @@ function chambolle_pock(
 
     # Diagonal scaling
     alpha = 1.0
-    affine_sets, TMt, Tc, S, SM, Sinv = diag_scaling(affine_sets, alpha, dims)
+    # affine_sets, TMt, Tc, S, SM, Sinv = diag_scaling(affine_sets, alpha, dims)
     M = vcat(affine_sets.A, affine_sets.G)
     Mt = M'
 
     theta = 1.0
-    L = 1.0 / norm(full(M'* M))
+    L = 1.0 / svds(M; nsv=1)[1][:S][1]
     s, t = sqrt(L), sqrt(L)
 
     # Fixed-point loop
@@ -127,26 +127,23 @@ function chambolle_pock(
 
         # Update primal variable
         @timeit "primal" begin
-            x =  sdp_cone_projection(x - TMt * u - Tc, dims, affine_sets, opt, k, polishing)::Vector{Float64}
-            # x = sdp_cone_projection(x - t * (Mt * u) - affine_sets.c, dims, affine_sets, opt, k)::Vector{Float64}
+            # x =  sdp_cone_projection(x - TMt * u - affine_sets.c, dims, affine_sets, opt, k, polishing)::Vector{Float64}
+            x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing)::Vector{Float64}
         end
 
         # Update dual variable
         @timeit "dual" begin
-            u += SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
-            u -= S * box_projection(Sinv .* u, dims, affine_sets)::Vector{Float64}
-            # u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
-            # u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
+            # u += SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            # u -= S * box_projection(Sinv .* u, dims, affine_sets)::Vector{Float64}
+            u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
         end
 
         # Compute residuals
         @timeit "logging" begin
-            P = (1 / t) * (x_old - x) - Mt * (u_old - u)::Vector{Float64}
-            D = (1 / s) * (u_old - u) - M * (x_old - x)::Vector{Float64}
-            push!(primal_residual, norm(P))
-            push!(dual_residual, norm(D))
+            push!(primal_residual, norm((1 / t) * (x_old - x) - Mt * (u_old - u)))
+            push!(dual_residual, norm((1 / s) * (u_old - u) - M * (x_old - x)))
             push!(comb_residual, primal_residual[end] + dual_residual[end])
-
             if mod(k, 100) == 0 && opt.verbose
                 print_progress(k, primal_residual[end], dual_residual[end])
             end
@@ -218,10 +215,8 @@ end
 function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing)::Vector{Float64}
 
     if opt.fullmat
-        X0 = @timeit "reshape" Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}
-        fact1 = @timeit "eig" eigfact!(X0, 0.0, Inf)
-        M0 = fact1[:vectors] * diagm(fact1[:values]) * fact1[:vectors]' ::Matrix{Float64}
-        v = vec(M0)::Vector{Float64}
+        fact1 = @timeit "eig" eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
+        v = vec(fact1[:vectors] * diagm(fact1[:values]) * fact1[:vectors]')::Vector{Float64}
     else
         @timeit "reshape" begin
             M = zeros(dims.n, dims.n)::Matrix{Float64}
@@ -230,29 +225,30 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
             for i in eachindex(iv)
                 M[im[i]] = v[iv[i]]
             end
-            X = Symmetric(M,:L)::Symmetric{Float64,Array{Float64,2}}
+            X = Symmetric(M, :L)::Symmetric{Float64,Array{Float64,2}}
         end
 
         if polishing
             fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-            D = diagm(max.(fact[:values], 0.0))
-            M3 = fact[:vectors] * D * fact[:vectors]'
+            D = diagm(max.(fact[:values], 0.0))::Matrix{Float64}
+            M0 = fact[:vectors] * D * fact[:vectors]'::Matrix{Float64}
             for i in eachindex(iv)
-                v[iv[i]] = M3[im[i]]
-            end
-        elseif iter < 10
-            fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-            M1 = fact[:vectors] * diagm(fact[:values]) * fact[:vectors]'::Matrix{Float64}
-            for i in eachindex(iv)
-                v[iv[i]] = M1[im[i]]
+                v[iv[i]] = M0[im[i]]
             end
         else
-            D, V = @timeit "eig" eigs(X; nev=1, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
-            D2 = diagm(max.(D, 0.0))::Matrix{Float64}
-            M2 = vec(V * D2 * V')::Vector{Float64}
-            v0 = vec(copy(V))::Vector{Float64}
-            for i in eachindex(iv)
-                v[iv[i]] = M2[im[i]]
+            try
+                D, V = @timeit "eig" eigs(X; nev=1, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+                D2 = diagm(max.(D, 0.0))::Matrix{Float64}
+                M1 = vec(V * D2 * V')::Vector{Float64}
+                for i in eachindex(iv)
+                    v[iv[i]] = M1[im[i]]
+                end
+            catch
+                fact = @timeit "eig" eigfact!(X, 0.0, Inf)
+                M2 = fact[:vectors] * diagm(fact[:values]) * fact[:vectors]'::Matrix{Float64}
+                for i in eachindex(iv)
+                    v[iv[i]] = M2[im[i]]
+                end
             end
         end
 
