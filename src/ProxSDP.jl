@@ -95,8 +95,7 @@ function chambolle_pock(
     m, n, p = dims.m, dims.n, dims.p
 
     # logging
-    best_comb_residual = Inf
-    comb_res_rank_update = Inf
+    best_comb_residual, comb_res_rank_update = Inf, Inf
     converged, status, polishing = false, false, false
     comb_residual, dual_residual, primal_residual = Float64[], Float64[], Float64[]
     sizehint!(comb_residual, max_iter)
@@ -119,10 +118,15 @@ function chambolle_pock(
     M = vcat(affine_sets.A, affine_sets.G)
     Mt = M'
 
+    # Overrelaxation parameter
     theta = 1.0
+    # Initial target-rank
     nev = 3
+    # Initial stepsizes
     L = 1.0 / svds(M; nsv=1)[1][:S][1]
-    s, t = sqrt(L), sqrt(L)
+    s0, t0 = sqrt(L), sqrt(L)
+    # Adaptive target rank parameters
+    s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -151,6 +155,17 @@ function chambolle_pock(
             end
         end
 
+        # Adaptive stepsizes
+        if primal_residual[end] > dual_residual[end] * adapt_threshold
+            t /= (1 - adapt_level)
+            s *= (1 - adapt_level)
+            adapt_level *= adapt_decay
+        elseif primal_residual[end] < dual_residual[end] / adapt_threshold
+            t *= (1 - adapt_level)
+            s /= (1 - adapt_level)
+            adapt_level *= adapt_decay    
+        end
+
         # Keep track
         @timeit "tracking" begin
             copy!(x_old, x)
@@ -169,7 +184,8 @@ function chambolle_pock(
         elseif primal_residual[end] < 10 * primal_tol && dual_residual[end] < 10 * dual_tol && polishing == false
             nev += 1
             comb_res_rank_update = comb_residual[end]
-            println("Updating target-rank to $nev")
+            s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
+            println("Updating target-rank to $nev")            
         end
     end
 
@@ -205,6 +221,14 @@ function diag_scaling(affine_sets, alpha, dims)
     affine_sets.h = Srhs[dims.p+1:end]
 
     return affine_sets, TMt, Tc, S, SM, Sinv
+end
+
+function init_balance_stepsize(s0, t0)
+    s, t = s0, t0
+    adapt_level = 0.5     # Factor by which the stepsizes will be balanced 
+    adapt_decay = 0.95    # Rate the adaptivity decreases over time
+    adapt_threshold = 1.5 # Minimum value that trigger to recompute the stepsizes 
+    return s, t, adapt_decay, adapt_level, adapt_threshold
 end
 
 function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector{Float64}
