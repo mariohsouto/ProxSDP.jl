@@ -38,7 +38,7 @@ struct CPOptions
 end
 
 function chambolle_pock(
-    affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-5, dual_tol=1e-5
+    affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-4, dual_tol=1e-4
 )   
     opt = CPOptions(false, verbose)
     c_orig = zeros(1)
@@ -96,6 +96,7 @@ function chambolle_pock(
 
     # logging
     best_comb_residual = Inf
+    comb_res_rank_update = Inf
     converged, status, polishing = false, false, false
     comb_residual, dual_residual, primal_residual = Float64[], Float64[], Float64[]
     sizehint!(comb_residual, max_iter)
@@ -119,6 +120,7 @@ function chambolle_pock(
     Mt = M'
 
     theta = 1.0
+    nev = 3
     L = 1.0 / svds(M; nsv=1)[1][:S][1]
     s, t = sqrt(L), sqrt(L)
 
@@ -128,7 +130,7 @@ function chambolle_pock(
         # Update primal variable
         @timeit "primal" begin
             # x =  sdp_cone_projection(x - TMt * u - affine_sets.c, dims, affine_sets, opt, k, polishing)::Vector{Float64}
-            x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing)::Vector{Float64}
+            x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
         end
 
         # Update dual variable
@@ -155,20 +157,25 @@ function chambolle_pock(
             copy!(u_old, u)
         end
 
+        if comb_res_rank_update < comb_residual[end] - 1e-6
+            polishing = true
+            nev -= 1
+        end
+
         # Check convergence
         if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol && polishing
             converged = true
             break
         elseif primal_residual[end] < 10 * primal_tol && dual_residual[end] < 10 * dual_tol && polishing == false
-            println("Starting polishing procedure ---")
-            polishing = true
+            nev += 1
+            comb_res_rank_update = comb_residual[end]
+            println("Updating target-rank to $nev")
         end
     end
 
     time = toq()
     println("Time = $time")
 
-    @show u
     @show dot(c_orig, x)
 
     return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
@@ -212,7 +219,7 @@ function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector
     return v
 end
 
-function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing)::Vector{Float64}
+function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing, nev)::Vector{Float64}
 
     if opt.fullmat
         fact1 = @timeit "eig" eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
@@ -237,7 +244,7 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
             end
         else
             try
-                D, V = @timeit "eig" eigs(X; nev=1, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+                D, V = @timeit "eig" eigs(X; nev=nev, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
                 D2 = diagm(max.(D, 0.0))::Matrix{Float64}
                 M1 = vec(V * D2 * V')::Vector{Float64}
                 for i in eachindex(iv)
@@ -255,7 +262,6 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
         # D = diagm(max.(fact[:values], 0.0))
         # M2 = fact[:vectors] * D * fact[:vectors]'
-
         # for i in eachindex(iv)
         #     v[iv[i]] = M2[im[i]]
         # end

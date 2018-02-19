@@ -49,7 +49,11 @@ const MOIU = MathOptInterfaceUtilities
         @constraint(m, bla, X[1, 1] <= 10.0)
 
         # JuMP.attach(m, SCSInstance())
-        # JuMP.attach(m, MosekInstance())
+        # JuMP.attach(m, MosekInstance(
+        #     MSK_DPAR_INTPNT_CO_TOL_DFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_INFEAS=1e-5,
+        #     MSK_DPAR_INTPNT_CO_TOL_MU_RED=1e-5, 
+        #     MSK_DPAR_INTPNT_CO_TOL_PFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_REL_GAP=1e-5
+        # ))
         # JuMP.attach(m, CSDP.CSDPInstance(maxiter=100000))
         JuMP.attach(m, ProxSDPSolverInstance())
 

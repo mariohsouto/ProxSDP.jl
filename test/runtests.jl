@@ -8,4 +8,4 @@ using ProxSDP
 
 # include("moitest.jl")
 
-include("jumptest.jl")
+include("max_cut.jl")
