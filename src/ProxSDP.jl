@@ -114,14 +114,14 @@ function chambolle_pock(
 
     # Diagonal scaling
     alpha = 1.0
-    # affine_sets, TMt, Tc, S, SM, Sinv = diag_scaling(affine_sets, alpha, dims)
     M = vcat(affine_sets.A, affine_sets.G)
     Mt = M'
+    affine_sets, TMt, Tc, S, SM, Sinv = diag_scaling(affine_sets, alpha, dims, M, Mt)
 
     # Overrelaxation parameter
     theta = 1.0
     # Initial target-rank
-    nev = 3
+    nev = 4
     # Initial stepsizes
     L = 1.0 / svds(M; nsv=1)[1][:S][1]
     s0, t0 = sqrt(L), sqrt(L)
@@ -133,16 +133,16 @@ function chambolle_pock(
 
         # Update primal variable
         @timeit "primal" begin
-            # x =  sdp_cone_projection(x - TMt * u - affine_sets.c, dims, affine_sets, opt, k, polishing)::Vector{Float64}
-            x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
+            # x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
+            x =  sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
         end
 
         # Update dual variable
         @timeit "dual" begin
-            # u += SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
-            # u -= S * box_projection(Sinv .* u, dims, affine_sets)::Vector{Float64}
-            u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
-            u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
+            # u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            # u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
+            u += s * SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            u -= s * S * box_projection((Sinv .* u) ./ s, dims, affine_sets)::Vector{Float64}
         end
 
         # Compute residuals
@@ -197,25 +197,21 @@ function chambolle_pock(
     return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
 end
 
-function diag_scaling(affine_sets, alpha, dims)
-    # Build full problem matrices
-    M = vcat(affine_sets.A, affine_sets.G)
-    rhs = vcat(affine_sets.b, affine_sets.h)
-    Mt = M'
-
+function diag_scaling(affine_sets, alpha, dims, M, Mt)
     # Diagonal scaling
     div = vec(sum(abs.(M).^(2.0-alpha), 1))
     div[find(x-> x == 0.0, div)] = 1.0
-    T = sparse(diagm(1.0 ./ div))
+    T = spdiagm(1.0 ./ div)
     div = vec(sum(abs.(M).^alpha, 2))
     div[find(x-> x == 0.0, div)] = 1.0
-    S = sparse(diagm(1.0 ./ div))
+    S = spdiagm(1.0 ./ div)
     Sinv = div
 
     # Cache matrix multiplications
     TMt = T * Mt
     Tc = T * affine_sets.c
     SM = S * M
+    rhs = vcat(affine_sets.b, affine_sets.h)
     Srhs = S * rhs
     affine_sets.b = Srhs[1:dims.p]
     affine_sets.h = Srhs[dims.p+1:end]
