@@ -131,6 +131,18 @@ function chambolle_pock(
     rank_updated = false
     rank_history = Float64[]
 
+    # Initialization
+    for i in 1:100
+        x = max.(x - t * TMt * u - t * Tc, 0.0)
+        u += s * SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
+        u -= s * S * box_projection((Sinv .* u) ./ s, dims, affine_sets)::Vector{Float64}
+    end
+    for i in 1:100
+        x = rank_one_projection(x - t * TMt * u - t * Tc, dims, affine_sets)
+        u += s * SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
+        u -= s * S * box_projection((Sinv .* u) ./ s, dims, affine_sets)::Vector{Float64}
+    end
+
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
@@ -177,7 +189,7 @@ function chambolle_pock(
 
         # Check convergence
         if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol # && rank_updated
-            println("lower bound = $(n / iter))")
+            println("lower bound = $(sqrt(n) / k))")
             converged = true
             break
         end
@@ -234,6 +246,24 @@ function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector
     return v
 end
 
+function rank_one_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)
+    M = zeros(dims.n, dims.n)::Matrix{Float64}
+    iv = aff.sdpcone[1][1]::Vector{Int}
+    im = aff.sdpcone[1][2]::Vector{Int}
+    for i in eachindex(iv)
+        M[im[i]] = v[iv[i]]
+    end
+    X = Symmetric(M, :L)::Symmetric{Float64,Array{Float64,2}}
+
+    D, V = @timeit "eig" eigs(X; nev=1, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+    M = vec(V * spdiagm(max.(D, 0.0)) * V')::Vector{Float64}
+    for i in eachindex(iv)
+        v[iv[i]] = M[im[i]]
+    end
+
+    return v
+end
+
 function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing, nev, rank_history, n)#::Vector{Float64}
 
     if opt.fullmat
@@ -253,10 +283,9 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         end
 
         @timeit "eig" begin
-            fact = @timeit "eig" eigfact!(X, n / iter, Inf)
+            fact = @timeit "eig" eigfact!(X, sqrt(n) / iter, Inf)
             # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-            D = spdiagm(max.(fact[:values], 0.0))
-            M2 = fact[:vectors] * D * fact[:vectors]'
+            M2 = fact[:vectors] * spdiagm(fact[:values]) * fact[:vectors]'
             for i in eachindex(iv)
                 v[iv[i]] = M2[im[i]]
             end
