@@ -129,6 +129,7 @@ function chambolle_pock(
     s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
 
     rank_updated = false
+    rank_history = Float64[]
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -136,7 +137,7 @@ function chambolle_pock(
         # Update primal variable
         @timeit "primal" begin
             # x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
-            x = sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
+            x, rank_history = sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev, rank_history, n)#::Vector{Float64}
         end
 
         # Update dual variable
@@ -175,20 +176,8 @@ function chambolle_pock(
         end
 
         # Check convergence
-        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol
-            diff = norm(x - sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev+1))
-            if diff > 10 * primal_tol
-                nev *= 2
-                s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
-                println("Updating target-rank to $nev")  
-            else
-                rank_updated = true
-                break
-            end
-        end
-          
-        # Check convergence
-        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol && rank_updated
+        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol # && rank_updated
+            println("lower bound = $(n / iter))")
             converged = true
             break
         end
@@ -198,6 +187,8 @@ function chambolle_pock(
     println("Time = $time")
 
     @show dot(c_orig, x)
+
+    @show rank_history
 
     return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
 end
@@ -243,7 +234,7 @@ function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector
     return v
 end
 
-function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing, nev)::Vector{Float64}
+function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing, nev, rank_history, n)#::Vector{Float64}
 
     if opt.fullmat
         # fact1 = @timeit "eig" eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
@@ -262,9 +253,8 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         end
 
         @timeit "eig" begin
-            fact = @timeit "eig" eigfact!(X, 1.0 / iter, Inf)
+            fact = @timeit "eig" eigfact!(X, n / iter, Inf)
             # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-            # println(length(fact[:values][fact[:values] .> 0.0]))
             D = spdiagm(max.(fact[:values], 0.0))
             M2 = fact[:vectors] * D * fact[:vectors]'
             for i in eachindex(iv)
@@ -273,7 +263,9 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
         end
     end
 
-    return v::Vector{Float64}
+    push!(rank_history, length(fact[:values][fact[:values] .> 1e-5]))
+
+    return v::Vector{Float64}, rank_history
 end
 
 function print_progress(k, primal_res, dual_res)

@@ -5,19 +5,18 @@ import Base.isempty
 # using MathOptInterfaceSCS
 # using MathOptInterfaceMosek
 
-using MathOptInterface
-const MOI = MathOptInterface
-using MathOptInterfaceUtilities
-const MOIU = MathOptInterfaceUtilities
-
-# using SemidefiniteOptInterface
+# using MathOptInterface
+# const MOI = MathOptInterface
+# using MathOptInterfaceUtilities
+# const MOIU = MathOptInterfaceUtilities
 # using CSDP
+# using SCS
 
 @testset "Max-Cut" begin
 
     # Read data from file
-    # data = readdlm("data/maxG11.dat-s")
-    data = readdlm("data/mcp500-1.dat-s")
+    # data = readdlm("data/maxG32.dat-s")
+    data = readdlm("data/mcp500-4.dat-s")
     # Instance size
     n = data[1, 1]
     # Partition weights
@@ -31,7 +30,8 @@ const MOIU = MathOptInterfaceUtilities
 
     # Build model
     m = Model() 
-    # m = Model(solver=CSDPSolver())   
+    # m = Model(solver=CSDPSolver()) 
+    # m = Model(solver=SCSSolver())   
     
     @variable(m, X[1:n, 1:n], PSD)
     # @variable(m, X[1:n, 1:n], SDP)
@@ -49,11 +49,14 @@ const MOIU = MathOptInterfaceUtilities
     JuMP.attach(m, ProxSDPSolverInstance())
 
     teste = JuMP.solve(m)
-    println("Duals equal. : ", JuMP.resultdual.(ctr))
-    println("Duals inequal. : ", JuMP.resultdual(bla))
-    println("Objective value: ", JuMP.objectivevalue(m))
-    println("primal Status value: ", JuMP.primalstatus(m))
-    println("dual Status value: ", JuMP.dualstatus(m))
-    println("term Status value: ", JuMP.terminationstatus(m))
-    println(JuMP.resultvalue.(X))
+    # println("Duals equal. : ", JuMP.resultdual.(ctr))
+    # println("Objective value: ", JuMP.objectivevalue(m))
+    # println("primal Status value: ", JuMP.primalstatus(m))
+    # println("dual Status value: ", JuMP.dualstatus(m))
+    # println("term Status value: ", JuMP.terminationstatus(m))
+
+    bla = Symmetric(JuMP.getvalue(X))
+    fact = eigfact!(bla, 0.0, Inf)
+    println(length(fact[:values][fact[:values] .> 1e-5]))
+    println(fact[:values])
 end
