@@ -83,12 +83,12 @@ function chambolle_pock(
 
     converged = false
     tic()
-    @timeit "print" if verbose
+    # @timeit "print" if verbose
         println(" Initializing Primal-Dual Hybrid Gradient method")
         println("----------------------------------------------------------")
         println("|  iter  | comb. res | prim. res |  dual res |    rho    |")
         println("----------------------------------------------------------")
-    end
+    # end
 
     @timeit "Init" begin
     # Given
@@ -121,12 +121,14 @@ function chambolle_pock(
     # Overrelaxation parameter
     theta = 1.0
     # Initial target-rank
-    nev = 4
+    nev = 1
     # Initial stepsizes
     L = 1.0 / svds(M; nsv=1)[1][:S][1]
     s0, t0 = sqrt(L), sqrt(L)
     # Adaptive target rank parameters
     s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
+
+    rank_updated = false
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -134,7 +136,7 @@ function chambolle_pock(
         # Update primal variable
         @timeit "primal" begin
             # x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
-            x =  sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
+            x = sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
         end
 
         # Update dual variable
@@ -150,7 +152,7 @@ function chambolle_pock(
             push!(primal_residual, norm((1 / t) * (x_old - x) - Mt * (u_old - u)))
             push!(dual_residual, norm((1 / s) * (u_old - u) - M * (x_old - x)))
             push!(comb_residual, primal_residual[end] + dual_residual[end])
-            if mod(k, 100) == 0 && opt.verbose
+            if mod(k, 500) == 0 && opt.verbose
                 print_progress(k, primal_residual[end], dual_residual[end])
             end
         end
@@ -172,20 +174,23 @@ function chambolle_pock(
             copy!(u_old, u)
         end
 
-        if comb_res_rank_update < comb_residual[end] - 1e-6
-            polishing = true
-            nev -= 1
-        end
-
         # Check convergence
-        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol && polishing
+        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol
+            diff = norm(x - sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev+1))
+            if diff > 10 * primal_tol
+                nev *= 2
+                s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
+                println("Updating target-rank to $nev")  
+            else
+                rank_updated = true
+                break
+            end
+        end
+          
+        # Check convergence
+        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol && rank_updated
             converged = true
             break
-        elseif primal_residual[end] < 10 * primal_tol && dual_residual[end] < 10 * dual_tol && polishing == false
-            nev += 1
-            comb_res_rank_update = comb_residual[end]
-            s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
-            println("Updating target-rank to $nev")            
         end
     end
 
@@ -220,11 +225,10 @@ function diag_scaling(affine_sets, alpha, dims, M, Mt)
 end
 
 function init_balance_stepsize(s0, t0)
-    s, t = s0, t0
-    adapt_level = 0.5     # Factor by which the stepsizes will be balanced 
+    adapt_level = 0.9     # Factor by which the stepsizes will be balanced 
     adapt_decay = 0.95    # Rate the adaptivity decreases over time
     adapt_threshold = 1.5 # Minimum value that trigger to recompute the stepsizes 
-    return s, t, adapt_decay, adapt_level, adapt_threshold
+    return s0, t0, adapt_decay, adapt_level, adapt_threshold
 end
 
 function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector{Float64}
@@ -242,9 +246,11 @@ end
 function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing, nev)::Vector{Float64}
 
     if opt.fullmat
-        fact1 = @timeit "eig" eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
+        # fact1 = @timeit "eig" eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
+        fact1 = eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
         v = vec(fact1[:vectors] * diagm(fact1[:values]) * fact1[:vectors]')::Vector{Float64}
     else
+
         @timeit "reshape" begin
             M = zeros(dims.n, dims.n)::Matrix{Float64}
             iv = aff.sdpcone[1][1]::Vector{Int}
@@ -255,36 +261,16 @@ function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, op
             X = Symmetric(M, :L)::Symmetric{Float64,Array{Float64,2}}
         end
 
-        if polishing
-            fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-            D = diagm(max.(fact[:values], 0.0))::Matrix{Float64}
-            M0 = fact[:vectors] * D * fact[:vectors]'::Matrix{Float64}
+        @timeit "eig" begin
+            fact = @timeit "eig" eigfact!(X, 1.0 / iter, Inf)
+            # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
+            # println(length(fact[:values][fact[:values] .> 0.0]))
+            D = spdiagm(max.(fact[:values], 0.0))
+            M2 = fact[:vectors] * D * fact[:vectors]'
             for i in eachindex(iv)
-                v[iv[i]] = M0[im[i]]
-            end
-        else
-            try
-                D, V = @timeit "eig" eigs(X; nev=nev, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
-                D2 = diagm(max.(D, 0.0))::Matrix{Float64}
-                M1 = vec(V * D2 * V')::Vector{Float64}
-                for i in eachindex(iv)
-                    v[iv[i]] = M1[im[i]]
-                end
-            catch
-                fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-                M2 = fact[:vectors] * diagm(fact[:values]) * fact[:vectors]'::Matrix{Float64}
-                for i in eachindex(iv)
-                    v[iv[i]] = M2[im[i]]
-                end
+                v[iv[i]] = M2[im[i]]
             end
         end
-
-        # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-        # D = diagm(max.(fact[:values], 0.0))
-        # M2 = fact[:vectors] * D * fact[:vectors]'
-        # for i in eachindex(iv)
-        #     v[iv[i]] = M2[im[i]]
-        # end
     end
 
     return v::Vector{Float64}

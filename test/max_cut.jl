@@ -17,7 +17,7 @@ const MOIU = MathOptInterfaceUtilities
 
     # Read data from file
     # data = readdlm("data/maxG11.dat-s")
-    data = readdlm("data/mcp250-1.dat-s")
+    data = readdlm("data/mcp500-1.dat-s")
     # Instance size
     n = data[1, 1]
     # Partition weights
@@ -30,8 +30,11 @@ const MOIU = MathOptInterfaceUtilities
     end
 
     # Build model
-    m = Model()    
+    m = Model() 
+    # m = Model(solver=CSDPSolver())   
+    
     @variable(m, X[1:n, 1:n], PSD)
+    # @variable(m, X[1:n, 1:n], SDP)
     @objective(m, Min, sum(W[i, j] * X[i, j] for i in 1:n, j in 1:n))
     @constraint(m, ctr[i in 1:n], X[i, i] == 1.0)
     # @constraint(m, bla, X[1, 1] <= 10.0)
