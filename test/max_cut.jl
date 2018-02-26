@@ -1,3 +1,5 @@
+#push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
+using ProxSDP
 using JuMP
 # using Mosek
 using Base.Test
@@ -16,7 +18,8 @@ import Base.isempty
 
     # Read data from file
     # data = readdlm("data/maxG11.dat-s")
-    data = readdlm("data/mcp500-1.dat-s")
+    PATH = joinpath(dirname(@__FILE__),"data","mcp500-1.dat-s")
+    data = readdlm(PATH)
     # Instance size
     n = data[1, 1]
     # Partition weights
@@ -55,8 +58,8 @@ import Base.isempty
     # println("dual Status value: ", JuMP.dualstatus(m))
     # println("term Status value: ", JuMP.terminationstatus(m))
 
-    bla = Symmetric(JuMP.getvalue(X))
-    fact = eigfact!(bla, 0.0, Inf)
-    println(length(fact[:values][fact[:values] .> 1e-5]))
-    println(fact[:values])
+    # bla = Symmetric(JuMP.resultvalue.(X))
+    # fact = eigfact!(bla, 0.0, Inf)
+    # println(length(fact[:values][fact[:values] .> 1e-5]))
+    # println(fact[:values])
 end
