@@ -212,7 +212,8 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     Asdp = preA[cone.f+cone.l+1:end,:]
     indices_sdp = Asdp.rowval
 
-    aff = AffineSets(A, G, b, h, c, Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
+    aff = AffineSets(A, G, b, h, c)
+    con = ConicSets(Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
     # @show aff
 
 
@@ -228,7 +229,7 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     # writecsv("/Users/mariosouto/Dropbox/proxsdp/c_jl.csv", c)
 
     dims = Dims(sympackeddim(size(A)[2]), size(A)[1], size(G)[1])
-    sol = @timeit "Main" chambolle_pock(aff, dims)
+    sol = @timeit "Main" chambolle_pock(aff, con, dims)
     instance.ret_val = sol.status
     instance.primal = sol.primal
     instance.dual = sol.dual
