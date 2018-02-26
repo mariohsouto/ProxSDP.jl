@@ -164,7 +164,7 @@ function chambolle_pock(
     x_temp = similar(x)
 
     # Fixed-point loop
-    @timeit "CP loop" for k in 1:1501#max_iter
+    @timeit "CP loop" for k in 1:max_iter
 
         # Update primal variable
         @timeit "primal" begin
