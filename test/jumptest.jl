@@ -12,6 +12,9 @@ const MOIU = MathOptInterfaceUtilities
 
 # using SemidefiniteOptInterface
 # using CSDP
+# using SCS
+# using Mosek
+
 
 # @testset "LP0" begin
 #     m = Model()
@@ -30,7 +33,12 @@ const MOIU = MathOptInterfaceUtilities
 
         srand(0)
         m = Model()
-        n = 100
+        
+        # m = Model(solver=CSDPSolver(objtol=1e-4, maxiter=10000, fastmode=1)) 
+        # m = Model(solver=SCSSolver(max_iters=1000000, eps=1e-4))
+        # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
+ 
+        n = 500
         # Channel
         H = randn((n, n))
         # Gaussian noise
@@ -41,29 +49,25 @@ const MOIU = MathOptInterfaceUtilities
         sigma = 0.01
         y = H * s + sigma * v
         L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
-        # L = readcsv("/Users/mariosouto/Dropbox/proxsdp/L.csv")
 
         @variable(m, X[1:n+1, 1:n+1], PSD)
+        # @variable(m, X[1:n+1, 1:n+1], SDP)
         @objective(m, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
         @constraint(m, ctr[i in 1:n+1], X[i, i] == 1.0)
-        @constraint(m, bla, X[1, 1] <= 10.0)
+        @constraint(m, bla, X[1, 1] <= 1.0)
 
-        # JuMP.attach(m, SCSInstance())
-        # JuMP.attach(m, MosekInstance(
-        #     MSK_DPAR_INTPNT_CO_TOL_DFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_INFEAS=1e-5,
-        #     MSK_DPAR_INTPNT_CO_TOL_MU_RED=1e-5, 
-        #     MSK_DPAR_INTPNT_CO_TOL_PFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_REL_GAP=1e-5
-        # ))
-        # JuMP.attach(m, CSDP.CSDPInstance(maxiter=100000))
         JuMP.attach(m, ProxSDPSolverInstance())
 
+        tic()
         teste = JuMP.solve(m)
-        println("Duals equal. : ", JuMP.resultdual.(ctr))
-        println("Duals inequal. : ", JuMP.resultdual(bla))
+        println(toc())
+        # println("Duals equal. : ", JuMP.resultdual.(ctr))
+        # println("Duals equal. : ", JuMP.getdual.(ctr))
+        # println(JuMP.getvalue.(X))
         println("Objective value: ", JuMP.objectivevalue(m))
         println("primal Status value: ", JuMP.primalstatus(m))
         println("dual Status value: ", JuMP.dualstatus(m))
         println("term Status value: ", JuMP.terminationstatus(m))
-        # println(JuMP.resultvalue.(X))
+        println(JuMP.resultvalue.(X))
     end
 end

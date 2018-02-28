@@ -5,18 +5,19 @@ import Base.isempty
 # using MathOptInterfaceSCS
 # using MathOptInterfaceMosek
 
-# using MathOptInterface
-# const MOI = MathOptInterface
-# using MathOptInterfaceUtilities
-# const MOIU = MathOptInterfaceUtilities
+using MathOptInterface
+const MOI = MathOptInterface
+using MathOptInterfaceUtilities
+const MOIU = MathOptInterfaceUtilities
 # using CSDP
 # using SCS
+# using Mosek
 
 @testset "Max-Cut" begin
 
     # Read data from file
     # data = readdlm("data/maxG11.dat-s")
-    data = readdlm("data/mcp500-1.dat-s")
+    data = readdlm("data/mcp250-1.dat-s")
     # Instance size
     n = data[1, 1]
     # Partition weights
@@ -30,6 +31,8 @@ import Base.isempty
 
     # Build model
     m = Model() 
+    # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
+
     # m = Model(solver=CSDPSolver()) 
     # m = Model(solver=SCSSolver())   
     
@@ -47,8 +50,9 @@ import Base.isempty
     # ))
     # JuMP.attach(m, CSDP.CSDPInstance(maxiter=100000))
     JuMP.attach(m, ProxSDPSolverInstance())
-
+    tic()
     teste = JuMP.solve(m)
+    println(toc())
     # println("Duals equal. : ", JuMP.resultdual.(ctr))
     # println("Objective value: ", JuMP.objectivevalue(m))
     # println("primal Status value: ", JuMP.primalstatus(m))

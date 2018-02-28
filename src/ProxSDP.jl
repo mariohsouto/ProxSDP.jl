@@ -1,9 +1,6 @@
 module ProxSDP
 
 using MathOptInterface, TimerOutputs
-# using PyCall
-# @pyimport scipy.linalg as sp
-# @pyimport scipy.sparse.linalg as ppp
 
 include("mathoptinterface.jl")
 
@@ -38,7 +35,7 @@ struct CPOptions
 end
 
 function chambolle_pock(
-    affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-4, dual_tol=1e-4
+    affine_sets, dims, verbose=true, max_iter=Int(1e+5), primal_tol=1e-4, dual_tol=1e-3
 )   
     opt = CPOptions(false, verbose)
     c_orig = zeros(1)
@@ -83,16 +80,16 @@ function chambolle_pock(
 
     converged = false
     tic()
-    # @timeit "print" if verbose
-        println(" Initializing Primal-Dual Hybrid Gradient method")
-        println("----------------------------------------------------------")
-        println("|  iter  | comb. res | prim. res |  dual res |    rho    |")
-        println("----------------------------------------------------------")
-    # end
+    println(" Initializing Primal-Dual Hybrid Gradient method")
+    println("----------------------------------------------------------")
+    println("|  iter  | comb. res | prim. res |  dual res |    rho    |")
+    println("----------------------------------------------------------")
+
 
     @timeit "Init" begin
     # Given
     m, n, p = dims.m, dims.n, dims.p
+    theta = 1.0 # Overrelaxation parameter
 
     # logging
     best_comb_residual, comb_res_rank_update = Inf, Inf
@@ -113,96 +110,143 @@ function chambolle_pock(
     end
 
     # Diagonal scaling
-    alpha = 1.0
     M = vcat(affine_sets.A, affine_sets.G)
     Mt = M'
-    affine_sets, TMt, Tc, S, SM, Sinv = diag_scaling(affine_sets, alpha, dims, M, Mt)
 
-    # Overrelaxation parameter
-    theta = 1.0
-    # Initial target-rank
-    nev = 1
-    # Initial stepsizes
+    # Stepsize parameters
     L = 1.0 / svds(M; nsv=1)[1][:S][1]
     s0, t0 = sqrt(L), sqrt(L)
-    # Adaptive target rank parameters
     s, t, adapt_decay, adapt_level, adapt_threshold = init_balance_stepsize(s0, t0)
-
-    rank_updated = false
-    rank_history = Float64[]
-
+    adapt_level2 = adapt_level
+    stepsize_update = 0
+    rank_update = 0
+    
     # Initialization
-    for i in 1:100
-        x = max.(x - t * TMt * u - t * Tc, 0.0)
-        u += s * SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
-        u -= s * S * box_projection((Sinv .* u) ./ s, dims, affine_sets)::Vector{Float64}
-    end
-    for i in 1:100
-        x = rank_one_projection(x - t * TMt * u - t * Tc, dims, affine_sets)
-        u += s * SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
-        u -= s * S * box_projection((Sinv .* u) ./ s, dims, affine_sets)::Vector{Float64}
-    end
+    v0 = zeros((0, ))
+    nev = 1 # Initial target-rank
+    adapt_level2 = 0.3
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
         # Update primal variable
         @timeit "primal" begin
-            # x = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, opt, k, polishing, nev)::Vector{Float64}
-            x, rank_history = sdp_cone_projection(x - t * TMt * u - t * Tc, dims, affine_sets, opt, k, polishing, nev, rank_history, n)#::Vector{Float64}
+            if k < 1000
+                eig_tol = 1e-3
+            else
+                eig_tol = 1e-3
+            end
+            x, v0 = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, nev, v0, eig_tol)::Tuple{Vector{Float64}, Vector{Float64}}
         end
-
+        
         # Update dual variable
         @timeit "dual" begin
-            # u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
-            # u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
-            u += s * SM * ((1.0 + theta) * x - x_old)::Vector{Float64}
-            u -= s * S * box_projection((Sinv .* u) ./ s, dims, affine_sets)::Vector{Float64}
+            u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
         end
 
         # Compute residuals
         @timeit "logging" begin
-            push!(primal_residual, norm((1 / t) * (x_old - x) - Mt * (u_old - u)))
-            push!(dual_residual, norm((1 / s) * (u_old - u) - M * (x_old - x)))
+            push!(primal_residual, norm((1 / t) * (x_old - x)))
+            push!(dual_residual, norm((1 / s) * (u_old - u)))
             push!(comb_residual, primal_residual[end] + dual_residual[end])
             if mod(k, 500) == 0 && opt.verbose
                 print_progress(k, primal_residual[end], dual_residual[end])
             end
         end
-
-        # Adaptive stepsizes
-        if primal_residual[end] > dual_residual[end] * adapt_threshold
-            t /= (1 - adapt_level)
-            s *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-        elseif primal_residual[end] < dual_residual[end] / adapt_threshold
-            t *= (1 - adapt_level)
-            s /= (1 - adapt_level)
-            adapt_level *= adapt_decay    
-        end
-
         # Keep track
         @timeit "tracking" begin
             copy!(x_old, x)
             copy!(u_old, u)
         end
 
+        # Adaptive stepsizes
+        stepsize_update += 1
+        if primal_residual[end] > 0.1 * dual_residual[end] * adapt_threshold 
+            stepsize_update = 0
+            t /= (1 - adapt_level)
+            s *= (1 - adapt_level)
+            adapt_level *= adapt_decay
+        elseif primal_residual[end] < 0.1 * dual_residual[end] / adapt_threshold 
+            stepsize_update = 0
+            t *= (1 - adapt_level)
+            s /= (1 - adapt_level)
+            adapt_level *= adapt_decay    
+        end
+        if primal_residual[end] < primal_tol && dual_residual[end] > 10 * dual_tol
+            t *= (1 - adapt_level2)
+            s /= (1 - adapt_level2)
+            adapt_level2 *= adapt_decay 
+            stepsize_update = 0
+        elseif primal_residual[end] > 10 * primal_tol && dual_residual[end] < dual_tol
+            t /= (1 - adapt_level2)
+            s *= (1 - adapt_level2)
+            stepsize_update = 0
+            adapt_level2 *= adapt_decay 
+        end
+
         # Check convergence
-        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol # && rank_updated
-            println("lower bound = $(sqrt(n) / k))")
-            converged = true
-            break
+        rank_update += 1
+        if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol
+            # Check convergence of inexact fixed-point
+            x, v0 = sdp_cone_projection(x - t * (Mt * u) - t * affine_sets.c, dims, affine_sets, nev + 1, v0, 1e-6)::Tuple{Vector{Float64}, Vector{Float64}}
+            u += s * M * ((1.0 + theta) * x - x_old)::Vector{Float64}
+            u -= s * box_projection(u ./ s, dims, affine_sets)::Vector{Float64}
+
+            push!(primal_residual, norm((1 / t) * (x_old - x)))
+            push!(dual_residual, norm((1 / s) * (u_old - u)))
+            push!(comb_residual, primal_residual[end] + dual_residual[end])
+            print_progress(k, primal_residual[end], dual_residual[end])
+
+            if primal_residual[end] < primal_tol && dual_residual[end] < dual_tol
+                converged = true
+                break
+            else
+                nev *= 2
+                rank_update = 0
+                println("Updating target-rank to. = $nev")
+            end
+
+        elseif k > 2000 && comb_residual[end - 1999] < comb_residual[end] && rank_update > 2000
+            nev *= 2
+            rank_update = 0
+            print_progress(k, primal_residual[end], dual_residual[end])
+            println("Updating target-rank to = $nev")
         end
     end
 
     time = toq()
     println("Time = $time")
-
     @show dot(c_orig, x)
 
-    @show rank_history
-
     return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
+end
+
+function initialize(x, u, dims::Dims, aff::AffineSets, t, Mt, M, s)
+    x_old = zeros(dims.n*(dims.n+1)/2)
+    iv = aff.sdpcone[1][1]::Vector{Int}
+    im = aff.sdpcone[1][2]::Vector{Int}
+    X = eye(dims.n)
+    
+    for i in 1:10
+        x = x - t * (Mt * u) - t * aff.c
+        for i in eachindex(iv)
+            X[im[i]] = x[iv[i]]
+        end
+        X = max.(min.(X, 1.0), -1.0)
+        for i in 1:dims.n
+            X[i,i] = max(X[i,i], 0.0)
+        end
+        for i in eachindex(iv)
+            x[iv[i]] = X[im[i]]
+        end
+        # x = max.(x - t * (Mt * u) - t * aff.c, 0.0)
+        u += s * M * ((2.0) * x - x_old)::Vector{Float64}
+        u -= s * box_projection(u ./ s, dims, aff)::Vector{Float64}
+        copy!(x_old, x)
+    end
+
+    return x, x_old, u
 end
 
 function diag_scaling(affine_sets, alpha, dims, M, Mt)
@@ -228,9 +272,9 @@ function diag_scaling(affine_sets, alpha, dims, M, Mt)
 end
 
 function init_balance_stepsize(s0, t0)
-    adapt_level = 0.9     # Factor by which the stepsizes will be balanced 
-    adapt_decay = 0.95    # Rate the adaptivity decreases over time
-    adapt_threshold = 1.5 # Minimum value that trigger to recompute the stepsizes 
+    adapt_level = 0.5      # Factor by which the stepsizes will be balanced 
+    adapt_decay = 0.9     # Rate the adaptivity decreases over time
+    adapt_threshold = 1.5  # Minimum value that trigger to recompute the stepsizes 
     return s0, t0, adapt_decay, adapt_level, adapt_threshold
 end
 
@@ -246,55 +290,36 @@ function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector
     return v
 end
 
-function rank_one_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)
-    M = zeros(dims.n, dims.n)::Matrix{Float64}
-    iv = aff.sdpcone[1][1]::Vector{Int}
-    im = aff.sdpcone[1][2]::Vector{Int}
-    for i in eachindex(iv)
-        M[im[i]] = v[iv[i]]
-    end
-    X = Symmetric(M, :L)::Symmetric{Float64,Array{Float64,2}}
+function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, nev::Int64, v0::Vector{Float64}, eig_tol::Float64)::Tuple{Vector{Float64}, Vector{Float64}}
 
-    D, V = @timeit "eig" eigs(X; nev=1, which=:LR)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
-    M = vec(V * spdiagm(max.(D, 0.0)) * V')::Vector{Float64}
-    for i in eachindex(iv)
-        v[iv[i]] = M[im[i]]
-    end
-
-    return v
-end
-
-function sdp_cone_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets, opt::CPOptions, iter, polishing, nev, rank_history, n)#::Vector{Float64}
-
-    if opt.fullmat
-        # fact1 = @timeit "eig" eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
-        fact1 = eigfact!(Symmetric(reshape(v, (dims.n, dims.n)))::Matrix{Float64}, 0.0, Inf)
-        v = vec(fact1[:vectors] * diagm(fact1[:values]) * fact1[:vectors]')::Vector{Float64}
-    else
-
-        @timeit "reshape" begin
-            M = zeros(dims.n, dims.n)::Matrix{Float64}
-            iv = aff.sdpcone[1][1]::Vector{Int}
-            im = aff.sdpcone[1][2]::Vector{Int}
-            for i in eachindex(iv)
-                M[im[i]] = v[iv[i]]
-            end
-            X = Symmetric(M, :L)::Symmetric{Float64,Array{Float64,2}}
+    @timeit "reshape1" begin
+        M = zeros(dims.n, dims.n)::Matrix{Float64}
+        iv = aff.sdpcone[1][1]::Vector{Int}
+        im = aff.sdpcone[1][2]::Vector{Int}
+        for i in eachindex(iv)
+            M[im[i]] = v[iv[i]]
         end
+        X = Symmetric(M, :L)::Symmetric{Float64,Array{Float64,2}}
+    end
 
-        @timeit "eig" begin
-            fact = @timeit "eig" eigfact!(X, sqrt(n) / iter, Inf)
-            # fact = @timeit "eig" eigfact!(X, 0.0, Inf)
-            M2 = fact[:vectors] * spdiagm(fact[:values]) * fact[:vectors]'
-            for i in eachindex(iv)
-                v[iv[i]] = M2[im[i]]
-            end
+    @timeit "eig" begin
+        try
+            D, V = eigs(X; nev=nev, which=:LR, maxiter=10000, tol=eig_tol, v0=v0)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+            M = V * spdiagm(max.(D, 0.0)) * V'::Matrix{Float64}
+            v0 = V[:, 1]::Vector{Float64}
+        catch
+            fact = eigfact!(X, 0.0, Inf)
+            M = fact[:vectors] * spdiagm(max.(fact[:values], 0.0)) * fact[:vectors]'::Matrix{Float64}
         end
     end
 
-    push!(rank_history, length(fact[:values][fact[:values] .> 1e-5]))
+    @timeit "reshape2" begin
+        for i in eachindex(iv)
+            v[iv[i]] = M[im[i]]
+        end
+    end
 
-    return v::Vector{Float64}, rank_history
+    return v::Vector{Float64}, v0::Vector{Float64}
 end
 
 function print_progress(k, primal_res, dual_res)
