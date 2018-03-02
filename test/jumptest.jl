@@ -38,7 +38,7 @@ const MOIU = MathOptInterfaceUtilities
         # m = Model(solver=SCSSolver(max_iters=1000000, eps=1e-4))
         # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
  
-        n = 500
+        n = 100
         # Channel
         H = randn((n, n))
         # Gaussian noise
@@ -63,7 +63,7 @@ const MOIU = MathOptInterfaceUtilities
         println(toc())
         # println("Duals equal. : ", JuMP.resultdual.(ctr))
         # println("Duals equal. : ", JuMP.getdual.(ctr))
-        # println(JuMP.getvalue.(X))
+        println(JuMP.resultvalue.(X))
         println("Objective value: ", JuMP.objectivevalue(m))
         println("primal Status value: ", JuMP.primalstatus(m))
         println("dual Status value: ", JuMP.dualstatus(m))
