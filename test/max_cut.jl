@@ -7,19 +7,19 @@ import Base.isempty
 # using MathOptInterfaceSCS
 # using MathOptInterfaceMosek
 
-# using MathOptInterface
-# const MOI = MathOptInterface
-# using MathOptInterfaceUtilities
-# const MOIU = MathOptInterfaceUtilities
+using MathOptInterface
+const MOI = MathOptInterface
+using MathOptInterfaceUtilities
+const MOIU = MathOptInterfaceUtilities
 # using CSDP
 # using SCS
-using Mosek
+# using Mosek
 
 @testset "Max-Cut" begin
 
     # Read data from file
-    data = readdlm("data/maxG55.dat-s")
-    # data = readdlm("data/mcp500-1.dat-s")
+    # data = readdlm("data/maxG55.dat-s")
+    data = readdlm("data/mcp250-1.dat-s")
 
     # Instance size
     n = data[1, 1]
@@ -33,15 +33,15 @@ using Mosek
     end
 
     # Build model
-    # m = Model() 
+    m = Model() 
     # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
 
     # m = Model(solver=CSDPSolver()) 
-    m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
+    # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
     # m = Model(solver=SCSSolver())   
     
-    # @variable(m, X[1:n, 1:n], PSD)
-    @variable(m, X[1:n, 1:n], SDP)
+    @variable(m, X[1:n, 1:n], PSD)
+    # @variable(m, X[1:n, 1:n], SDP)
     @objective(m, Min, sum(W[i, j] * X[i, j] for i in 1:n, j in 1:n))
     @constraint(m, ctr[i in 1:n], X[i, i] == 1.0)
     # @constraint(m, bla, X[1, 1] <= 10.0)
@@ -53,7 +53,7 @@ using Mosek
     #     MSK_DPAR_INTPNT_CO_TOL_PFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_REL_GAP=1e-5
     # ))
     # JuMP.attach(m, CSDP.CSDPInstance(maxiter=100000))
-    # JuMP.attach(m, ProxSDPSolverInstance())
+    JuMP.attach(m, ProxSDPSolverInstance())
     tic()
     teste = JuMP.solve(m)
     println(toc())
