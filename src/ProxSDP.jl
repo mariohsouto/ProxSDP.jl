@@ -299,7 +299,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AllocatedData, dims::Dims, 
     if nev < 8
         try
             @timeit "eigs" begin
-                D, V = eigs(a.m; nev=nev, which=:LR, maxiter=100000, tol=1e-6)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+                D, V = eigs(a.m; nev=nev, which=:LR, maxiter=100000)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
                 fill!(a.m.data, 0.0)
                 for i in 1:min(nev, dims.n)
                     if D[i] > 1e-6
