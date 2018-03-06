@@ -19,7 +19,7 @@ const MOIU = MathOptInterfaceUtilities
 
     # Read data from file
     data = readdlm("data/maxG11.dat-s")
-    # data = readdlm("data/mcp250-1.dat-s")
+    # data = readdlm("data/mcp500-1.dat-s")
 
     # Instance size
     n = data[1, 1]

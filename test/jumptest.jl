@@ -33,12 +33,12 @@ const MOIU = MathOptInterfaceUtilities
 
         srand(0)
         m = Model()
-        
         # m = Model(solver=CSDPSolver(objtol=1e-4, maxiter=10000, fastmode=1)) 
         # m = Model(solver=SCSSolver(max_iters=1000000, eps=1e-4))
         # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
- 
-        n = 300
+
+        # Instance size
+        n = 500
         # Channel
         H = randn((n, n))
         # Gaussian noise
