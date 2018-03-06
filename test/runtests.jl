@@ -6,6 +6,6 @@ using ProxSDP
 
 # ProxSDP.runpsdp(datapath)
 
-# include("jumptest.jl")
+include("jumptest.jl")
 
-include("max_cut.jl")
+# include("max_cut.jl")
