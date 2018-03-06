@@ -103,7 +103,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     nev = 1 # Initial target-rank
     a = AllocatedData(dims)
     rank_update, adapt_stepsize = 0, 0
-    primal_step, dual_step = 1.0, 1.0
+
+    # Stepsize parameters
+    # L = 1.0 / svds(M; nsv=1)[1][:S][1]
+    # s, t = sqrt(L), sqrt(L)  
+    primal_step, dual_step = 1.0, 1.0 # Initial stepsizes
+    adapt_level = 0.5                 # Factor by which the stepsizes will be balanced 
+    adapt_decay = 0.95                # Rate the adaptivity decreases over time
+    adapt_threshold = 1.5             # Minimum value that trigger to recompute the stepsizes 
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -150,6 +157,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             rank_update = 0
             print_progress(k, primal_residual[end], dual_residual[end], nev)
             println("Updating target-rank to = $nev")
+
+        # Adaptive stepsizes
+        elseif primal_residual[end] > 10 * primal_tol && dual_residual[end] < dual_tol
+            primal_step /= (1 - adapt_level)
+            dual_step *= (1 - adapt_level)
+            adapt_level *= adapt_decay
+        elseif primal_residual[end] < primal_tol && dual_residual[end] > 10 * dual_tol
+            primal_step *= (1 - adapt_level)
+            dual_step /= (1 - adapt_level)
+            adapt_level *= adapt_decay   
         end
     end
 
