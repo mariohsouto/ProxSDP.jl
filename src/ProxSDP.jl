@@ -105,9 +105,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     rank_update, adapt_stepsize = 0, 0
 
     # Stepsize parameters
-    # L = 1.0 / svds(M; nsv=1)[1][:S][1]
-    # s, t = sqrt(L), sqrt(L)  
-    primal_step, dual_step = 1.0, 1.0 # Initial stepsizes
+    L = 1.0 / svds(M; nsv=1)[1][:S][1]
+    primal_step, dual_step = sqrt(L), sqrt(L)  
+    # primal_step, dual_step = 1.0, 1.0 # Initial stepsizes
     adapt_level = 0.5                 # Factor by which the stepsizes will be balanced 
     adapt_decay = 0.95                # Rate the adaptivity decreases over time
     adapt_threshold = 1.5             # Minimum value that trigger to recompute the stepsizes 
@@ -177,13 +177,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     return CPResult(Int(converged), x, u, 0.0*x, primal_residual[end], dual_residual[end], dot(c_orig, x))
 end
 
-function compute_residual(x::Vector{Float64}, x_old::Vector{Float64}, u::Vector{Float64}, u_old::Vector{Float64}, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64)#::Void    
+function compute_residual(x::Vector{Float64}, x_old::Vector{Float64}, u::Vector{Float64}, u_old::Vector{Float64}, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64)::Void    
     push!(primal_residual, norm((1.0 / primal_step) * (x - x_old) + Mt * (u - u_old)))
     push!(dual_residual, norm((1.0 / dual_step) * (u - u_old) + M * (x - x_old)))
     push!(comb_residual, primal_residual[end] + dual_residual[end])
+    return nothing
 end
 
-function initialize(x::Vector{Float64}, u::Vector{Float64}, dims::Dims, aff::AffineSets, conic_sets::ConicSets, Mt::SparseMatrixCSC{Float64,Int64}, M::SparseMatrixCSC{Float64,Int64}, s::Float64, a::AllocatedData)
+function initialize(x::Vector{Float64}, u::Vector{Float64}, dims::Dims, aff::AffineSets, conic_sets::ConicSets, Mt::SparseMatrixCSC{Float64,Int64}, M::SparseMatrixCSC{Float64,Int64}, s::Float64, a::AllocatedData)::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
     x_old = zeros(dims.n*(dims.n+1)/2)
     iv = conic_sets.sdpcone[1][1]::Vector{Int}
     im = conic_sets.sdpcone[1][2]::Vector{Int}
@@ -241,7 +242,7 @@ function diag_scaling(affine_sets::AffineSets, alpha::Float64, dims::Dims, M::Sp
     return affine_sets, TMt, Tc, S, SM, Sinv
 end
 
-function dual_step!(x::Vector{Float64}, u::Vector{Float64}, x_old::Vector{Float64}, a::AllocatedData, dims::Dims, affine_sets::AffineSets, S::SparseMatrixCSC{Float64,Int64}, SM::SparseMatrixCSC{Float64,Int64}, Sinv::Vector{Float64}, dual_step::Float64)
+function dual_step!(x::Vector{Float64}, u::Vector{Float64}, x_old::Vector{Float64}, a::AllocatedData, dims::Dims, affine_sets::AffineSets, S::SparseMatrixCSC{Float64,Int64}, SM::SparseMatrixCSC{Float64,Int64}, Sinv::Vector{Float64}, dual_step::Float64)::Void
     copy!(a.x_1, x_old)
     Base.LinAlg.axpy!(-2.0, x, a.x_1) # alpha*x + y
     A_mul_B!(a.u_1, SM, a.x_1)
@@ -253,6 +254,8 @@ function dual_step!(x::Vector{Float64}, u::Vector{Float64}, x_old::Vector{Float6
     box_projection!(a.u_1, dims, affine_sets)
     A_mul_B!(a.u_2, S, a.u_1)
     Base.LinAlg.axpy!(-dual_step, a.u_2, u) # alpha*x + y
+
+    return nothing
 end
 
 function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector{Float64}
@@ -272,16 +275,18 @@ function box_projection!(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Void
     return nothing
 end
 
-function primal_step!(x::Vector{Float64}, u::Vector{Float64}, a::AllocatedData, dims::Dims, conic_sets::ConicSets, nev::Int64, TMt::SparseMatrixCSC{Float64,Int64}, Tc::Vector{Float64}, primal_step::Float64)
+function primal_step!(x::Vector{Float64}, u::Vector{Float64}, a::AllocatedData, dims::Dims, conic_sets::ConicSets, nev::Int64, TMt::SparseMatrixCSC{Float64,Int64}, Tc::Vector{Float64}, primal_step::Float64)::Void
     # x=x+(-t)*(TMt*u)+(-t)*Tc
     A_mul_B!(a.x_1, TMt, u) # (TMt*u)
     Base.LinAlg.axpy!(-primal_step, a.x_1, x) # x=x+(-t)*(TMt*u)
     Base.LinAlg.axpy!(-primal_step, Tc, x) # x=x+(-t)*Tc
-    
+
+    # Projection onto the psd cone
     sdp_cone_projection!(x, a, dims, conic_sets, nev)::Void
+    return nothing
 end
 
-function sdp_cone_projection!(v::Vector{Float64}, a::AllocatedData, dims::Dims, con::ConicSets, nev::Int64)
+function sdp_cone_projection!(v::Vector{Float64}, a::AllocatedData, dims::Dims, con::ConicSets, nev::Int64)::Void
 
     iv = con.sdpcone[1][1]::Vector{Int}
     im = con.sdpcone[1][2]::Vector{Int}
@@ -291,25 +296,31 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AllocatedData, dims::Dims, 
         end
     end
 
-    try
-        @timeit "eigs" begin
-            D, V = eigs(a.m; nev=nev, which=:LR, maxiter=100000, tol=1e-6)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
-            fill!(a.m.data, 0.0)
-            for i in 1:min(nev, dims.n)
-                if D[i] > 0.0
-                    Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
+    if nev < 8
+        try
+            @timeit "eigs" begin
+                D, V = eigs(a.m; nev=nev, which=:LR, maxiter=100000, tol=1e-6)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+                fill!(a.m.data, 0.0)
+                for i in 1:min(nev, dims.n)
+                    if D[i] > 1e-6
+                        Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
+                    end
                 end
             end
+            @timeit "reshape" begin
+                @inbounds @simd for i in eachindex(iv)
+                    v[iv[i]] = a.m.data[im[i]]
+                end
+            end
+            return nothing
         end
-    catch
-        @timeit "eigfact" begin
-            fact = eigfact!(a.m, 0.0, Inf)
-            fill!(a.m.data, 0.0)
-            for i in 1:length(fact[:values])
-                if fact[:values][i] > 0.0
-                    Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
-                end
-            end
+    end
+    
+    @timeit "eigfact" begin
+        fact = eigfact!(a.m, 1e-6, Inf)
+        fill!(a.m.data, 0.0)
+        for i in 1:length(fact[:values])
+            Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
         end
     end
 
@@ -318,7 +329,6 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AllocatedData, dims::Dims, 
             v[iv[i]] = a.m.data[im[i]]
         end
     end
-
     return nothing
 end
 
@@ -345,6 +355,7 @@ function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, nev::I
     a *= " "^max(0, 12 - length(s_nev))
     a *= s_nev
     println(a)
+    return nothing
 end
 
 end
