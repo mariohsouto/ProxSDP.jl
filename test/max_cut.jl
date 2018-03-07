@@ -18,8 +18,8 @@ const MOIU = MathOptInterfaceUtilities
 @testset "Max-Cut" begin
 
     # Read data from file
-    data = readdlm("data/maxG11.dat-s")
-    # data = readdlm("data/mcp500-1.dat-s")
+    # data = readdlm("data/maxG11.dat-s")
+    data = readdlm("data/mcp500-1.dat-s")
 
     # Instance size
     n = data[1, 1]
