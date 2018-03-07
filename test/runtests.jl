@@ -6,41 +6,43 @@ using JuMP
 using Base.Test
 import Base.isempty
 
-if VERSION > v"0.6.0"
+if Base.libblas_name == "libmkl_rt"
     using ProxSDP
     using MathOptInterface
     const MOI = MathOptInterface
     using MathOptInterfaceUtilities
     const MOIU = MathOptInterfaceUtilities
-    # using Mosek
-    # using MathOptInterfaceMosek
+elseif VERSION < v"0.6.0"
+    using CSDP 
 else
-    using CSDP
     using SCS
+    if is_linux()
+        using Mosek
+    end
 end
-
-# ProxSDP.runpsdp(datapath)
 
 include("jumptest.jl")
 include("max_cut.jl")
 
 @testset "MIMO" begin
-    if VERSION > v"0.6.0"
+    if Base.libblas_name == "libmkl_rt"
         mimo(ProxSDPSolverInstance())
-        # mimo(MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000))
-    else
-        mimo(SCSSolver(max_iters=1000000, eps=1e-4))
+    elseif VERSION < v"0.6.0"
         mimo(CSDPSolver(objtol=1e-4, maxiter=10000, fastmode=1))
+    else
+        # mimo(SCSSolver(max_iters=1000000, eps=1e-4))
+        mimo(MosekSolver())
     end
 end
 
 @testset "Max-Cut" begin
     path = "data/mcp500-1.dat-s" 
-    if VERSION > v"0.6.0"
+    if Base.libblas_name == "libmkl_rt"
         max_cut(ProxSDPSolverInstance(), path)
-        # mimo(MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000))
-    else
-        max_cut(SCSSolver(max_iters=1000000, eps=1e-4), path)
+    elseif VERSION < v"0.6.0"
         max_cut(CSDPSolver(objtol=1e-4, maxiter=10000, fastmode=1), path)
+    else
+        # max_cut(SCSSolver(max_iters=1000000, eps=1e-4), path)
+        max_cut(MosekSolver(), path)
     end
 end
