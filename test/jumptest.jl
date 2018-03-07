@@ -3,7 +3,7 @@ using JuMP
 using Base.Test
 import Base.isempty
 # using MathOptInterfaceSCS
-# using MathOptInterfaceMosek
+using MathOptInterfaceMosek
 
 using MathOptInterface
 const MOI = MathOptInterface
@@ -38,7 +38,7 @@ const MOIU = MathOptInterfaceUtilities
         # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
 
         # Instance size
-        n = 500
+        n = 200
         # Channel
         H = randn((n, n))
         # Gaussian noise
@@ -57,17 +57,22 @@ const MOIU = MathOptInterfaceUtilities
         @constraint(m, bla, X[1, 1] <= 1.0)
 
         JuMP.attach(m, ProxSDPSolverInstance())
+        # JuMP.attach(m, MosekInstance(
+        #     MSK_DPAR_INTPNT_CO_TOL_DFEAS=1e-3, MSK_DPAR_INTPNT_CO_TOL_INFEAS=1e-3,
+        #     MSK_DPAR_INTPNT_CO_TOL_MU_RED=1e-3, 
+        #     MSK_DPAR_INTPNT_CO_TOL_PFEAS=1e-3, MSK_DPAR_INTPNT_CO_TOL_REL_GAP=1e-3
+        # ))
 
         tic()
         teste = JuMP.solve(m)
         println(toc())
         # println("Duals equal. : ", JuMP.resultdual.(ctr))
         # println("Duals equal. : ", JuMP.getdual.(ctr))
-        println(JuMP.resultvalue.(X))
-        println("Objective value: ", JuMP.objectivevalue(m))
-        println("primal Status value: ", JuMP.primalstatus(m))
-        println("dual Status value: ", JuMP.dualstatus(m))
-        println("term Status value: ", JuMP.terminationstatus(m))
-        println(JuMP.resultvalue.(X))
+        # println(JuMP.resultvalue.(X))
+        # println("Objective value: ", JuMP.objectivevalue(m))
+        # println("primal Status value: ", JuMP.primalstatus(m))
+        # println("dual Status value: ", JuMP.dualstatus(m))
+        # println("term Status value: ", JuMP.terminationstatus(m))
+        # println(JuMP.resultvalue.(X))
     end
 end

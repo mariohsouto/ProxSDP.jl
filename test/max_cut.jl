@@ -5,15 +5,15 @@ using JuMP
 using Base.Test
 import Base.isempty
 # using MathOptInterfaceSCS
-# using MathOptInterfaceMosek
+using MathOptInterfaceMosek
 
-using MathOptInterface
-const MOI = MathOptInterface
-using MathOptInterfaceUtilities
-const MOIU = MathOptInterfaceUtilities
+# using MathOptInterface
+# const MOI = MathOptInterface
+# using MathOptInterfaceUtilities
+# const MOIU = MathOptInterfaceUtilities
 # using CSDP
 # using SCS
-# using Mosek
+using Mosek
 
 @testset "Max-Cut" begin
 
@@ -34,7 +34,7 @@ const MOIU = MathOptInterfaceUtilities
 
     # Build model
     m = Model() 
-    # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
+    # m = Model(solver=MosekSolver()) 
 
     # m = Model(solver=CSDPSolver()) 
     # m = Model(solver=MosekSolver(MSK_IPAR_BI_MAX_ITERATIONS=10000)) 
@@ -47,13 +47,13 @@ const MOIU = MathOptInterfaceUtilities
     # @constraint(m, bla, X[1, 1] <= 10.0)
 
     # JuMP.attach(m, SCSInstance())
-    # JuMP.attach(m, MosekInstance(
-    #     MSK_DPAR_INTPNT_CO_TOL_DFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_INFEAS=1e-5,
-    #     MSK_DPAR_INTPNT_CO_TOL_MU_RED=1e-5, 
-    #     MSK_DPAR_INTPNT_CO_TOL_PFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_REL_GAP=1e-5
-    # ))
+    JuMP.attach(m, MosekInstance(
+        MSK_DPAR_INTPNT_CO_TOL_DFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_INFEAS=1e-5,
+        MSK_DPAR_INTPNT_CO_TOL_MU_RED=1e-5, 
+        MSK_DPAR_INTPNT_CO_TOL_PFEAS=1e-5, MSK_DPAR_INTPNT_CO_TOL_REL_GAP=1e-5
+    ))
     # JuMP.attach(m, CSDP.CSDPInstance(maxiter=100000))
-    JuMP.attach(m, ProxSDPSolverInstance())
+    # JuMP.attach(m, ProxSDPSolverInstance())
     tic()
     teste = JuMP.solve(m)
     println(toc())

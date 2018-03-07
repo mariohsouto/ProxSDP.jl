@@ -92,12 +92,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # logging
         converged = false
         rank_update = 0
-        best_comb_residual, comb_res_rank_update = Inf, Inf
+        best_prim_residual, best_dual_residual = Inf, Inf
         converged, status, polishing = false, false, false
-        comb_residual, dual_residual, primal_residual = Float64[], Float64[], Float64[]
-        sizehint!(comb_residual, max_iter)
-        sizehint!(dual_residual, max_iter)
-        sizehint!(primal_residual, max_iter)
+        # comb_residual, dual_residual, primal_residual = Float64[], Float64[], Float64[]
+        # sizehint!(comb_residual, max_iter)
+        # sizehint!(dual_residual, max_iter)
+        # sizehint!(primal_residual, max_iter)
+        primal_residual, dual_residual, comb_residual = zeros(max_iter), zeros(max_iter), zeros(max_iter)
     end
 
     @timeit "Scaling" begin
@@ -114,9 +115,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     adapt_decay = 0.9       # Rate the adaptivity decreases over time
     adapt_threshold = 1.5   # Minimum value that trigger to recompute the stepsizes
 
-    # Update dual variable
-    @timeit "dual" dual_step!(pair, a, dims, affine_sets, S, SM, Sinv, dual_step)::Void
-
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
@@ -127,24 +125,25 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, S, SM, Sinv, dual_step)::Void
 
         # Compute residuals and update old iterates
-        @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step)::Void
+        @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
 
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
-            print_progress(k, primal_residual[end], dual_residual[end], target_rank)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
         end
 
         # Check convergence
         rank_update += 1
-        if comb_residual[end] < 1e-4
+        if comb_residual[k] < 1e-3
             # Check convergence of inexact fixed-point
             @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank + 1, TMt, Tc, primal_step)::Int64
             @timeit "dual" dual_step!(pair, a, dims, affine_sets, S, SM, Sinv, dual_step)::Void
-            @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step)::Void
-            print_progress(k, primal_residual[end], dual_residual[end], target_rank)::Void
+            @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
-            if comb_residual[end] < 1e-4
+            if comb_residual[k] < 1e-3
                 converged = true
+                best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 break
             elseif rank_update > 1000
                 target_rank *= 2
@@ -155,20 +154,20 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > 3000 && comb_residual[end - 1999] < comb_residual[end] && rank_update > 2000
+        elseif k > 3000 && comb_residual[k - 2999] < comb_residual[k] && rank_update > 2000
             target_rank *= 2
             rank_update = 0
             if target_rank < 9
                 adapt_level = 0.5 
             end
-            print_progress(k, primal_residual[end], dual_residual[end], target_rank)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Adaptive stepsizes
-        elseif primal_residual[end] > 100 * primal_tol && dual_residual[end] < dual_tol
+        elseif primal_residual[k] > 100 * primal_tol && dual_residual[k] < dual_tol 
             primal_step /= (1 - adapt_level)
             dual_step *= (1 - adapt_level)
             adapt_level *= adapt_decay
-        elseif primal_residual[end] < primal_tol && dual_residual[end] > 100 * dual_tol
+        elseif primal_residual[k] < primal_tol && dual_residual[k] > 100 * dual_tol
             primal_step *= (1 - adapt_level)
             dual_step /= (1 - adapt_level)
             adapt_level *= adapt_decay 
@@ -179,14 +178,24 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     println("Time = $time")
     @show dot(c_orig, pair.x)
 
-    return CPResult(Int(converged), pair.x, pair.u, 0.0*pair.x, primal_residual[end], dual_residual[end], dot(c_orig, pair.x))
+    return CPResult(Int(converged), pair.x, pair.u, 0.0*pair.x, best_prim_residual, best_dual_residual, dot(c_orig, pair.x))
 end
 
-function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64)::Void    
-    # Compute residuals
-    push!(primal_residual, norm((1.0 / primal_step) * (pair.x - pair.x_old) + a.TMtu - a.TMtu_old, 1))
-    push!(dual_residual, norm((1.0 / dual_step) * (pair.u - pair.u_old) + a.SMx - a.SMx_old, 1))
-    push!(comb_residual, primal_residual[end] + dual_residual[end])
+function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64)::Void    
+    # Compute primal residual
+    Base.LinAlg.axpy!(-1.0, a.TMtu, a.TMtu_old)
+    Base.LinAlg.axpy!((1.0 / primal_step), pair.x_old, a.TMtu_old)
+    Base.LinAlg.axpy!(-(1.0 / primal_step), pair.x, a.TMtu_old)
+    primal_residual[iter] = norm(a.TMtu_old, 2)
+
+    # Compute dual residual
+    Base.LinAlg.axpy!(-1.0, a.SMx, a.SMx_old)
+    Base.LinAlg.axpy!((1.0 / dual_step), pair.u_old, a.SMx_old)
+    Base.LinAlg.axpy!(-(1.0 / dual_step), pair.u, a.SMx_old)
+    dual_residual[iter] = norm(a.SMx_old, 2)
+
+    # Compute combined residual
+    comb_residual[iter] = primal_residual[iter] + dual_residual[iter]
 
     # Keep track of previous iterates
     copy!(pair.x_old, pair.x)
