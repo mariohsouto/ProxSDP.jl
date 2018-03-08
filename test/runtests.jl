@@ -1,6 +1,6 @@
-path = joinpath(dirname(@__FILE__),"..","..")
+path = joinpath(dirname(@__FILE__), "..", "..")
 push!(Base.LOAD_PATH, path)
-datapath = joinpath(dirname(@__FILE__),"data")
+datapath = joinpath(dirname(@__FILE__), "data")
 
 using JuMP
 using Base.Test
