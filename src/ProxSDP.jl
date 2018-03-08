@@ -69,20 +69,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
     @timeit "Init" begin
         opt = CPOptions(false, verbose)
-        c_orig = zeros(1)
-        M = zeros(Int, dims.n, dims.n)
-        iv = conic_sets.sdpcone[1][1]
-        im = conic_sets.sdpcone[1][2]
-        for i in eachindex(iv)
-            M[im[i]] = iv[i]
-        end
-        X = Symmetric(M,:L)
-        ids = vec(X)
-        offdiag_ids = setdiff(Set(ids), Set(diag(X)))
-        c_orig = copy(affine_sets.c)
-        for i in offdiag_ids
-            affine_sets.c[i] /= 2.0
-        end  
+        # Scale objective function
+        c_orig = scale_objective!(affine_sets, dims, conic_sets)
 
         # Initialization
         pair = PrimalDual(dims)
@@ -90,14 +78,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         target_rank = 1
         
         # logging
-        converged = false
         rank_update = 0
         best_prim_residual, best_dual_residual = Inf, Inf
-        converged, status, polishing = false, false, false
-        # comb_residual, dual_residual, primal_residual = Float64[], Float64[], Float64[]
-        # sizehint!(comb_residual, max_iter)
-        # sizehint!(dual_residual, max_iter)
-        # sizehint!(primal_residual, max_iter)
+        converged, polishing = false, false
         primal_residual, dual_residual, comb_residual = zeros(max_iter), zeros(max_iter), zeros(max_iter)
     end
 
@@ -268,6 +251,24 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets
     # Projection onto the psd cone
     target_rank = sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank)::Int64
     return target_rank
+end
+
+function scale_objective!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
+    c_orig = zeros(1)
+    M = zeros(Int, dims.n, dims.n)
+    iv = conic_sets.sdpcone[1][1]
+    im = conic_sets.sdpcone[1][2]
+    for i in eachindex(iv)
+        M[im[i]] = iv[i]
+    end
+    X = Symmetric(M,:L)
+    ids = vec(X)
+    offdiag_ids = setdiff(Set(ids), Set(diag(X)))
+    c_orig = copy(aff.c)
+    for i in offdiag_ids
+        aff.c[i] /= 2.0
+    end  
+    return c_orig
 end
 
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, target_rank::Int64)::Int64
