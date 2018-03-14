@@ -15,22 +15,27 @@ function max_cut(solver, path)
         end
     end
 
-    if Base.libblas_name == "libmkl_rt"
-        m = Model()
-    else
-        m = Model(solver=solver) 
-    end
+    # if Base.libblas_name == "libmkl_rt"
+    #     m = Model()
+    # else
+    #     m = Model(solver=solver) 
+    # end
+    m = Model()
 
-    if Base.libblas_name == "libmkl_rt"
-        @variable(m, X[1:n, 1:n], PSD)
-    else
-        @variable(m, X[1:n, 1:n], SDP)
-    end
+    # if Base.libblas_name == "libmkl_rt"
+    #     @variable(m, X[1:n, 1:n], PSD)
+    # else
+    #     @variable(m, X[1:n, 1:n], SDP)
+    # end
+    @variable(m, X[1:n, 1:n], PSD)
     @objective(m, Min, sum(W[i, j] * X[i, j] for i in 1:n, j in 1:n))
     @constraint(m, ctr[i in 1:n], X[i, i] == 1.0)
 
-    if Base.libblas_name == "libmkl_rt"
-        JuMP.attach(m, solver)
-    end
+    # if Base.libblas_name == "libmkl_rt"
+    #     JuMP.attach(m, solver)
+    # end
+    JuMP.attach(m, solver)
     teste = JuMP.solve(m)
+
+    @show JuMP.resultvalue.(X)
 end
