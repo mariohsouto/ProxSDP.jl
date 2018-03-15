@@ -9,7 +9,7 @@ function mimo(solver)
     m = Model()
     
     # Instance size
-    n = 10
+    n = 300
     # Channel
     H = randn((n, n))
     # Gaussian noise
@@ -17,7 +17,7 @@ function mimo(solver)
     # True signal
     s = rand([-1, 1], n)
     # Received signal
-    sigma = 0.00001
+    sigma = 0.01
     y = H * s + sigma * v
     L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
     # if Base.libblas_name == "libmkl_rt"
