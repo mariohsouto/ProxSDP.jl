@@ -93,8 +93,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     adapt_decay = 0.9       # Rate the adaptivity decreases over time
     adapt_threshold = 1.5   # Minimum value that trigger to recompute the stepsizes
 
+    theta = 1.0
+
     # Update dual variable
-    @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step)::Void
+    @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step, theta)::Void
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -103,7 +105,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step)::Int64
 
         # Update dual variable
-        @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step)::Void
+        @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step, theta)::Void
 
         # Compute residuals and update old iterates
         @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
@@ -137,11 +139,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > 10 * primal_tol && dual_residual[k] < dual_tol 
+        elseif primal_residual[k] > 10 * tol && dual_residual[k] < tol 
             primal_step /= (1 - adapt_level)
             dual_step *= (1 - adapt_level)
             adapt_level *= adapt_decay
-        elseif primal_residual[k] < primal_tol && dual_residual[k] > 10 * dual_tol
+        elseif primal_residual[k] < tol && dual_residual[k] > 10 * tol
             primal_step *= (1 - adapt_level)
             dual_step /= (1 - adapt_level)
             adapt_level *= adapt_decay 
@@ -203,10 +205,11 @@ function diag_scaling(affine_sets::AffineSets, alpha::Float64, dims::Dims, M::Sp
     return affine_sets, TMt, Tc, S, SM, Sinv
 end
 
-function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, dual_step::Float64)::Void
-    copy!(a.u_1, a.Mx_old)
-    A_mul_B!(a.Mx, M, pair.x)
-    Base.LinAlg.axpy!(-2.0, a.Mx, a.u_1) # alpha*x + y
+function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, dual_step::Float64, theta::Float64)::Void
+    
+    copy!(a.u_1, theta * a.Mx_old) # theta * K * x_old
+    A_mul_B!(a.Mx, M, pair.x) # K * x
+    Base.LinAlg.axpy!(-(1.0 + theta), a.Mx, a.u_1) #  (1 + theta) * K * x
     Base.LinAlg.axpy!(-dual_step, a.u_1, pair.u) # alpha*x + y
     @inbounds @simd for i in eachindex(pair.u)
         a.u_1[i] = pair.u[i] / dual_step
