@@ -83,21 +83,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         best_prim_residual, best_dual_residual = Inf, Inf
         converged, polishing = false, false
         primal_residual, dual_residual, comb_residual = zeros(max_iter), zeros(max_iter), zeros(max_iter)
-
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
+
+        # Stepsize parameters and linesearch parameters
+        L = 1.0 / svds(M; nsv=1)[1][:S][1]
+        primal_step, dual_step = sqrt(L), sqrt(L)  
+        beta, theta = 1.0, 1.0
+        pair.x[1] = 1.0
     end
 
-    # Stepsize parameters and linesearch parameters
-    L = 1.0 / svds(M; nsv=1)[1][:S][1]
-    primal_step, dual_step = sqrt(L), sqrt(L)  
-    beta, theta = 1.0, 1.0
+    dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)
     
-    # Update dual variable
-    for i = 1:1
-        @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step, theta)::Void
-    end
-
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
