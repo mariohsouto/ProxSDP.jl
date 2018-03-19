@@ -89,14 +89,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     # Stepsize parameters
     L = 1.0 / svds(M; nsv=1)[1][:S][1]
     primal_step, dual_step = sqrt(L), sqrt(L)  
-    adapt_level = 0.5       # Factor by which the stepsizes will be balanced 
-    adapt_decay = 0.9       # Rate the adaptivity decreases over time
-    adapt_threshold = 1.5   # Minimum value that trigger to recompute the stepsizes
 
+    # Linesearch parameters
     theta = 1.0
+    primal_step_old = primal_step
 
     # Update dual variable
-    @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step, theta)::Void
+    for i = 1:10
+        @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step, theta)::Void
+    end
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -104,8 +105,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Update primal variable
         @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step)::Int64
 
-        # Update dual variable
-        @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, dual_step, theta)::Void
+        # Dual update with linesearch
+        @timeit "linesearch" primal_step, primal_step_old = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, primal_step_old, theta)::Tuple{Float64, Float64}
 
         # Compute residuals and update old iterates
         @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
@@ -113,6 +114,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+            println((primal_step, primal_step_old))
         end
 
         # Check convergence
@@ -137,16 +139,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             target_rank *= 2
             rank_update = 0
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
-
-        # Adaptive stepsizes
-        elseif primal_residual[k] > 10 * tol && dual_residual[k] < tol 
-            primal_step /= (1 - adapt_level)
-            dual_step *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-        elseif primal_residual[k] < tol && dual_residual[k] > 10 * tol
-            primal_step *= (1 - adapt_level)
-            dual_step /= (1 - adapt_level)
-            adapt_level *= adapt_decay 
         end
     end
 
@@ -234,6 +226,26 @@ function box_projection!(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Void
         v[dims.p+i] = min(v[dims.p+i], aff.h[i])
     end
     return nothing
+end
+
+function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, primal_step::Float64, primal_step_old::Float64, theta::Float64)::Tuple{Float64, Float64}
+    max_iter_linesearch = 100
+    beta = 2.0
+    delta = 0.99
+    mu = 0.7
+    primal_step_old = primal_step
+    primal_step = primal_step * sqrt(1.0 + theta)
+    for i = 1:max_iter_linesearch
+        theta = primal_step / primal_step_old
+        dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)
+        if primal_step * sqrt(beta) * norm(Mt * pair.u - a.Mtu_old) <= delta * norm(pair.u - pair.u_old)
+            return primal_step, primal_step_old
+        else
+            primal_step_old = primal_step
+            primal_step *= mu
+        end
+    end
+    return primal_step, primal_step_old
 end
 
 function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, Mt::SparseMatrixCSC{Float64,Int64}, c::Vector{Float64}, primal_step::Float64)::Int64
