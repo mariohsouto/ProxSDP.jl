@@ -113,16 +113,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
 
         # Print progress
-        # if mod(k, 1000) == 0 && opt.verbose
-        #     print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
-        # end
-        print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+        if mod(k, 1000) == 0 && opt.verbose
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+        end
 
         # Check convergence
         rank_update += 1
         if comb_residual[k] < tol
             # Check convergence of inexact fixed-point
-            @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step, arc)::Int64
+            @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank + 1, Mt, affine_sets.c, primal_step, arc)::Int64
             @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
@@ -319,25 +318,25 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     end
 
     if target_rank < 8
-        # @timeit "eigs" begin
-        #     D, V = eigs(a.m; nev=target_rank, which=:LR, maxiter=100000)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
-        #     fill!(a.m.data, 0.0)
-        #     for i in 1:min(target_rank, dims.n)
-        #         if D[i] > 0.0
-        #             Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
-        #         end
-        #     end
-        # end
-
-        @timeit "eigs" begin 
-            eig!(arc, a.m, target_rank)
+        @timeit "eigs" begin
+            D, V = eigs(a.m; nev=target_rank, which=:LR, maxiter=100000)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
             fill!(a.m.data, 0.0)
             for i in 1:min(target_rank, dims.n)
-                if unsafe_getvalues(arc)[i] > 0.0
-                    Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+                if D[i] > 0.0
+                    Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
                 end
             end
         end
+
+        # @timeit "eigs" begin 
+        #     eig!(arc, a.m, target_rank)
+        #     fill!(a.m.data, 0.0)
+        #     for i in 1:min(target_rank, dims.n)
+        #         if unsafe_getvalues(arc)[i] > 0.0
+        #             Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+        #         end
+        #     end
+        # end
 
         @timeit "reshape2" begin
             cont = 1

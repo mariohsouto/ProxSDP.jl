@@ -54,7 +54,7 @@ using MathOptInterfaceUtilities
 const MOIU = MathOptInterfaceUtilities
 include("jumptest.jl")
 include("max_cut.jl")
-mimo(ProxSDPSolverInstance())
-# path = "data/mcp500-1.dat-s" 
+# mimo(ProxSDPSolverInstance())
+path = "data/mcp250-1.dat-s" 
 # path = "data/maxG11.dat-s" 
-# max_cut(ProxSDPSolverInstance(), path)
+max_cut(ProxSDPSolverInstance(), path)
