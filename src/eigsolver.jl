@@ -166,6 +166,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
 
     arc
+    return nothing
 end
 
 function _AUPD!(arc)
@@ -184,6 +185,7 @@ function _AUPD!(arc)
             throw(ARPACKException("unexpected behavior"))
         end
     end
+    return nothing
 end
 
 function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
@@ -211,6 +213,7 @@ function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
     arc.info_e[1]   = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
     arc.sigmar[1] = BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
+    return nothing
 
 end
 
@@ -227,7 +230,7 @@ function _EUPD!(arc)
 
     # p = sortperm(dmap(d), rev=true)
     # return d[p], v[1:n, p]#,iparam[5],iparam[3],iparam[9],resid
-    nothing
+    return nothing
 end
 
 
@@ -237,26 +240,5 @@ function eig!(arc, A, nev)
     _AUPD!(arc)
     _EUPD!(arc)
 
-    nothing
+    return nothing
 end
-
-# Example:
-
-# initialize inplace eig structure
-arc = ARPACKAlloc(Float64)
-# applye sparse eigen decomposition to A (Symmetric and Real) with nev eigenpairs
-eig!(arc, eye(50,50), 3)
-# return vector of eigenvalues
-unsafe_getvalues(arc)
-# return matrix of eigenvector (contains extra vector columns only the first matter)
-unsafe_getvectors(arc)[:,1:3]
-
-# compare with usual implementation
-A = Symmetric(rand(30,30),:L)
-eig(A)
-eig!(arc,A,3)
-
-# structure only re-allocates (automatically) when matrix size of number or eigenpairs change
-
-# for prox sdp, we will use one structure for each matrix of each chordal unit of each sdp constraint (because each has a differnete size)
-
