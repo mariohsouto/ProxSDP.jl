@@ -1,0 +1,262 @@
+
+import Base.LinAlg: BlasInt, ARPACKException
+
+Base.LinAlg.ARPACK
+
+mutable struct ARPACKAlloc{T}
+
+    # eigs
+    n::Int
+    nev::Int
+    ncv::Int
+    maxiter::Int
+
+    bmat::String
+    which::String
+    mode::Int
+
+    A::Function
+    solveSI::Function
+    B::Function
+
+
+    # in aupd_wrapper
+
+    lworkl::Int
+
+    TOL::Vector{T}#Ref{T}
+
+    v::Matrix{T}
+    workd::Vector{T}
+    workl::Vector{T}
+    rwork::Vector{T}
+
+    resid::Vector{T}
+    info::Vector{BlasInt}#Ref{BlasInt}
+
+    iparam::Vector{BlasInt}
+    ipntr::Vector{BlasInt}
+    ido::Vector{BlasInt}#Ref{BlasInt}
+
+    zernm1::UnitRange{Int}
+
+    # eupd
+
+    howmny::String
+    select::Vector{BlasInt}
+    info_e::Vector{BlasInt}#Ref{BlasInt}
+
+    d::Vector{T}
+    sigmar::Vector{T}#Ref{T}
+
+    function ARPACKAlloc{T}() where T
+        new{T}()
+    end
+end
+
+function Base.getindex(arc::ARPACKAlloc, s::Symbol)
+    if s == :Values
+        return arc.d
+    elseif s == :Vector
+        return arc.v
+    else
+        error("Not a field")
+    end
+end
+
+function Base.getindex(arc::ARPACKAlloc{T}, s::Symbol, i::Integer)::T where T
+    if s == :Values && i <= arc.nev
+        return arc.d[i]
+    else
+        error("Not allowed")
+    end
+end
+
+function getvector(arc::ARPACKAlloc{T}, s::Symbol, i::Integer)::Vector{T} where T
+    if i <= arc.nev
+        return arc.v[:,i]
+    else
+        error("Bounds out of range")
+    end
+end
+
+function unsafe_getvalues(arc::ARPACKAlloc)
+    return arc.d
+end
+
+function unsafe_getvectors(arc::ARPACKAlloc)
+    return arc.v
+end
+
+function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1)
+    arc = ARPACKAlloc{T}()
+    ARPACKAlloc_reset!(arc::ARPACKAlloc, speye(T,n), 1)
+    return arc
+end
+
+function ARPACKAlloc(A, nev::Integer)
+    arc = ARPACKAlloc{T}()
+    ARPACKAlloc_reset!(arc::ARPACKAlloc, A, nev)
+    return arc
+end
+
+function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
+
+    tol = 0.0
+    v0=zeros(eltype(A),(0,))
+
+    newT = eltype(A)
+    n = Base.LinAlg.checksquare(A)
+
+    if newT != T
+        error("Element type change is not allowed")
+    end
+
+    # eigs
+    arc.n = n
+    arc.nev = nev
+    arc.ncv = max(20,2*arc.nev+1)
+    arc.maxiter = 100000
+
+    arc.bmat = "I"
+    arc.which = "LA"
+
+    arc.mode = 1
+    arc.solveSI = x->x
+    arc.B = x->x
+    matvecA!(y, x) = A_mul_B!(y, A, x)
+    arc.A = matvecA!
+
+    # aupd
+
+    arc.lworkl = arc.ncv * (arc.ncv + 8)#cmplx ? ncv * (3*ncv + 5) : (sym ? ncv * (ncv + 8) :  ncv * (3*ncv + 6) )
+
+    arc.TOL = tol*ones(T,1)#Ref{T}(tol)
+
+    arc.v = Matrix{T}(arc.n, arc.ncv)
+    arc.workd = Vector{T}(3*arc.n)
+    arc.workl = Vector{T}(arc.lworkl)
+    arc.rwork = Vector{T}() # cmplx ? Vector{TR}(ncv) : Vector{TR}()
+
+    if isempty(v0)
+        arc.resid = Vector{T}(arc.n)
+        arc.info  = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+    else
+        arc.resid = deepcopy(v0)
+        arc.info  = ones(BlasInt, 1)#Ref{BlasInt}(1)
+    end
+
+    arc.iparam = zeros(BlasInt, 11)
+    arc.ipntr = zeros(BlasInt, 11) # = zeros(BlasInt, (sym && !cmplx) ? 11 : 14)
+    arc.ido = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+
+    arc.iparam[1] = BlasInt(1)       # ishifts
+    arc.iparam[3] = BlasInt(arc.maxiter) # maxiter
+    arc.iparam[7] = BlasInt(1)    # mode
+
+    arc.zernm1 = 0:(arc.n-1)
+
+    # eupd
+
+    arc.howmny = "A"
+    arc.select = Vector{BlasInt}(arc.ncv)
+    arc.info_e = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+
+    arc.d = Vector{T}(arc.nev)
+    arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
+
+    arc
+end
+
+function _AUPD!(arc)
+    while true
+        Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
+        arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
+
+        x = view(arc.workd, arc.ipntr[1] .+ arc.zernm1)
+        y = view(arc.workd, arc.ipntr[2] .+ arc.zernm1)
+
+        if arc.ido[] == 1
+            arc.A(y, x)
+        elseif arc.ido[] == 99
+            break
+        else
+            throw(ARPACKException("unexpected behavior"))
+        end
+    end
+end
+
+function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
+
+    n = Base.LinAlg.checksquare(A)
+    T = eltype(A)
+
+    if eltype(arc.v) != T || n != arc.n || nev != arc.nev
+        return ARPACKAlloc_reset!(arc, A, nev)
+    end
+
+    matvecA!(y, x) = A_mul_B!(y, A, x)
+    arc.A = matvecA!
+
+    arc.info[1] = BlasInt(0)# = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+
+    # arc.iparam = zeros(BlasInt, 11)
+    # arc.ipntr = zeros(BlasInt, 11) # = zeros(BlasInt, (sym && !cmplx) ? 11 : 14)
+    arc.ido[1] = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
+
+    arc.iparam[1] = BlasInt(1)       # ishifts
+    arc.iparam[3] = BlasInt(arc.maxiter) # maxiter
+    arc.iparam[7] = BlasInt(1)    # mode
+
+    arc.info_e[1]   = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
+
+    arc.sigmar[1] = BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
+
+end
+
+function _EUPD!(arc)
+
+    # d = Vector{T}(nev)
+    # sigmar = Ref{T}(sigma)
+    Base.LinAlg.ARPACK.seupd(true, arc.howmny, arc.select, arc.d, arc.v, arc.n, arc.sigmar,
+    arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
+    arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info_e)
+    if arc.info_e[] != 0
+        throw(ARPACKException(arc.info_e[]))
+    end
+
+    # p = sortperm(dmap(d), rev=true)
+    # return d[p], v[1:n, p]#,iparam[5],iparam[3],iparam[9],resid
+    nothing
+end
+
+
+function eig!(arc, A, nev)
+
+    _INIT!(arc, A, nev)
+    _AUPD!(arc)
+    _EUPD!(arc)
+
+    nothing
+end
+
+# Example:
+
+# initialize inplace eig structure
+arc = ARPACKAlloc(Float64)
+# applye sparse eigen decomposition to A (Symmetric and Real) with nev eigenpairs
+eig!(arc, eye(50,50), 3)
+# return vector of eigenvalues
+unsafe_getvalues(arc)
+# return matrix of eigenvector (contains extra vector columns only the first matter)
+unsafe_getvectors(arc)[:,1:3]
+
+# compare with usual implementation
+A = Symmetric(rand(30,30),:L)
+eig(A)
+eig!(arc,A,3)
+
+# structure only re-allocates (automatically) when matrix size of number or eigenpairs change
+
+# for prox sdp, we will use one structure for each matrix of each chordal unit of each sdp constraint (because each has a differnete size)
+

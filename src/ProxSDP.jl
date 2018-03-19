@@ -3,6 +3,7 @@ module ProxSDP
 using MathOptInterface, TimerOutputs
 
 include("mathoptinterface.jl")
+include("eigsolver.jl")
 
 immutable Dims
     n::Int  # Size of primal variables
@@ -62,6 +63,8 @@ end
 
 function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-3)::CPResult
 
+    BLAS.set_num_threads(12)
+
     tic()
     println(" Initializing Primal-Dual Hybrid Gradient method")
     println("----------------------------------------------------------")
@@ -91,6 +94,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_step, dual_step = sqrt(L), sqrt(L)  
         beta, theta = 1.0, 1.0
         pair.x[1] = 1.0
+
+        arc = ARPACKAlloc(Float64)
     end
 
     dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)
@@ -99,7 +104,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     @timeit "CP loop" for k in 1:max_iter
 
         # Update primal variable
-        @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step)::Int64
+        @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step, arc)::Int64
 
         # Dual update with linesearch
         @timeit "linesearch" primal_step, beta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64}
@@ -108,15 +113,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
 
         # Print progress
-        if mod(k, 1000) == 0 && opt.verbose
-            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
-        end
+        # if mod(k, 1000) == 0 && opt.verbose
+        #     print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+        # end
+        print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Check convergence
         rank_update += 1
         if comb_residual[k] < tol
             # Check convergence of inexact fixed-point
-            @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank + 1, Mt, affine_sets.c, primal_step)::Int64
+            @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step, arc)::Int64
             @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
@@ -257,13 +263,13 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
     return primal_step, beta
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, Mt::SparseMatrixCSC{Float64,Int64}, c::Vector{Float64}, primal_step::Float64)::Int64
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, Mt::SparseMatrixCSC{Float64,Int64}, c::Vector{Float64}, primal_step::Float64, arc::ARPACKAlloc)::Int64
     # x=x+(-t)*(Mt*u)+(-t)*c
     Base.LinAlg.axpy!(-primal_step, a.Mtu, pair.x) # x=x+(-t)*(Mt*u)
     Base.LinAlg.axpy!(-primal_step, c, pair.x) # x=x+(-t)*c
 
     # Projection onto the psd cone
-    return sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank)::Int64
+    return sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank, arc)::Int64
 end
 
 function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
@@ -299,7 +305,7 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     return c_orig[ord], sortperm(ord)
 end
 
-function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, target_rank::Int64)::Int64
+function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, target_rank::Int64, arc::ARPACKAlloc)::Int64
 
     n = dims.n
     iv = con.sdpcone[1][1]::Vector{Int}
@@ -313,26 +319,35 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     end
 
     if target_rank < 8
-        try
-            @timeit "eigs" begin
-                D, V = eigs(a.m; nev=target_rank, which=:LR, maxiter=100000)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
-                fill!(a.m.data, 0.0)
-                for i in 1:min(target_rank, dims.n)
-                    if D[i] > 0.0
-                        Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
-                    end
+        # @timeit "eigs" begin
+        #     D, V = eigs(a.m; nev=target_rank, which=:LR, maxiter=100000)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+        #     fill!(a.m.data, 0.0)
+        #     for i in 1:min(target_rank, dims.n)
+        #         if D[i] > 0.0
+        #             Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
+        #         end
+        #     end
+        # end
+
+        @timeit "eigs" begin 
+            eig!(arc, a.m, target_rank)
+            fill!(a.m.data, 0.0)
+            for i in 1:min(target_rank, dims.n)
+                if unsafe_getvalues(arc)[i] > 0.0
+                    Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
                 end
             end
-            @timeit "reshape2" begin
-                cont = 1
-                @inbounds for j in 1:n, i in j:n
-                    v[cont] = a.m.data[i,j]
-                    cont+=1
-                end
-            end
-            return target_rank
         end
-    end
+
+        @timeit "reshape2" begin
+            cont = 1
+            @inbounds for j in 1:n, i in j:n
+                v[cont] = a.m.data[i,j]
+                cont+=1
+            end
+        end
+        return target_rank
+        end
     
     @timeit "eigfact" begin
         fact = eigfact!(a.m, 0.0, Inf)
