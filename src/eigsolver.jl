@@ -16,8 +16,8 @@ mutable struct ARPACKAlloc{T}
     mode::Int
 
     A::Function
-    solveSI::Function
-    B::Function
+    # solveSI::Function
+    # B::Function
 
 
     # in aupd_wrapper
@@ -122,8 +122,8 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     arc.which = "LA"
 
     arc.mode = 1
-    arc.solveSI = x->x
-    arc.B = x->x
+    # arc.solveSI = x->x
+    # arc.B = x->x
     matvecA!(y, x) = A_mul_B!(y, A, x)
     arc.A = matvecA!
 
@@ -174,8 +174,8 @@ function _AUPD!(arc)
         Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
-        x = view(arc.workd, arc.ipntr[1] .+ arc.zernm1)
-        y = view(arc.workd, arc.ipntr[2] .+ arc.zernm1)
+        x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
+        y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
 
         if arc.ido[] == 1
             arc.A(y, x)
@@ -212,7 +212,7 @@ function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
 
     arc.info_e[1]   = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
-    arc.sigmar[1] = BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
+    arc.sigmar[1] = 0.0#BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
     return nothing
 
 end
