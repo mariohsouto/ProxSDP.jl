@@ -61,7 +61,7 @@ type AuxiliaryData
     )
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-3)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
 
     BLAS.set_num_threads(12)
 
@@ -141,9 +141,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Adaptive beta
-        elseif primal_residual[k] > 10 * tol && dual_residual[k] < tol 
+        elseif primal_residual[k] > 2 * tol && dual_residual[k] < tol 
             beta *= 0.9
-        elseif primal_residual[k] < tol && dual_residual[k] > 10 * tol
+        elseif primal_residual[k] < tol && dual_residual[k] > 2 * tol
             beta *= 1.1
         end
     end
@@ -317,26 +317,16 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if target_rank < 8
-        @timeit "eigs" begin
-            D, V = eigs(a.m; nev=target_rank, which=:LR, maxiter=100000)::Tuple{Array{Float64,1},Array{Float64,2},Int64,Int64,Int64,Array{Float64,1}}
+    if target_rank <= 8
+        @timeit "eigs" begin 
+            eig!(arc, a.m, target_rank)
             fill!(a.m.data, 0.0)
-            for i in 1:min(target_rank, dims.n)
-                if D[i] > 0.0
-                    Base.LinAlg.BLAS.gemm!('N', 'T', D[i], V[:, i], V[:, i], 1.0, a.m.data)
+            for i in 1:target_rank
+                if unsafe_getvalues(arc)[i] > 0.0
+                    Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
                 end
             end
         end
-
-        # @timeit "eigs" begin 
-        #     eig!(arc, a.m, target_rank)
-        #     fill!(a.m.data, 0.0)
-        #     for i in 1:min(target_rank, dims.n)
-        #         if unsafe_getvalues(arc)[i] > 0.0
-        #             Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
-        #         end
-        #     end
-        # end
 
         @timeit "reshape2" begin
             cont = 1
@@ -346,7 +336,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             end
         end
         return target_rank
-        end
+    end
     
     @timeit "eigfact" begin
         fact = eigfact!(a.m, 0.0, Inf)

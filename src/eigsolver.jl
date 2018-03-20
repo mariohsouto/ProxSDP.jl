@@ -1,6 +1,8 @@
 
 import Base.LinAlg: BlasInt, ARPACKException
 
+using TimerOutputs
+
 Base.LinAlg.ARPACK
 
 mutable struct ARPACKAlloc{T}
@@ -16,11 +18,6 @@ mutable struct ARPACKAlloc{T}
     mode::Int
 
     A::Function
-    # solveSI::Function
-    # B::Function
-
-
-    # in aupd_wrapper
 
     lworkl::Int
 
@@ -116,7 +113,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     arc.n = n
     arc.nev = nev
     arc.ncv = max(20,2*arc.nev+1)
-    arc.maxiter = 100000
+    arc.maxiter = Int(1e+6)
 
     arc.bmat = "I"
     arc.which = "LA"
@@ -126,8 +123,6 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     # arc.B = x->x
     matvecA!(y, x) = A_mul_B!(y, A, x)
     arc.A = matvecA!
-
-    # aupd
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)#cmplx ? ncv * (3*ncv + 5) : (sym ? ncv * (ncv + 8) :  ncv * (3*ncv + 6) )
 
@@ -148,15 +143,13 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
 
     arc.iparam = zeros(BlasInt, 11)
     arc.ipntr = zeros(BlasInt, 11) # = zeros(BlasInt, (sym && !cmplx) ? 11 : 14)
-    arc.ido = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+    arc.ido = zeros(BlasInt, 1) #Ref{BlasInt}(0)
 
     arc.iparam[1] = BlasInt(1)       # ishifts
     arc.iparam[3] = BlasInt(arc.maxiter) # maxiter
     arc.iparam[7] = BlasInt(1)    # mode
 
     arc.zernm1 = 0:(arc.n-1)
-
-    # eupd
 
     arc.howmny = "A"
     arc.select = Vector{BlasInt}(arc.ncv)
@@ -165,19 +158,20 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     arc.d = Vector{T}(arc.nev)
     arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
 
-    arc
     return nothing
 end
 
-function _AUPD!(arc)
+function _AUPD!(arc::ARPACKAlloc)
     while true
         Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
-        x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
-        y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
+        # x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
+        # y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
 
         if arc.ido[] == 1
+            x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
+            y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
             arc.A(y, x)
         elseif arc.ido[] == 99
             break
@@ -236,9 +230,9 @@ end
 
 function eig!(arc, A, nev)
 
-    _INIT!(arc, A, nev)
-    _AUPD!(arc)
-    _EUPD!(arc)
+    @timeit "_INIT!" _INIT!(arc, A, nev)
+    @timeit "_AUPD!" _AUPD!(arc)
+    @timeit "_EUPD!" _EUPD!(arc)
 
     return nothing
 end
