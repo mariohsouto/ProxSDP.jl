@@ -320,22 +320,26 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     if target_rank <= 8
         @timeit "eigs" begin 
             eig!(arc, a.m, target_rank)
-            fill!(a.m.data, 0.0)
-            for i in 1:target_rank
-                if unsafe_getvalues(arc)[i] > 0.0
-                    Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+            if hasconverged(arc)
+                fill!(a.m.data, 0.0)
+                for i in 1:target_rank
+                    if unsafe_getvalues(arc)[i] > 0.0
+                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+                    end
                 end
             end
         end
 
-        @timeit "reshape2" begin
-            cont = 1
-            @inbounds for j in 1:n, i in j:n
-                v[cont] = a.m.data[i,j]
-                cont+=1
+        if hasconverged(arc)
+            @timeit "reshape2" begin
+                cont = 1
+                @inbounds for j in 1:n, i in j:n
+                    v[cont] = a.m.data[i,j]
+                    cont+=1
+                end
             end
+            return target_rank
         end
-        return target_rank
     end
     
     @timeit "eigfact" begin
