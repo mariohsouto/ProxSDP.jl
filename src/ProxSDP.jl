@@ -115,6 +115,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+            println(beta)
         end
 
         # Check convergence
@@ -141,10 +142,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Adaptive beta
-        elseif primal_residual[k] > 2 * tol && dual_residual[k] < tol 
-            beta *= 0.9
-        elseif primal_residual[k] < tol && dual_residual[k] > 2 * tol
-            beta *= 1.1
+        elseif primal_residual[k] > 10 * tol && dual_residual[k] < tol 
+            beta = min(0.9 * beta, 100.0)
+        elseif primal_residual[k] < tol && dual_residual[k] > 10 * tol
+            beta = min(1.1 * beta, 100.0)
         end
     end
 
@@ -162,13 +163,13 @@ function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::A
     Base.LinAlg.axpy!(-1.0, a.Mtu, a.Mtu_old)
     Base.LinAlg.axpy!((1.0 / primal_step), pair.x_old, a.Mtu_old)
     Base.LinAlg.axpy!(-(1.0 / primal_step), pair.x, a.Mtu_old)
-    primal_residual[iter] = norm(a.Mtu_old, 2)
+    primal_residual[iter] = norm(a.Mtu_old, 2) / (1 + norm(pair.x))
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
     Base.LinAlg.axpy!((1.0 / dual_step), pair.u_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / dual_step), pair.u, a.Mx_old)
-    dual_residual[iter] = norm(a.Mx_old, 2)
+    dual_residual[iter] = norm(a.Mx_old, 2) / (1 + norm(pair.u))
 
     # Compute combined residual
     comb_residual[iter] = primal_residual[iter] + dual_residual[iter]
