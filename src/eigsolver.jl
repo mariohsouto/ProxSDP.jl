@@ -112,8 +112,8 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     # eigs
     arc.n = n
     arc.nev = nev
-    arc.ncv = max(20,2*arc.nev+1)
-    arc.maxiter = Int(1e+6)
+    arc.ncv = max(20, 2*arc.nev+1)
+    arc.maxiter = Int(1e+8)
 
     arc.bmat = "I"
     arc.which = "LA"
