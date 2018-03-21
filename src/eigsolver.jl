@@ -18,6 +18,8 @@ mutable struct ARPACKAlloc{T}
     mode::Int
 
     A::Function
+    x::Vector{T}
+    y::Vector{T}
 
     lworkl::Int
 
@@ -46,10 +48,15 @@ mutable struct ARPACKAlloc{T}
     d::Vector{T}
     sigmar::Vector{T}#Ref{T}
 
+    converged::Bool
+    arpackerror::Bool
+
     function ARPACKAlloc{T}() where T
         new{T}()
     end
 end
+
+hasconverged(arc::ARPACKAlloc) = arc.converged
 
 function Base.getindex(arc::ARPACKAlloc, s::Symbol)
     if s == :Values
@@ -112,8 +119,8 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     # eigs
     arc.n = n
     arc.nev = nev
-    arc.ncv = max(20, 2*arc.nev+1)
-    arc.maxiter = Int(1e+8)
+    arc.ncv = max(20,2*arc.nev+1)
+    arc.maxiter = Int(1e+3)
 
     arc.bmat = "I"
     arc.which = "LA"
@@ -123,6 +130,8 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     # arc.B = x->x
     matvecA!(y, x) = A_mul_B!(y, A, x)
     arc.A = matvecA!
+    arc.x = Vector{T}(arc.n)
+    arc.y = Vector{T}(arc.n)
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)#cmplx ? ncv * (3*ncv + 5) : (sym ? ncv * (ncv + 8) :  ncv * (3*ncv + 6) )
 
@@ -158,6 +167,9 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     arc.d = Vector{T}(arc.nev)
     arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
 
+    arc.converged = false
+    arc.arpackerror = false
+
     return nothing
 end
 
@@ -166,16 +178,29 @@ function _AUPD!(arc::ARPACKAlloc)
         Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
+        x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
+        y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
+        arc.A(y, x)
+
         if arc.ido[] == 1
-            x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
-            y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
-            arc.A(y, x)
+            @inbounds @simd for i in 1:arc.n
+                arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
+            end
+            arc.A(arc.y, arc.x)
+            @inbounds @simd for i in 1:arc.n
+                 arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
+            end
         elseif arc.ido[] == 99
             break
         else
-            throw(ARPACKException("unexpected behavior"))
+            arc.converged = false
+            arc.arpackerror = true
+            return nothing
+            # throw(ARPACKException("unexpected behavior"))
         end
     end
+
+    arc.converged = true
     return nothing
 end
 
@@ -204,11 +229,19 @@ function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
     arc.info_e[1]   = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
     arc.sigmar[1] = 0.0#BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
-    return nothing
 
+    arc.converged = false
+    arc.arpackerror = false
+
+    return nothing
 end
 
 function _EUPD!(arc)
+
+    if !arc.converged
+        arc.converged = false        
+        return nothing
+    end
 
     # d = Vector{T}(nev)
     # sigmar = Ref{T}(sigma)
@@ -216,9 +249,21 @@ function _EUPD!(arc)
     arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
     arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info_e)
     if arc.info_e[] != 0
-        throw(ARPACKException(arc.info_e[]))
+        arc.converged = false
+        arc.arpackerror = true
+        return nothing
+        # throw(ARPACKException(arc.info_e[]))
     end
 
+    nconv = arc.iparam[5]
+    if nconv < arc.nev 
+        arc.converged = false
+        arc.arpackerror = false
+        return nothing        
+    end
+
+    arc.converged = true
+    arc.arpackerror = false
     # p = sortperm(dmap(d), rev=true)
     # return d[p], v[1:n, p]#,iparam[5],iparam[3],iparam[9],resid
     return nothing

@@ -63,8 +63,6 @@ end
 
 function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
 
-    BLAS.set_num_threads(12)
-
     tic()
     println(" Initializing Primal-Dual Hybrid Gradient method")
     println("----------------------------------------------------------")
@@ -94,8 +92,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_step = sqrt(1.0 / vecnorm(M, 2))
         beta, theta = 1.0, 1.0
 
-        dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)::Void
         pair.x[1] = 1.0
+        dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)::Void
+
     end
 
     # Fixed-point loop
@@ -140,9 +139,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
         # Adaptive beta
         elseif primal_residual[k] > tol && dual_residual[k] < tol 
-            beta = max(1e-3, min(0.9 * beta, 1e+3))
+            beta = max(1e-1, min(0.9 * beta, 1e+1))
         elseif primal_residual[k] < tol && dual_residual[k] > tol
-            beta = max(1e-3, min(1.1 * beta, 1e+3))
+            beta = max(1e-1, min(1.1 * beta, 1e+1))
         end
     end
 
@@ -160,13 +159,13 @@ function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::A
     Base.LinAlg.axpy!(-1.0, a.Mtu, a.Mtu_old)
     Base.LinAlg.axpy!((1.0 / primal_step), pair.x_old, a.Mtu_old)
     Base.LinAlg.axpy!(-(1.0 / primal_step), pair.x, a.Mtu_old)
-    primal_residual[iter] = norm(a.Mtu_old, 2) / norm(pair.x_old, 2)
+    primal_residual[iter] = norm(a.Mtu_old, 2) / (1.0 + norm(pair.x_old, 2))
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
     Base.LinAlg.axpy!((1.0 / dual_step), pair.u_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / dual_step), pair.u, a.Mx_old)
-    dual_residual[iter] = norm(a.Mx_old, 2) / norm(pair.u_old, 2)
+    dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + norm(pair.u_old, 2))
 
     # Compute combined residual
     comb_residual[iter] = primal_residual[iter] + dual_residual[iter]
@@ -318,22 +317,26 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     if target_rank <= 8
         @timeit "eigs" begin 
             eig!(arc, a.m, target_rank)
-            fill!(a.m.data, 0.0)
-            for i in 1:target_rank
-                if unsafe_getvalues(arc)[i] > 0.0
-                    Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+            if hasconverged(arc)
+                fill!(a.m.data, 0.0)
+                for i in 1:target_rank
+                    if unsafe_getvalues(arc)[i] > 0.0
+                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+                    end
                 end
             end
         end
 
-        @timeit "reshape2" begin
-            cont = 1
-            @inbounds for j in 1:n, i in j:n
-                v[cont] = a.m.data[i,j]
-                cont+=1
+        if hasconverged(arc)
+            @timeit "reshape2" begin
+                cont = 1
+                @inbounds for j in 1:n, i in j:n
+                    v[cont] = a.m.data[i,j]
+                    cont+=1
+                end
             end
+            return target_rank
         end
-        return target_rank
     end
     
     @timeit "eigfact" begin
