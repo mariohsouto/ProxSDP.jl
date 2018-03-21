@@ -99,6 +99,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     end
 
     dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)
+
+    normc = norm(affine_sets.c)
+    normb = norm(affine_sets.b)
     
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -110,7 +113,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "linesearch" primal_step, beta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64}
 
         # Compute residuals and update old iterates
-        @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
+        @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, normc, normb)::Void
 
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
@@ -122,7 +125,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         if comb_residual[k] < tol
             # Check convergence of inexact fixed-point
             @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank + 1, Mt, affine_sets.c, primal_step, arc)::Int64
-            @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
+            @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, normc, normb)::Void
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
             if comb_residual[k] < tol
@@ -135,16 +138,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > 3000 && comb_residual[k - 2999] < comb_residual[k] && rank_update > 2000
+        elseif k > 2000 && comb_residual[k - 1999] < comb_residual[k] && rank_update > 2000
             target_rank *= 2
             rank_update = 0
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Adaptive beta
-        elseif primal_residual[k] > 2 * tol && dual_residual[k] < tol 
-            beta *= 0.9
-        elseif primal_residual[k] < tol && dual_residual[k] > 2 * tol
-            beta *= 1.1
+        elseif primal_residual[k] > 10.0 * tol && dual_residual[k] < tol 
+            beta = max(0.1, min(0.9 * beta, 10.0))
+        elseif primal_residual[k] < tol && dual_residual[k] > 10.0 * tol
+            beta = max(0.1, min(1.1 * beta, 10.0))
         end
     end
 
@@ -157,18 +160,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     return CPResult(Int(converged), pair.x, pair.u, 0.0*pair.x, best_prim_residual, best_dual_residual, dot(c_orig[idx], pair.x))
 end
 
-function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64)::Void    
+function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64, normc::Float64, normb::Float64)::Void    
     # Compute primal residual
     Base.LinAlg.axpy!(-1.0, a.Mtu, a.Mtu_old)
     Base.LinAlg.axpy!((1.0 / primal_step), pair.x_old, a.Mtu_old)
     Base.LinAlg.axpy!(-(1.0 / primal_step), pair.x, a.Mtu_old)
-    primal_residual[iter] = norm(a.Mtu_old, 2)
+    primal_residual[iter] = norm(a.Mtu_old, 2) / (1.0 + norm(pair.x, 2))
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
     Base.LinAlg.axpy!((1.0 / dual_step), pair.u_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / dual_step), pair.u, a.Mx_old)
-    dual_residual[iter] = norm(a.Mx_old, 2)
+    dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + norm(pair.u, 2))
 
     # Compute combined residual
     comb_residual[iter] = primal_residual[iter] + dual_residual[iter]
