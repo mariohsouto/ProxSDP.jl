@@ -90,18 +90,20 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
         # Stepsize parameters and linesearch parameters
         primal_step = sqrt(1.0 / vecnorm(M, 2))
-        beta, theta = 1.0, 1.0
+        beta, theta = 1.0, 1.0      # Ratio (dual / primal) and overrelaxation parameter
+        adapt_level = 0.5           # Factor by which the stepsizes will be balanced 
+        adapt_decay = 0.9           # Rate the adaptivity decreases over time
 
+        # Initial iterates
         pair.x[1] = 1.0
         dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)::Void
-
     end
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
         # Update primal variable
-        @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step, arc)::Int64
+        @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
 
         # Dual update with linesearch
         @timeit "linesearch" primal_step, dual_step, beta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64, Float64}
@@ -118,37 +120,39 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         rank_update += 1
         if comb_residual[k] < tol
             # Check convergence of inexact fixed-point
-            @timeit "primal" target_rank = primal_step!(pair, a, dims, conic_sets, target_rank + 1, Mt, affine_sets.c, primal_step, arc)::Int64
-            @timeit "logging" compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k)::Void
-            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+            @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank + 1, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
 
-            if comb_residual[k] < tol
+            if min_eig < tol
+                print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 break
             elseif rank_update > 1000
                 target_rank *= 2
                 rank_update = 0
+                adapt_level = 0.5
             end
 
         # Check divergence
-        elseif k > 2000 && comb_residual[k - 1999] < comb_residual[k] && rank_update > 2000
+        elseif k > 2000 && comb_residual[k - 1999] < comb_residual[k] && rank_update > 1000
             target_rank *= 2
             rank_update = 0
+            adapt_level = 0.5
             print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
 
         # Adaptive beta
         elseif primal_residual[k] > tol && dual_residual[k] < tol 
-            beta = max(1e-1, min(0.9 * beta, 1e+1))
+            beta = max(1e-3, min(beta * (1 - adapt_level), 1e+3))
+            adapt_level *= adapt_decay 
         elseif primal_residual[k] < tol && dual_residual[k] > tol
-            beta = max(1e-1, min(1.1 * beta, 1e+1))
+            beta = max(1e-3, min(beta / (1 + adapt_level), 1e+3))
+            adapt_level *= adapt_decay 
         end
     end
 
     time = toq()
     println("Time = $time")
     @show dot(c_orig, pair.x)
-
     pair.x = pair.x[idx]
 
     return CPResult(Int(converged), pair.x, pair.u, 0.0*pair.x, best_prim_residual, best_dual_residual, dot(c_orig[idx], pair.x))
@@ -259,13 +263,13 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
     return primal_step, beta * primal_step, beta
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, Mt::SparseMatrixCSC{Float64,Int64}, c::Vector{Float64}, primal_step::Float64, arc::ARPACKAlloc)::Int64
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, Mt::SparseMatrixCSC{Float64,Int64}, c::Vector{Float64}, primal_step::Float64, arc::ARPACKAlloc)::Tuple{Int64, Float64}
     # x=x+(-t)*(Mt*u)+(-t)*c
     Base.LinAlg.axpy!(-primal_step, a.Mtu, pair.x) # x=x+(-t)*(Mt*u)
     Base.LinAlg.axpy!(-primal_step, c, pair.x) # x=x+(-t)*c
 
     # Projection onto the psd cone
-    return sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank, arc)::Int64
+    return sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank, arc)::Tuple{Int64, Float64}
 end
 
 function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
@@ -301,7 +305,7 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     return c_orig[ord], sortperm(ord)
 end
 
-function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, target_rank::Int64, arc::ARPACKAlloc)::Int64
+function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, target_rank::Int64, arc::ARPACKAlloc)::Tuple{Int64, Float64}
 
     n = dims.n
     iv = con.sdpcone[1][1]::Vector{Int}
@@ -335,15 +339,14 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
                     cont+=1
                 end
             end
-            return target_rank
+            return target_rank, minimum(unsafe_getvalues(arc))
         end
     end
     
     @timeit "eigfact" begin
         fact = eigfact!(a.m, 0.0, Inf)
         fill!(a.m.data, 0.0)
-        target_rank = length(fact[:values])
-        for i in 1:target_rank
+        for i in 1:length(fact[:values])
             Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
         end
     end
@@ -355,7 +358,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             cont+=1
         end
     end
-    return target_rank
+    return length(fact[:values]), 0.0
 end
 
 function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target_rank::Int64)::Void

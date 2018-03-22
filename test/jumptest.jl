@@ -8,7 +8,7 @@ function mimo(solver)
     # end
     
     # Instance size
-    n = 400
+    n = 100
     # Channel
     H = randn((n, n))
     # Gaussian noise
