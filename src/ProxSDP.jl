@@ -11,12 +11,12 @@ immutable Dims
     m::Int  # Number of linear inequalities
 end
 
-type AffineSets
-    A::AbstractMatrix
-    G::AbstractMatrix
-    b::AbstractVector
-    h::AbstractVector
-    c::AbstractVector
+type AffineSets{T}
+    A::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
+    G::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
+    b::Vector{T}
+    h::Vector{T}
+    c::Vector{T}
 end
 
 type ConicSets
@@ -202,14 +202,17 @@ end
 
 function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, dual_step::Float64, theta::Float64)::Void
     
-    copy!(a.u_1, theta * a.Mx_old) # theta * K * x_old
+    # copy!(a.u_1, theta * a.Mx_old) # theta * K * x_old
+    @inbounds @simd for i in eachindex(pair.u)
+        a.u_1[i] = theta * a.Mx_old[i]
+    end
     A_mul_B!(a.Mx, M, pair.x) # K * x
     Base.LinAlg.axpy!(-(1.0 + theta), a.Mx, a.u_1) #  (1 + theta) * K * x
     Base.LinAlg.axpy!(-dual_step, a.u_1, pair.u) # alpha*x + y
     @inbounds @simd for i in eachindex(pair.u)
         a.u_1[i] = pair.u[i] / dual_step
     end
-    box_projection!(a.u_1, dims, affine_sets)
+    @timeit "box" box_projection!(a.u_1, dims, affine_sets)
     Base.LinAlg.axpy!(-dual_step, a.u_1, pair.u) # alpha*x + y
     return nothing
 end
@@ -242,7 +245,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
         # Inital guess for theta
         theta = primal_step / primal_step_old
         # Update dual variable
-        dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)
+        @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, beta * primal_step, theta)
         # Check linesearch convergence
         A_mul_B!(a.Mtu, Mt, pair.u)
         copy!(a.Mtu_diff, a.Mtu)
@@ -321,7 +324,9 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
                 fill!(a.m.data, 0.0)
                 for i in 1:target_rank
                     if unsafe_getvalues(arc)[i] > 0.0
-                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], unsafe_getvectors(arc)[:, i], 1.0, a.m.data)
+                        vec = unsafe_getvectors(arc)[:, i]
+                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
+                        # Base.LinAlg.BLAS.syr!('L', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], a.m.data)
                     end
                 end
             end

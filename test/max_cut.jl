@@ -35,7 +35,7 @@ function max_cut(solver, path)
         JuMP.attach(m, solver)
     end
     # JuMP.attach(m, solver)
-    teste = JuMP.solve(m)
+    @time teste = JuMP.solve(m)
 
     # @show JuMP.resultvalue.(X)
 end
