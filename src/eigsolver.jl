@@ -178,9 +178,9 @@ function _AUPD!(arc::ARPACKAlloc)
         Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
-        x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
-        y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
-        arc.A(y, x)
+        # x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
+        # y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
+        # arc.A(y, x)
 
         if arc.ido[] == 1
             @inbounds @simd for i in 1:arc.n
