@@ -64,17 +64,3 @@ include("max_cut.jl")
         end
     end
 end
-# toc()
-
-
-#using ProxSDP
-#using MathOptInterface
-#const MOI = MathOptInterface
-#using MathOptInterfaceUtilities
-#const MOIU = MathOptInterfaceUtilities
-#include("jumptest.jl")
-#include("max_cut.jl")
-#mimo(ProxSDPSolverInstance())
-# path = "data/mcp500-1.dat-s" 
-# path = "data/maxG51.dat-s" 
-# max_cut(ProxSDPSolverInstance(), path)

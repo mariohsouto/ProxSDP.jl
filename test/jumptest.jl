@@ -9,7 +9,7 @@ function mimo(solver,len)
     #m = Model()
     
     # Instance size
-    n = len
+    n = 100
     # Channel
     H = randn((n, n))
     # Gaussian noise
