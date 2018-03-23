@@ -92,7 +92,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_step = sqrt(1.0 / vecnorm(M, 2))
         beta, theta = 1.0, 1.0      # Ratio (dual / primal) and overrelaxation parameter
         adapt_level = 0.5           # Factor by which the stepsizes will be balanced 
-        adapt_decay = 0.9           # Rate the adaptivity decreases over time
+        adapt_decay = 0.99          # Rate the adaptivity decreases over time
 
         # Initial iterates
         pair.x[1] = 1.0
