@@ -64,6 +64,7 @@ end
 
 function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-3)::CPResult
 
+    time0 = time()
     tic()
     println(" Initializing Primal-Dual Hybrid Gradient method")
     println("----------------------------------------------------------")
@@ -93,19 +94,20 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_step = sqrt(1.0 / vecnorm(M, 2))
         dual_step = primal_step
         beta, theta = 1.0, 1.0  # Ratio (dual / primal) and overrelaxation parameter
-        adapt_level = 0.5       # Factor by which the stepsizes will be balanced 
-        adapt_decay = 0.99       # Rate the adaptivity decreases over time
-        adapt_threshold = 1.5
+        adapt_level = 0.9       # Factor by which the stepsizes will be balanced 
+        adapt_decay = 0.9     # Rate the adaptivity decreases over time
 
         # Initial iterates
         pair.x[1] = 1.0
         dual_step!(pair, a, dims, affine_sets, M, Mt, dual_step, theta)::Void
     end
 
-    l = 500
+    l = 1000
     step_update = 0
     max_prim_res, max_dual_res = 1.0, 1.0
+
     # Fixed-point loop
+    # max_iter = 2037
     @timeit "CP loop" for k in 1:max_iter
 
         # Update primal variable
@@ -117,20 +119,20 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
-            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
         end
 
         # Check convergence
         rank_update += 1
         step_update += 1
-        if comb_residual[k] < tol
+        if primal_residual[k] < tol && dual_residual[k] < tol
             # Check convergence of inexact fixed-point
             @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank + 1, M, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
             @timeit "linesearch" primal_step, dual_step, beta, theta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64, Float64, Float64}
             @timeit "logging" max_prim_res, max_dual_res = compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, dims, max_prim_res, max_dual_res)::Tuple{Float64, Float64}
 
             if min_eig < tol
-                print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+                print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
                 println(min_eig)
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -139,31 +141,30 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 target_rank *= 2
                 rank_update = 0
                 println(min_eig)
-                print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+                print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
                 println("update1")
-                adapt_level = 0.5
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.9 * comb_residual[k] && rank_update > l && dims.n > 100 && target_rank <= 10
+        elseif k > l && comb_residual[k - l] < 0.7 * comb_residual[k] && rank_update > l && target_rank <= 10
             target_rank *= 2
             rank_update = 0
-            print_progress(k, primal_residual[k], dual_residual[k], target_rank)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
+            @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank, M, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
             println("update2")
-            adapt_level = 0.5
 
-        # Adaptive beta
-        elseif primal_residual[k] > dual_residual[k] * adapt_threshold
+        # Adaptive beta  
+        elseif primal_residual[k] > tol && dual_residual[k] < tol
             beta *= (1 - adapt_level)
             adapt_level *= adapt_decay
-        elseif primal_residual[k] < dual_residual[k] / adapt_threshold
+        elseif primal_residual[k] < tol && dual_residual[k] > tol
             beta *= (1 + adapt_level)
-            adapt_level *= adapt_decay    
+            adapt_level *= adapt_decay  
         end
     end
 
-    time = toq()
-    println("Time = $time")
+    time_ = toq()
+    println("Time = $time_")
     @show dot(c_orig, pair.x)
     pair.x = pair.x[idx]
 
@@ -194,28 +195,6 @@ function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::A
     return max(max_prim_res, primal_residual[iter]), max(max_dual_res, dual_residual[iter])
 end
 
-function diag_scaling(affine_sets::AffineSets, alpha::Float64, dims::Dims, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64})
-    # Diagonal scaling
-    div = vec(sum(abs.(M).^(2.0-alpha), 1))
-    div[find(x-> x == 0.0, div)] = 1.0
-    T = spdiagm(1.0 ./ div)
-    div = vec(sum(abs.(M).^alpha, 2))
-    div[find(x-> x == 0.0, div)] = 1.0
-    S = spdiagm(1.0 ./ div)
-    Sinv = div
-
-    # Cache matrix multiplications
-    TMt = T * Mt
-    Tc = T * affine_sets.c
-    SM = S * M
-    rhs = vcat(affine_sets.b, affine_sets.h)
-    Srhs = S * rhs
-    affine_sets.b = Srhs[1:dims.p]
-    affine_sets.h = Srhs[dims.p+1:end]
-
-    return affine_sets, TMt, Tc, S, SM, Sinv
-end
-
 function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, dual_step::Float64, theta::Float64)::Void
     
     @inbounds @simd for i in eachindex(pair.u)
@@ -232,11 +211,6 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets:
     return nothing
 end
 
-function box_projection(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Vector{Float64}
-    box_projection!(v::Vector{Float64}, dims::Dims, aff::AffineSets)
-    return v
-end
-
 function box_projection!(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Void
     # Projection onto = b
     @inbounds @simd for i in 1:length(aff.b)
@@ -250,8 +224,8 @@ function box_projection!(v::Vector{Float64}, dims::Dims, aff::AffineSets)::Void
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, primal_step::Float64, beta::Float64, theta::Float64)::Tuple{Float64, Float64, Float64, Float64}
-    max_iter_linesearch = 1000
-    delta = 0.99
+    max_iter_linesearch = 50
+    delta = 1.0 - 1e-6
     mu = 0.8
     primal_step_old = primal_step
     primal_step = primal_step * sqrt(1.0 + theta)
@@ -260,7 +234,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
     # Linesearch loop
     for i = 1:max_iter_linesearch
         # Inital guess for theta
-        theta = primal_step / primal_step_old
+        theta = min(primal_step / primal_step_old, 1.99)
         # Update dual variable
         dual_step = primal_step * beta
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, Mt, dual_step, theta)
@@ -288,9 +262,9 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
 end
 
 function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, c::Vector{Float64}, primal_step::Float64, arc::ARPACKAlloc)::Tuple{Int64, Float64}
-    # x=x+(-t)*(Mt*u)+(-t)*c
-    Base.LinAlg.axpy!(-primal_step, a.Mtu, pair.x) # x=x+(-t)*(Mt*u)
-    Base.LinAlg.axpy!(-primal_step, c, pair.x) # x=x+(-t)*c
+    A_mul_B!(a.Mtu, Mt, pair.u) # (TMt*u)
+    Base.LinAlg.axpy!(-primal_step, a.Mtu, pair.x) # x=x+(-t)*(TMt*u)
+    Base.LinAlg.axpy!(-primal_step, c, pair.x) # x=x+(-t)*Tc
 
     # Projection onto the psd cone
     target_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank, arc)::Tuple{Int64, Float64}
@@ -333,6 +307,12 @@ end
 
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, target_rank::Int64, arc::ARPACKAlloc)::Tuple{Int64, Float64}
 
+    if target_rank < 1
+        @show target_rank
+        target_rank = 1
+    end
+
+    eig_tol = 1e-15
     n = dims.n
     iv = con.sdpcone[1][1]::Vector{Int}
     im = con.sdpcone[1][2]::Vector{Int}
@@ -344,16 +324,17 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if target_rank <= 10 && dims.n > 100
+    if target_rank <= max(16, dims.n/100) && dims.n > 100
         @timeit "eigs" begin 
             eig!(arc, a.m, target_rank)
             if hasconverged(arc)
                 fill!(a.m.data, 0.0)
+                # target_rank_ = 0
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 0.0
+                    if unsafe_getvalues(arc)[i] > eig_tol
+                        # target_rank_ += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
-                        # Base.LinAlg.BLAS.syr!('L', unsafe_getvalues(arc)[i], unsafe_getvectors(arc)[:, i], a.m.data)
                     end
                 end
             end
@@ -367,15 +348,19 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
                     cont+=1
                 end
             end
+            # return max(target_rank_, 1), minimum(unsafe_getvalues(arc))
             return target_rank, minimum(unsafe_getvalues(arc))
+
         end
     end
     
     @timeit "eigfact" begin
-        fact = eigfact!(a.m, 0.0, Inf)
+        fact = eigfact!(a.m, max(dims.n-target_rank, 1):dims.n)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
-            Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
+            if fact[:values][i] > eig_tol
+                Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
+            end
         end
     end
 
@@ -386,10 +371,11 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             cont+=1
         end
     end
-    return length(fact[:values]), 0.0
+    # return max(count(x->x>0.0, fact[:values]), 1), 0.0
+    return target_rank, 0.0
 end
 
-function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target_rank::Int64)::Void
+function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target_rank::Int64, time0::Float64)::Void
     s_k = @sprintf("%d", k)
     s_k *= " |"
     s_s = @sprintf("%.4f", primal_res + dual_res)
@@ -411,6 +397,7 @@ function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target
     a *= s_d
     a *= " "^max(0, 12 - length(s_target_rank))
     a *= s_target_rank
+    a *= @sprintf("%.4f", time() - time0)
     println(a)
     return nothing
 end

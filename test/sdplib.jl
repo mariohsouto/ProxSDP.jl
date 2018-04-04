@@ -39,17 +39,19 @@ function sdplib(solver, path)
     println("build F")
 
     # Build model
-    if Base.libblas_name == "libmkl_rt"
-        model = Model()
-    else
-        model = Model(solver=solver) 
-    end
+    # if Base.libblas_name == "libmkl_rt"
+    #     model = Model()
+    # else
+    #     model = Model(solver=solver) 
+    # end
+    model = Model()
 
-    if Base.libblas_name == "libmkl_rt"
-        @variable(model, X[1:n, 1:n], PSD)
-    else
-        @variable(model, X[1:n, 1:n], SDP)
-    end
+    # if Base.libblas_name == "libmkl_rt"
+    #     @variable(model, X[1:n, 1:n], PSD)
+    # else
+    #     @variable(model, X[1:n, 1:n], SDP)
+    # end
+    @variable(model, X[1:n, 1:n], PSD)
 
     # Objective function
     @objective(model, Min, sum(F[0][idx...] * X[idx...] for idx in zip(findnz(F[0])[1:end-1]...)))
@@ -61,10 +63,11 @@ function sdplib(solver, path)
     end
     println("const")
 
-    if Base.libblas_name == "libmkl_rt"
-        JuMP.attach(model, solver)
-    end
+    # if Base.libblas_name == "libmkl_rt"
+    #     JuMP.attach(model, solver)
+    # end
     tic()
+    JuMP.attach(model, solver)
     teste = JuMP.solve(model)
     toc()
 end

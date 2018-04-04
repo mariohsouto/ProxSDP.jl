@@ -18,6 +18,7 @@ mutable struct ARPACKAlloc{T}
     mode::Int
 
     A::Function
+    Amat::Symmetric{Float64,Matrix{Float64}}
     x::Vector{T}
     y::Vector{T}
 
@@ -94,7 +95,7 @@ end
 
 function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1)
     arc = ARPACKAlloc{T}()
-    ARPACKAlloc_reset!(arc::ARPACKAlloc, speye(T,n), 1)
+    ARPACKAlloc_reset!(arc::ARPACKAlloc, Symmetric(eye(T,n,n)), 1)
     return arc
 end
 
@@ -104,10 +105,11 @@ function ARPACKAlloc(A, nev::Integer)
     return arc
 end
 
-function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
+function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer) where T
 
     tol = 0.0
     v0=zeros(eltype(A),(0,))
+    #, v0::Vector{T} = zeros(T,(0,))
 
     newT = eltype(A)
     n = Base.LinAlg.checksquare(A)
@@ -130,12 +132,14 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
     # arc.B = x->x
     matvecA!(y, x) = A_mul_B!(y, A, x)
     arc.A = matvecA!
+    arc.Amat = A
     arc.x = Vector{T}(arc.n)
     arc.y = Vector{T}(arc.n)
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)#cmplx ? ncv * (3*ncv + 5) : (sym ? ncv * (ncv + 8) :  ncv * (3*ncv + 6) )
 
-    arc.TOL = tol*ones(T,1)#Ref{T}(tol)
+    # arc.TOL = tol*ones(T,1)#Ref{T}(tol)
+    arc.TOL = 1e-6*ones(T,1)
 
     arc.v = Matrix{T}(arc.n, arc.ncv)
     arc.workd = Vector{T}(3*arc.n)
@@ -146,7 +150,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A, nev::Integer) where T
         arc.resid = Vector{T}(arc.n)
         arc.info  = zeros(BlasInt, 1)#Ref{BlasInt}(0)
     else
-        arc.resid = deepcopy(v0)
+        # arc.resid = v0#deepcopy(v0)
         arc.info  = ones(BlasInt, 1)#Ref{BlasInt}(1)
     end
 
@@ -186,7 +190,8 @@ function _AUPD!(arc::ARPACKAlloc)
             @inbounds @simd for i in 1:arc.n
                 arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
             end
-            arc.A(arc.y, arc.x)
+            # arc.A(arc.y, arc.x)
+            A_mul_B!(arc.y, arc.Amat, arc.x)
             @inbounds @simd for i in 1:arc.n
                  arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
             end
@@ -199,12 +204,11 @@ function _AUPD!(arc::ARPACKAlloc)
             # throw(ARPACKException("unexpected behavior"))
         end
     end
-
     arc.converged = true
     return nothing
 end
 
-function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
+function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer) where T1
 
     n = Base.LinAlg.checksquare(A)
     T = eltype(A)
@@ -215,8 +219,10 @@ function _INIT!(arc::ARPACKAlloc, A::AbstractMatrix, nev::Integer)
 
     matvecA!(y, x) = A_mul_B!(y, A, x)
     arc.A = matvecA!
+    arc.Amat = A
 
-    arc.info[1] = BlasInt(0)# = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+    # arc.info[1] = BlasInt(0)# = zeros(BlasInt, 1)#Ref{BlasInt}(0)
+    arc.info[1] = BlasInt(1)# hotstart
 
     # arc.iparam = zeros(BlasInt, 11)
     # arc.ipntr = zeros(BlasInt, 11) # = zeros(BlasInt, (sym && !cmplx) ? 11 : 14)
