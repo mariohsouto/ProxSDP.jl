@@ -21,12 +21,20 @@ function sdplib(solver, path)
     if isa(data[4, 1], Float64) || isa(data[4, 1], Int64) 
         c = data[4, :]
     else
-        c = parse.(Float64, split(data[4, 1][2:end - 1], ","))
+        c = [parse(Float64,string) for string in split(data[4, 1][2:end - 1], ",")]
     end
-    n = cum_blks[end]
+    # n = abs(cum_blks[end])
+    n = length(c)
+    # n = 335
     F = Dict(i => spzeros(n, n) for i = 0:m)
     for k=5:size(data)[1]
         idx = cum_blks[data[k, 2]]
+        # if data[k, 2] == 1
+        #     idx = 0
+        # else
+        #     idx = 161
+        # end
+
         i, j = data[k, 3] + idx, data[k, 4] + idx
         if data[k, 1] == 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
             F[0][i, j] = - data[k, 5]
@@ -39,19 +47,17 @@ function sdplib(solver, path)
     println("build F")
 
     # Build model
-    # if Base.libblas_name == "libmkl_rt"
-    #     model = Model()
-    # else
-    #     model = Model(solver=solver) 
-    # end
-    model = Model()
+    if Base.libblas_name == "libmkl_rt"
+        model = Model()
+    else
+        model = Model(solver=solver) 
+    end
 
-    # if Base.libblas_name == "libmkl_rt"
-    #     @variable(model, X[1:n, 1:n], PSD)
-    # else
-    #     @variable(model, X[1:n, 1:n], SDP)
-    # end
-    @variable(model, X[1:n, 1:n], PSD)
+    if Base.libblas_name == "libmkl_rt"
+        @variable(model, X[1:n, 1:n], PSD)
+    else
+        @variable(model, X[1:n, 1:n], SDP)
+    end
 
     # Objective function
     @objective(model, Min, sum(F[0][idx...] * X[idx...] for idx in zip(findnz(F[0])[1:end-1]...)))
@@ -63,11 +69,10 @@ function sdplib(solver, path)
     end
     println("const")
 
-    # if Base.libblas_name == "libmkl_rt"
-    #     JuMP.attach(model, solver)
-    # end
+    if Base.libblas_name == "libmkl_rt"
+        JuMP.attach(model, solver)
+    end
     tic()
-    JuMP.attach(model, solver)
     teste = JuMP.solve(model)
     toc()
 end

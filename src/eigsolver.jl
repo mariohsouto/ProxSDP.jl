@@ -121,7 +121,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     # eigs
     arc.n = n
     arc.nev = nev
-    arc.ncv = max(20,2*arc.nev+1)
+    arc.ncv = max(20, 2*arc.nev+1)
     arc.maxiter = Int(1e+3)
 
     arc.bmat = "I"
