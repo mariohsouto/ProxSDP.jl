@@ -15,10 +15,13 @@ if Base.libblas_name == "libmkl_rt"
  #elseif VERSION < v"0.6.0"
     
 else
-    # using CSDP 
-    using SCS
+    using CSDP 
+    # using SCS
     # using Mosek
 end
+
+# include("mimo.jl")
+# mimo(ProxSDPSolverInstance())
 
 include("sdplib.jl")
 
@@ -39,6 +42,8 @@ include("sdplib.jl")
     push!(paths, "data/gpp500-2.dat-s")
     push!(paths, "data/gpp500-3.dat-s")
     push!(paths, "data/gpp500-4.dat-s")
+    push!(paths, "data/equalG11.dat-s")
+    push!(paths, "data/equalG51.dat-s")
 
     # Truss topology
     # push!(paths, "data/arch0.dat-s")
@@ -58,15 +63,18 @@ include("sdplib.jl")
     # push!(paths, "data/mcp500-2.dat-s")
     # push!(paths, "data/mcp500-3.dat-s")
     # push!(paths, "data/mcp500-4.dat-s")
+    # push!(paths, "data/maxG11.dat-s")
+    # push!(paths, "data/maxG51.dat-s")
+    # push!(paths, "data/maxG32.dat-s")
 
     for path in paths
         @show path
         if Base.libblas_name == "libmkl_rt"
             sdplib(ProxSDPSolverInstance(), path)
         else
-            # sdplib(CSDPSolver(objtol=1e-4, maxiter=100000), path)
+            sdplib(CSDPSolver(objtol=1e-4, maxiter=100000), path)
             # sdplib(SCSSolver(max_iters=1000000, eps=1e-4), path)
-            sdplib(SCSSolver(eps=1e-4), path)
+            # sdplib(SCSSolver(eps=1e-4), path)
             # sdplib(MosekSolver(), path)
         end
     end

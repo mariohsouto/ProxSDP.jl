@@ -93,9 +93,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Stepsize parameters and linesearch parameters
         primal_step = sqrt(1.0 / vecnorm(M, 2))
         dual_step = primal_step
+        primal_step_start = primal_step
         beta, theta = 1.0, 1.0  # Ratio (dual / primal) and overrelaxation parameter
         adapt_level = 0.9       # Factor by which the stepsizes will be balanced 
-        adapt_decay = 0.95       # Rate the adaptivity decreases over time
+        adapt_decay = 0.9       # Rate the adaptivity decreases over time
 
         # Initial iterates
         pair.x[1] = 1.0
@@ -104,11 +105,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
     l = 500
     max_prim_res, max_dual_res = 1.0, 1.0
+    best_comb_residual = Inf
+    best_x, best_u = copy(pair.x), copy(pair.u)
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
-
-        # @show (beta, theta, primal_step, adapt_level)
 
         # Update primal variable
         @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank, M, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
@@ -116,6 +117,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "linesearch" primal_step, dual_step, beta, theta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64, Float64, Float64}
         # Compute residuals and update old iterates
         @timeit "logging" max_prim_res, max_dual_res = compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, dims, max_prim_res, max_dual_res)::Tuple{Float64, Float64}
+
+        # Save best incumbent
+        if comb_residual[k] < best_comb_residual
+            best_comb_residual = comb_residual[k]
+            best_x, best_u = copy(pair.x), copy(pair.u)
+        end
 
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
@@ -128,7 +135,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             # Check convergence of inexact fixed-point
             target_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank + 1, arc)::Tuple{Int64, Float64}
             @timeit "linesearch" primal_step, dual_step, beta, theta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64, Float64, Float64}
-            @timeit "logging" max_prim_res, max_dual_res = compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, dims, max_prim_res, max_dual_res)::Tuple{Float64, Float64}
 
             if min_eig < tol
                 print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
@@ -145,20 +151,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l && target_rank <= 10
+        elseif k > l && comb_residual[k - l] < comb_residual[k] && rank_update > l
             target_rank *= 2
             rank_update = 0
             print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
-            @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank, M, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
+            pair.x, pair.u = copy(best_x), copy(best_u)
             println("update2")
 
         # Adaptive beta  
-        elseif primal_residual[k] > tol && dual_residual[k] < 5 * tol
-            # beta *= (1 - adapt_level)
+        elseif primal_residual[k] > tol && dual_residual[k] < tol
             beta = max(beta * (1 - adapt_level), 0.001)
             adapt_level *= adapt_decay
-        elseif primal_residual[k] < tol && dual_residual[k] > 5 * tol
-            # beta *= (1 + adapt_level)
+        elseif primal_residual[k] < tol && dual_residual[k] > tol
             beta = min(beta * (1 + adapt_level), 1000.0)
             adapt_level *= adapt_decay  
         end
@@ -175,14 +179,14 @@ end
 function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64, dims::Dims, max_prim_res::Float64, max_dual_res::Float64)::Tuple{Float64, Float64}    
     # Compute primal residual
     Base.LinAlg.axpy!(-1.0, a.Mtu, a.Mtu_old)
-    Base.LinAlg.axpy!((1.0 / primal_step), pair.x_old, a.Mtu_old)
-    Base.LinAlg.axpy!(-(1.0 / primal_step), pair.x, a.Mtu_old)
+    Base.LinAlg.axpy!((1.0 / (1.0 + primal_step)), pair.x_old, a.Mtu_old)
+    Base.LinAlg.axpy!(-(1.0 / (1.0 + primal_step)), pair.x, a.Mtu_old)
     primal_residual[iter] = norm(a.Mtu_old, 2) / (1.0 + max_prim_res)
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
-    Base.LinAlg.axpy!((1.0 / dual_step), pair.u_old, a.Mx_old)
-    Base.LinAlg.axpy!(-(1.0 / dual_step), pair.u, a.Mx_old)
+    Base.LinAlg.axpy!((1.0 / (1.0 + dual_step)), pair.u_old, a.Mx_old)
+    Base.LinAlg.axpy!(-(1.0 / (1.0 + dual_step)), pair.u, a.Mx_old)
     dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + max_dual_res)
 
     # Compute combined residual
@@ -227,7 +231,7 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64}, primal_step::Float64, beta::Float64, theta::Float64)::Tuple{Float64, Float64, Float64, Float64}
     max_iter_linesearch = 50
     delta = 1.0 - 1e-3
-    mu = 0.8
+    mu = 0.7
     primal_step_old = primal_step
     primal_step = primal_step * sqrt(1.0 + theta)
     pair.u_aux = copy(pair.u)
@@ -257,7 +261,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
 
     println(":")
 
-    primal_step = primal_step_old * 0.9
+    primal_step = primal_step_old
     theta = 1.0
     dual_step = primal_step * 1.0
     @timeit "dual" dual_step!(pair, a, dims, affine_sets, M, Mt, dual_step, theta)
@@ -334,7 +338,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             if hasconverged(arc)
                 fill!(a.m.data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > eig_tol
+                    if unsafe_getvalues(arc)[i] > 0.0
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
                     end
@@ -356,10 +360,10 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     @timeit "eigfact" begin
         cont_ = 0
         fact = eigfact!(a.m, max(dims.n-target_rank, 1):dims.n)
-        # fact = eigfact!(a.m)#, -Inf, Inf)
+        # fact = eigfact!(a.m)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
-            if fact[:values][i] > eig_tol
+            if fact[:values][i] > 0.0
                 cont_ += 1
                 Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
             end

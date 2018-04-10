@@ -75,4 +75,14 @@ function sdplib(solver, path)
     tic()
     teste = JuMP.solve(model)
     toc()
+
+    if Base.libblas_name == "libmkl_rt"
+        XX = getvalue2.(X)
+    else
+        XX = getvalue.(X)
+    end
+    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-4])
+    @show rank
 end
+
+getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])
