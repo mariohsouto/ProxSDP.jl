@@ -98,7 +98,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         rhs = vcat(affine_sets.b, affine_sets.h)
 
         # Stepsize parameters and linesearch parameters
-        primal_step = sqrt(1.0 / vecnorm(M, 2))
+        primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
         dual_step = primal_step
         primal_step_start = primal_step
         beta, theta = 1.0, 1.0  # Ratio (dual / primal) and overrelaxation parameter
