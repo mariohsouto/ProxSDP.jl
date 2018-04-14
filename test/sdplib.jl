@@ -25,15 +25,15 @@ function sdplib(solver, path)
     end
     # n = abs(cum_blks[end])
     n = length(c)
-    # n = 335
+    n = 335
     F = Dict(i => spzeros(n, n) for i = 0:m)
     for k=5:size(data)[1]
         idx = cum_blks[data[k, 2]]
-        # if data[k, 2] == 1
-        #     idx = 0
-        # else
-        #     idx = 161
-        # end
+        if data[k, 2] == 1
+            idx = 0
+        else
+            idx = 161
+        end
 
         i, j = data[k, 3] + idx, data[k, 4] + idx
         if data[k, 1] == 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        

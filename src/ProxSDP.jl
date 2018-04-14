@@ -146,28 +146,25 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
+                print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
                 break
-            elseif rank_update > l && dims.n > 100 && target_rank <= 10
-                target_rank *= 2
+            elseif rank_update > l && dims.n > 100
+                target_rank = min(2 * target_rank, dims.n)
                 rank_update = 0
             end
 
         # Check divergence
         elseif k > l && comb_residual[k - l] < comb_residual[k] && rank_update > l
-            target_rank *= 2
+            target_rank = min(2 * target_rank, dims.n)
             rank_update = 0
             pair.x, pair.u = copy(best_x), copy(best_u)
-            # Update primal variable
-            @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, target_rank, M, Mt, affine_sets.c, primal_step, arc)::Tuple{Int64, Float64}
-            # Dual update with linesearch
-            @timeit "linesearch" primal_step, dual_step, beta, theta = linesearch!(pair, a, dims, affine_sets, M, Mt, primal_step, beta, theta)::Tuple{Float64, Float64, Float64, Float64}
-
+  
         # Adaptive beta  
         elseif primal_residual[k] > tol && dual_residual[k] < tol
-            beta = max(beta * (1 - adapt_level), 0.001)
+            beta = max(beta * (1 - adapt_level), 1e-3)
             adapt_level *= adapt_decay
         elseif primal_residual[k] < tol && dual_residual[k] > tol
-            beta = min(beta * (1 + adapt_level), 1000.0)
+            beta = min(beta * (1 + adapt_level), 1e+3)
             adapt_level *= adapt_decay  
         end
     end
