@@ -29,11 +29,11 @@ include("sdplib.jl")
     paths = String[]
 
     # Graph equipartition problem
-    # push!(paths, "data/gpp124-1.dat-s")
-    # push!(paths, "data/gpp124-1.dat-s")
-    # push!(paths, "data/gpp124-2.dat-s")
-    # push!(paths, "data/gpp124-3.dat-s")
-    # push!(paths, "data/gpp124-4.dat-s")
+    push!(paths, "data/gpp124-1.dat-s")
+    push!(paths, "data/gpp124-1.dat-s")
+    push!(paths, "data/gpp124-2.dat-s")
+    push!(paths, "data/gpp124-3.dat-s")
+    push!(paths, "data/gpp124-4.dat-s")
     # push!(paths, "data/gpp250-1.dat-s")
     # push!(paths, "data/gpp250-2.dat-s")
     # push!(paths, "data/gpp250-3.dat-s")
