@@ -153,10 +153,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "logging" max_prim_res, max_dual_res = compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, dims, max_prim_res, max_dual_res, norm_c, norm_rhs)::Tuple{Float64, Float64}
 
         # Save best incumbent
-        if comb_residual[k] < best_comb_residual
-            best_comb_residual = comb_residual[k]
-            best_x, best_y = copy(pair.x), copy(pair.y)
-        end
+        # if comb_residual[k] < best_comb_residual
+        #     best_comb_residual = comb_residual[k]
+        #     best_x, best_y = copy(pair.x), copy(pair.y)
+        # end
 
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
@@ -181,7 +181,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         elseif k > l && comb_residual[k - l] < comb_residual[k] && rank_update > l
             target_rank = min(2 * target_rank, dims.n)
             rank_update = 0
-            pair.x, pair.y = copy(best_x), copy(best_y)
+            # pair.x, pair.y = copy(best_x), copy(best_y)
   
         # Adaptive beta  
         elseif primal_residual[k] > tol && dual_residual[k] < tol
@@ -431,8 +431,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     
     @timeit "eigfact" begin
         cont_ = 0
-        fact = eigfact!(a.m, max(dims.n-target_rank, 1):dims.n)
-        # fact = eigfact!(a.m)
+        # fact = eigfact!(a.m, max(dims.n-target_rank, 1):dims.n)
+        fact = eigfact!(a.m, 1e-8, Inf)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
             if fact[:values][i] > 0.0
@@ -449,11 +449,12 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             cont+=1
         end
     end
-    if cont_ == 0
-        return target_rank, 0.0
-    else
-        return target_rank, minimum(fact[:values])
-    end
+    # if cont_ == 0
+    #     return target_rank, 0.0
+    # else
+    #     # return target_rank, minimum(fact[:values])
+    # end
+    return target_rank, 0.0
 end
 
 function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target_rank::Int64, time0::Float64)::Void

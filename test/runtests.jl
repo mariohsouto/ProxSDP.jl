@@ -67,6 +67,14 @@ include("sdplib.jl")
     push!(paths, "data/maxG51.dat-s")
     push!(paths, "data/maxG32.dat-s")
 
+    # push!(paths, "data/truss1.dat-s")
+    # push!(paths, "data/truss2.dat-s")
+    # push!(paths, "data/truss3.dat-s")
+    # push!(paths, "data/truss4.dat-s")
+    # push!(paths, "data/truss5.dat-s")
+    # push!(paths, "data/truss6.dat-s")
+    # push!(paths, "data/truss7.dat-s")
+
     for path in paths
         @show path
         if Base.libblas_name == "libmkl_rt"
