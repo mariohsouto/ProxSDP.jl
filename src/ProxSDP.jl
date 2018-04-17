@@ -138,8 +138,29 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
 
         # Initial iterates
-        pair.x[1] = 1.0
-        @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
+        iv = conic_sets.sdpcone[1][1]::Vector{Int}
+        im = conic_sets.sdpcone[1][2]::Vector{Int}
+        for i in 1:100
+            Base.LinAlg.axpy!(-primal_step, a.TMty, pair.x)
+            Base.LinAlg.axpy!(-primal_step, mat.Tc, pair.x)
+            # Projection onto the psd cone
+            cont = 1
+            @inbounds for j in 1:dims.n, i in j:dims.n
+                if i == j
+                    pair.x[cont] = max(pair.x[cont], 0.0)
+                else
+                    pair.x[cont] = 0.0
+                end
+                cont+=1
+            end
+            A_mul_B!(a.SMx, mat.SM, pair.x)
+            A_mul_B!(a.Mx, mat.M, pair.x)
+            @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
+            @timeit "logging" max_prim_res, max_dual_res = compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, i, dims, max_prim_res, max_dual_res, norm_c, norm_rhs)::Tuple{Float64, Float64}
+        end
+
+        # pair.x[1] = 1.0
+        # @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
     end
 
     # Fixed-point loop
@@ -151,12 +172,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
         # Compute residuals and update old iterates
         @timeit "logging" max_prim_res, max_dual_res = compute_residual(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, dims, max_prim_res, max_dual_res, norm_c, norm_rhs)::Tuple{Float64, Float64}
-
-        # Save best incumbent
-        # if comb_residual[k] < best_comb_residual
-        #     best_comb_residual = comb_residual[k]
-        #     best_x, best_y = copy(pair.x), copy(pair.y)
-        # end
 
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
@@ -181,7 +196,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         elseif k > l && comb_residual[k - l] < comb_residual[k] && rank_update > l
             target_rank = min(2 * target_rank, dims.n)
             rank_update = 0
-            # pair.x, pair.y = copy(best_x), copy(best_y)
   
         # Adaptive beta  
         elseif primal_residual[k] > tol && dual_residual[k] < tol
@@ -189,6 +203,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             dual_step *= (1 - adapt_level)
             adapt_level *= adapt_decay
         elseif primal_residual[k] < tol && dual_residual[k] > tol
+            primal_step *= (1 - adapt_level)
+            dual_step /= (1 - adapt_level)
+            adapt_level *= adapt_decay  
+        elseif primal_residual[k] > 100.0 * dual_residual[k]
+            primal_step /= (1 - adapt_level)
+            dual_step *= (1 - adapt_level)
+            adapt_level *= adapt_decay
+        elseif 100.0 * primal_residual[k] < dual_residual[k]
             primal_step *= (1 - adapt_level)
             dual_step /= (1 - adapt_level)
             adapt_level *= adapt_decay  
@@ -260,7 +282,6 @@ function compute_residual(pair::PrimalDual, a::AuxiliaryData, primal_residual::A
     copy!(a.Mty_old, a.Mty)
     copy!(a.Mx_old, a.Mx)
 
-    copy!(a.TMty_old, a.TMty)
     copy!(a.SMx_old, a.SMx)
 
     return max(max_prim_res, primal_residual[iter]), max(max_dual_res, dual_residual[iter])

@@ -20,8 +20,8 @@ else
     # using Mosek
 end
 
-# include("mimo.jl")
-# mimo(ProxSDPSolverInstance())
+include("mimo.jl")
+mimo(ProxSDPSolverInstance())
 
 include("sdplib.jl")
 
