@@ -75,6 +75,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         println("======================================================================")
         println("          ProxSDP : Proximal Semidefinite Programming Solver          ")
         println("                 (c) Mario Souto and Joaquim D. Garcia, 2018          ")
+        println("                                                Beta version          ")
         println("----------------------------------------------------------------------")
         println(" Initializing Primal-Dual Hybrid Gradient method")
         println("----------------------------------------------------------------------")
@@ -146,7 +147,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
                 break
-            elseif rank_update > l && dims.n > 100
+            elseif rank_update > l
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update = 0
             end
@@ -163,10 +164,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         elseif primal_residual[k] < tol && dual_residual[k] > tol
             beta = min(beta * (1 + adapt_level), 1e+3)
             adapt_level *= adapt_decay  
-        elseif primal_residual[k] > 100.0 * dual_residual[k]
+        elseif primal_residual[k] > 10.0 * dual_residual[k]
             beta = max(beta * (1 - adapt_level), 1e-3)
             adapt_level *= adapt_decay
-        elseif 100.0 * primal_residual[k] < dual_residual[k]
+        elseif 10.0 * primal_residual[k] < dual_residual[k]
             beta = min(beta * (1 + adapt_level), 1e+3)
             adapt_level *= adapt_decay  
         end
@@ -280,8 +281,8 @@ end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, beta::Float64, theta::Float64)::Tuple{Float64, Float64, Float64, Float64}
     max_iter_linesearch = 50
-    delta = 1.0 - 1e-3
-    mu = 0.7
+    delta = 1.0 - 1e-1
+    mu = 0.8
     primal_step_old = primal_step
     primal_step = primal_step * sqrt(1.0 + theta)
     pair.y_aux = copy(pair.y)

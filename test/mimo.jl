@@ -1,6 +1,6 @@
 
-function mimo(solver)
-    srand(0)
+function mimo(solver, seed)
+    srand(seed)
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else
@@ -8,7 +8,8 @@ function mimo(solver)
     end
     
     # Instance size
-    m, n = 1000, 300
+    n = 500
+    m = 10 * n
     # Channel
     H = randn((m, n))
     # Gaussian noise
@@ -16,7 +17,7 @@ function mimo(solver)
     # True signal
     s = rand([-1, 1], n)
     # Received signal
-    sigma = 1e-6
+    sigma = 1e-3
     y = H * s + sigma * v
     L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
     if Base.libblas_name == "libmkl_rt"

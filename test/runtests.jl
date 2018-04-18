@@ -12,23 +12,35 @@ if Base.libblas_name == "libmkl_rt"
      const MOI = MathOptInterface
      using MathOptInterfaceUtilities
      const MOIU = MathOptInterfaceUtilities
- #elseif VERSION < v"0.6.0"
-    
 else
     using CSDP 
     # using SCS
     # using Mosek
 end
 
+# MIMO ---------------------------------------------------------------
 # include("mimo.jl")
-# mimo(ProxSDPSolverInstance())
+# if Base.libblas_name == "libmkl_rt"
+#     mimo(ProxSDPSolverInstance(), 0)
+# else
+#     # mimo(MosekSolver(), 0)
+#     mimo(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
+# end
+# println("-------------------------------\n")
+# for i in 1:5
+#     if Base.libblas_name == "libmkl_rt"
+#         mimo(ProxSDPSolverInstance(), i)
+#     else
+#         # mimo(MosekSolver(), i)
+#         mimo(CSDPSolver(objtol=1e-4, maxiter=100000), i)
+#     end
+# end
 
+
+# Graph equipartition problem -----------------------------------------
 include("sdplib.jl")
-
-@testset "MIMO" begin
+@testset "Graph" begin
     paths = String[]
-
-    # Graph equipartition problem
     push!(paths, "data/gpp124-1.dat-s")
     push!(paths, "data/gpp124-1.dat-s")
     push!(paths, "data/gpp124-2.dat-s")
@@ -44,28 +56,6 @@ include("sdplib.jl")
     push!(paths, "data/gpp500-4.dat-s")
     push!(paths, "data/equalG11.dat-s")
     push!(paths, "data/equalG51.dat-s")
-
-    # Truss topology
-    # push!(paths, "data/arch0.dat-s")
-    # push!(paths, "data/arch0.dat-s")
-    # push!(paths, "data/arch2.dat-s")
-    # push!(paths, "data/arch2.dat-s")
-    # push!(paths, "data/arch4.dat-s")
-    # push!(paths, "data/arch8.dat-s")
-
-    # Max-Cut
-    push!(paths, "data/mcp250-1.dat-s")
-    push!(paths, "data/mcp250-1.dat-s")
-    push!(paths, "data/mcp250-2.dat-s")
-    push!(paths, "data/mcp250-3.dat-s")
-    push!(paths, "data/mcp250-4.dat-s")
-    push!(paths, "data/mcp500-1.dat-s")
-    push!(paths, "data/mcp500-2.dat-s")
-    push!(paths, "data/mcp500-3.dat-s")
-    push!(paths, "data/mcp500-4.dat-s")
-    push!(paths, "data/maxG11.dat-s")
-    push!(paths, "data/maxG51.dat-s")
-    push!(paths, "data/maxG32.dat-s")
 
     for path in paths
         @show path
