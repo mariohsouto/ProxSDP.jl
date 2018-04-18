@@ -15,13 +15,13 @@ if Base.libblas_name == "libmkl_rt"
  #elseif VERSION < v"0.6.0"
     
 else
-    using CSDP 
+    # using CSDP 
     # using SCS
-    # using Mosek
+    using Mosek
 end
 
-include("mimo.jl")
-mimo(ProxSDPSolverInstance())
+# include("mimo.jl")
+# mimo(ProxSDPSolverInstance())
 
 include("sdplib.jl")
 
@@ -80,10 +80,10 @@ include("sdplib.jl")
         if Base.libblas_name == "libmkl_rt"
             sdplib(ProxSDPSolverInstance(), path)
         else
-            sdplib(CSDPSolver(objtol=1e-4, maxiter=100000), path)
+            # sdplib(CSDPSolver(objtol=1e-4, maxiter=100000), path)
             # sdplib(SCSSolver(max_iters=1000000, eps=1e-4), path)
             # sdplib(SCSSolver(eps=1e-4), path)
-            # sdplib(MosekSolver(), path)
+            sdplib(MosekSolver(), path)
         end
     end
 end
