@@ -102,7 +102,8 @@ function scalecoef(rows, coef, minus, s::MOI.PositiveSemidefiniteConeTriangle, r
         if rows[i] in diagidx
             output[i] *= scaling
         else
-            output[i] *= scaling2
+            # output[i] *= scaling2
+            output[i] *= 2.0
         end
     end
     output

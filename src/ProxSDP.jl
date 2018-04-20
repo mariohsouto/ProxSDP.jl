@@ -83,12 +83,13 @@ type Matrices
     Matrices(M, Mt, c, S, Sinv, SM, T, Tc, TMt) = new(M, Mt, c, S, Sinv, SM, T, Tc, TMt)
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-8)::CPResult
 
     if verbose
         println("======================================================================")
         println("          ProxSDP : Proximal Semidefinite Programming Solver          ")
         println("                 (c) Mario Souto and Joaquim D. Garcia, 2018          ")
+        println("                                                Beta version          ")
         println("----------------------------------------------------------------------")
         println(" Initializing Primal-Dual Hybrid Gradient method")
         println("----------------------------------------------------------------------")
@@ -111,6 +112,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_residual, dual_residual, comb_residual = zeros(max_iter), zeros(max_iter), zeros(max_iter)
 
         # Diagonal scaling
+        # affine_sets.A = - affine_sets.A
+        # affine_sets.b = - affine_sets.b
+
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
         S, Sinv, SM, T, Tc, TMt = diag_scaling(affine_sets, dims, M, Mt)
@@ -118,18 +122,21 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         rhs = vcat(affine_sets.b, affine_sets.h)
         
         # Stepsize parameters and linesearch parameters
-        primal_step = 1.0
+        # primal_step = 1.0 / svds(S * M * T; nsv=1)[1][:S][1]
+        primal_step = 0.9
         dual_step = primal_step
-        primal_step_start = primal_step
         theta = 1.0          # Overrelaxation parameter
         adapt_level = 0.9    # Factor by which the stepsizes will be balanced 
         adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 500              # Convergence check window
-        norm_c, norm_rhs = norm(affine_sets.c) / 2.0, norm(rhs)
+        norm_c, norm_rhs = norm(affine_sets.c / 2.0), norm(rhs)
+        norm_c, norm_rhs = 1.0, 1.0
 
         # Initial iterates
-        initialize!(pair, a, affine_sets, conic_sets, dims, mat, primal_step, dual_step, theta)::Void
+        # initialize!(pair, a, affine_sets, conic_sets, dims, mat, primal_step, dual_step, theta)::Void
     end
+
+    update_cont = 0
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -147,39 +154,47 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
         # Check convergence of inexact fixed-point
         rank_update += 1
-        if primal_residual[k] < tol && dual_residual[k] < tol
+        if primal_residual[k] < tol && dual_residual[k] < tol && k > l
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
                 break
-            elseif rank_update > l && dims.n > 100
-                target_rank = min(2 * target_rank, dims.n)
-                rank_update = 0
+            elseif rank_update > l
+                update_cont += 1
+                if update_cont > 3
+                    target_rank = min(2 * target_rank, dims.n)
+                    rank_update = 0
+                    update_cont = 0
+                end
             end
 
         # Check divergence
         elseif k > l && comb_residual[k - l] < comb_residual[k] && rank_update > l
-            target_rank = min(2 * target_rank, dims.n)
-            rank_update = 0
-  
+            update_cont += 1
+            if update_cont > 5
+                rank_update, update_cont = 0, 0
+                target_rank = min(2 * target_rank, dims.n)
+            end
+
         # Adaptive stepsizes  
-        elseif primal_residual[k] > tol && dual_residual[k] < tol
-            primal_step /= (1 - adapt_level)
-            dual_step *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-        elseif primal_residual[k] < tol && dual_residual[k] > tol
-            primal_step *= (1 - adapt_level)
-            dual_step /= (1 - adapt_level)
-            adapt_level *= adapt_decay  
-        elseif primal_residual[k] > 10.0 * dual_residual[k]
-            primal_step /= (1 - adapt_level)
-            dual_step *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-        elseif 10.0 * primal_residual[k] < dual_residual[k]
-            primal_step *= (1 - adapt_level)
-            dual_step /= (1 - adapt_level)
-            adapt_level *= adapt_decay  
+        # elseif primal_residual[k] > tol && dual_residual[k] < tol
+        #     primal_step /= (1 - adapt_level)
+        #     dual_step *= (1 - adapt_level)
+        #     adapt_level *= adapt_decay
+        # elseif primal_residual[k] < tol && dual_residual[k] > tol
+        #     primal_step *= (1 - adapt_level)
+        #     dual_step /= (1 - adapt_level)
+        #     adapt_level *= adapt_decay
+        # elseif primal_residual[k] > 10.0 * dual_residual[k]
+        #     primal_step /= (1 - adapt_level)
+        #     dual_step *= (1 - adapt_level)
+        #     adapt_level *= adapt_decay
+        #     rank_update = 0
+        # elseif 10.0 * primal_residual[k] < dual_residual[k]
+        #     primal_step *= (1 - adapt_level)
+        #     dual_step /= (1 - adapt_level)
+        #     adapt_level *= adapt_decay 
         end
     end
 
@@ -246,17 +261,19 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
 end
 
 function diag_scaling(affine_sets::AffineSets, dims::Dims, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64})
-    alpha = 1.0
-    # Diagonal scaling
-    div = vec(sum(abs.(M).^(2.0-alpha), 1))
+
+    # Right conditioner
+    div = vec(sum(abs.(M), 1) .^ 0.5)
     div[find(x-> x == 0.0, div)] = 1.0
     T = spdiagm(1.0 ./ div)
-    div = vec(sum(abs.(M).^alpha, 2))
+    
+    # Left conditioner
+    div = vec(sum(abs.(M), 2) .^ 0.5)
     div[find(x-> x == 0.0, div)] = 1.0
     S = spdiagm(1.0 ./ div)
-    Sinv = div
 
     # Cache matrix multiplications
+    Sinv = 1.0 ./ diag(S)
     TMt = T * Mt
     Tc = T * affine_sets.c
     SM = S * M
@@ -288,7 +305,7 @@ end
 function initialize!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, mat::Matrices, primal_step::Float64, dual_step::Float64, theta::Float64)::Void
     iv = conic_sets.sdpcone[1][1]::Vector{Int}
     im = conic_sets.sdpcone[1][2]::Vector{Int}
-    for k in 1:500
+    for k in 1:1000
         Base.LinAlg.axpy!(-primal_step, a.Mty, pair.x)
         Base.LinAlg.axpy!(-primal_step, mat.c, pair.x)
         # Projection onto the psd cone
@@ -342,6 +359,7 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     c_orig = copy(aff.c)
     for i in offdiag_ids
         aff.c[i] /= 2.0
+        c_orig[i] /= 2.0
     end  
 
     aff.A, aff.G, aff.c = aff.A[:, ord], aff.G[:, ord], aff.c[ord]
@@ -399,8 +417,6 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     eig_tol = 1e-6
     n = dims.n
-    iv = con.sdpcone[1][1]::Vector{Int}
-    im = con.sdpcone[1][2]::Vector{Int}
     @timeit "reshape1" begin
         cont = 1
         @inbounds for j in 1:n, i in j:n
@@ -409,39 +425,44 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if target_rank <= max(16, dims.n/100) && dims.n > 100
-        @timeit "eigs" begin 
-            eig!(arc, a.m, target_rank)
-            if hasconverged(arc)
-                fill!(a.m.data, 0.0)
-                for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 0.0
-                        vec = unsafe_getvectors(arc)[:, i]
-                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
-                    end
-                end
-            end
-        end
-        if hasconverged(arc)
-            @timeit "reshape2" begin
-                cont = 1
-                @inbounds for j in 1:n, i in j:n
-                    v[cont] = a.m.data[i,j]
-                    cont+=1
-                end
-            end
-            return target_rank, minimum(unsafe_getvalues(arc))
-        end
-    end
+    # @timeit "reshape" begin
+    #     @inbounds @simd for i in eachindex(iv)
+    #         a.m.data[im[i]] = v[iv[i]]
+    #     end
+    # end
+
+    # if target_rank <= max(16, dims.n/100) && dims.n >= 100
+    #     @timeit "eigs" begin 
+    #         eig!(arc, a.m, target_rank)
+    #         if hasconverged(arc)
+    #             fill!(a.m.data, 0.0)
+    #             for i in 1:target_rank
+    #                 if unsafe_getvalues(arc)[i] > 0.0
+    #                     vec = unsafe_getvectors(arc)[:, i]
+    #                     Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
+    #                 end
+    #             end
+    #         end
+    #     end
+    #     if hasconverged(arc)
+    #         @timeit "reshape2" begin
+    #             cont = 1
+    #             @inbounds for j in 1:n, i in j:n
+    #                 v[cont] = a.m.data[i,j]
+    #                 cont+=1
+    #             end
+    #         end
+    #         return target_rank, minimum(unsafe_getvalues(arc))
+    #     end
+    # end
     
     @timeit "eigfact" begin
-        cont_ = 0
         # fact = eigfact!(a.m, max(dims.n-target_rank, 1):dims.n)
-        fact = eigfact!(a.m, eig_tol, Inf)
+        # fact = eigfact!(a.m, 0.0, Inf)
+        fact = eigfact!(a.m)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
             if fact[:values][i] > 0.0
-                cont_ += 1
                 Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
             end
         end
@@ -454,6 +475,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             cont+=1
         end
     end
+
     # if cont_ == 0
     #     return target_rank, 0.0
     # else
