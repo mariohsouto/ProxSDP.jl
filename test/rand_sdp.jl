@@ -12,8 +12,9 @@ function rand_sdp(solver, seed)
     # Objective function
     c_sqrt = rand((n, n))
     C = c_sqrt * c_sqrt'
-    # C[1, 2] *= 0.5
-    # C[2, 1] = C[1, 2]
+    C[1, 2] /= 2.0
+    C[2, 1] = C[1, 2]
+    @show C
     # Generate m-dimensional feasible system
     A, b = Dict(), Dict()
     X_ = randn((n, n))
@@ -46,7 +47,11 @@ function rand_sdp(solver, seed)
     rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
     @show rank
 
-    println(trace(C * XX)-b[1])
+    println(trace(C * XX))
+
+    for i in 1:m
+        println(trace(A[i] * XX)-b[i])
+    end
 end
 
 getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])

@@ -59,13 +59,14 @@ type AuxiliaryData
     TMty_old::Vector{Float64}
     SMx::Vector{Float64}
     SMx_old::Vector{Float64}
+    Sproj::Vector{Float64}
 
     y_half::Vector{Float64}
     y_diff::Vector{Float64}
     AuxiliaryData(dims) = new(
         Symmetric(zeros(dims.n, dims.n), :L), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2),
         zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
-        zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
+        zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
         zeros(dims.p+dims.m), zeros(dims.p+dims.m)
     )
 end
@@ -83,7 +84,7 @@ type Matrices
     Matrices(M, Mt, c, S, Sinv, SM, T, Tc, TMt) = new(M, Mt, c, S, Sinv, SM, T, Tc, TMt)
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-8)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-10)::CPResult
 
     if verbose
         println("======================================================================")
@@ -100,9 +101,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time0 = time()
     tic()
     @timeit "Init" begin
+        @show affine_sets.c[3] /= 2.0
         opt = CPOptions(false, verbose)  
         # Scale objective function
         c_orig, idx = preprocess!(affine_sets, dims, conic_sets)
+        @show affine_sets.c
 
         # Initialization
         pair = PrimalDual(dims)
@@ -112,9 +115,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_residual, dual_residual, comb_residual = zeros(max_iter), zeros(max_iter), zeros(max_iter)
 
         # Diagonal scaling
-        # affine_sets.A = - affine_sets.A
-        # affine_sets.b = - affine_sets.b
-
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
         S, Sinv, SM, T, Tc, TMt = diag_scaling(affine_sets, dims, M, Mt)
@@ -122,14 +122,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         rhs = vcat(affine_sets.b, affine_sets.h)
         
         # Stepsize parameters and linesearch parameters
-        # primal_step = 1.0 / svds(S * M * T; nsv=1)[1][:S][1]
-        primal_step = 0.9
+        # @show primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
+        primal_step = 1.0
         dual_step = primal_step
         theta = 1.0          # Overrelaxation parameter
         adapt_level = 0.9    # Factor by which the stepsizes will be balanced 
         adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 500              # Convergence check window
-        norm_c, norm_rhs = norm(affine_sets.c / 2.0), norm(rhs)
+        # norm_c, norm_rhs = norm(affine_sets.c / 2.0), norm(rhs)
         norm_c, norm_rhs = 1.0, 1.0
 
         # Initial iterates
@@ -263,14 +263,16 @@ end
 function diag_scaling(affine_sets::AffineSets, dims::Dims, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64})
 
     # Right conditioner
-    div = vec(sum(abs.(M), 1) .^ 0.5)
+    div = vec(sum(abs.(M), 1) .^ 1.0)
     div[find(x-> x == 0.0, div)] = 1.0
     T = spdiagm(1.0 ./ div)
     
     # Left conditioner
-    div = vec(sum(abs.(M), 2) .^ 0.5)
+    div = vec(sum(abs.(M), 2) .^ 1.0)
     div[find(x-> x == 0.0, div)] = 1.0
     S = spdiagm(1.0 ./ div)
+
+    # S, T = speye(size(S)...), speye(size(T)...) 
 
     # Cache matrix multiplications
     Sinv = 1.0 ./ diag(S)
@@ -293,9 +295,11 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets:
     # Compute dual variable (y_{k + 1})
     @inbounds @simd for i in eachindex(pair.y)
         a.y_half[i] = mat.Sinv[i] * pair.y[i] / dual_step
+        # a.y_half[i] = pair.y[i] / dual_step
     end
     @timeit "box" box_projection!(a.y_half, dims, affine_sets)
-    Base.LinAlg.axpy!(-dual_step, mat.S * a.y_half, pair.y)
+    A_mul_B!(a.Sproj, mat.S, a.y_half)
+    Base.LinAlg.axpy!(-dual_step, a.Sproj, pair.y)
     A_mul_B!(a.TMty, mat.TMt, pair.y)
     A_mul_B!(a.Mty, mat.Mt, pair.y)
 
@@ -346,7 +350,7 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     cont = 1
     sdp_vars = zeros(Int, div(n*(n+1),2))
     for j in 1:n, i in j:n
-        sdp_vars[cont] = X[i,j]
+        sdp_vars[cont] = X[i, j]
         cont+=1
     end
 
@@ -358,8 +362,8 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     offdiag_ids = setdiff(Set(ids), Set(diag(X)))
     c_orig = copy(aff.c)
     for i in offdiag_ids
-        aff.c[i] /= 2.0
-        c_orig[i] /= 2.0
+        # aff.c[i] *= 2.0
+        c_orig[i] *= 2.0
     end  
 
     aff.A, aff.G, aff.c = aff.A[:, ord], aff.G[:, ord], aff.c[ord]
@@ -458,8 +462,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     
     @timeit "eigfact" begin
         # fact = eigfact!(a.m, max(dims.n-target_rank, 1):dims.n)
-        # fact = eigfact!(a.m, 0.0, Inf)
-        fact = eigfact!(a.m)
+        fact = eigfact!(a.m, 0.0, Inf)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
             if fact[:values][i] > 0.0
