@@ -123,8 +123,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         mat = Matrices(SM, TMt, affine_sets.c, S, Sinv, SM, T, Tc, TMt)
         
         # Stepsize parameters and linesearch parameters
-        # @show primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
-        primal_step = 1.0
+        @show primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
+        # primal_step = 1.0
         dual_step = primal_step
         theta = 1.0          # Overrelaxation parameter
         adapt_level = 0.9    # Factor by which the stepsizes will be balanced 
@@ -230,7 +230,7 @@ function box_projection!(pair::PrimalDual, dims::Dims, aff::AffineSets, dual_ste
     end
     # Projection onto <= h
     @inbounds @simd for i in 1:length(aff.h)
-        pair.y[dims.p+i] = min(pair.y[dims.p+i] - dual_step * aff.h[i], 0.0)
+        pair.y[dims.p+i] = max(pair.y[dims.p+i] - dual_step * aff.h[i], 0.0)
     end
     return nothing
 end
@@ -298,12 +298,14 @@ end
 
 function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, dual_step::Float64, theta::Float64)::Void
 
-    # Compute intermediate dual variable (y_{k + 1/2})
-    @inbounds @simd for i in eachindex(pair.y)
-        a.y_half[i] = theta * a.Mx_old[i]
-    end
-    Base.LinAlg.axpy!(-(1.0 + theta), a.Mx, a.y_half)
-    Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
+    # # Compute intermediate dual variable (y_{k + 1/2})
+    # @inbounds @simd for i in eachindex(pair.y)
+    #     a.y_half[i] = theta * a.Mx_old[i]
+    # end
+    # Base.LinAlg.axpy!(-(1.0 + theta), a.Mx, a.y_half)
+    # Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
+
+    pair.y = pair.y + dual_step * mat.M * (2.0 * pair.x - pair.x_old)
 
     @timeit "box" box_projection!(pair, dims, affine_sets, dual_step)
     A_mul_B!(a.Mty, mat.Mt, pair.y)

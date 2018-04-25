@@ -18,14 +18,25 @@ else
     using Mosek
 end
 
-include("rand_sdp.jl")
+include("base.jl")
 if Base.libblas_name == "libmkl_rt"
-    rand_sdp(ProxSDPSolverInstance(), 0)
+    base_sdp(ProxSDPSolverInstance(), 0)
+    base_sdp2(ProxSDPSolverInstance(), 0)
 else
-    rand_sdp(MosekSolver(), 0)
+    base_sdp(MosekSolver(), 0)
+    base_sdp2(MosekSolver(), 0)
     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
 end
+
+# include("rand_sdp.jl")
+# if Base.libblas_name == "libmkl_rt"
+#     rand_sdp(ProxSDPSolverInstance(), 0)
+# else
+#     rand_sdp(MosekSolver(), 0)
+#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
+#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
+# end
 
 # rand_sdp(MosekSolver(), 0)
 
