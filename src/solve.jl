@@ -103,8 +103,8 @@ function scalecoef(rows, coef, minus, s::MOI.PositiveSemidefiniteConeTriangle, r
             output[i] *= scaling
             # output[i] *= 1.0
         else
-            # output[i] *= scaling2
-            output[i] *= 2.0
+            output[i] *= scaling2
+            # output[i] *= 2.0
         end
     end
     output
