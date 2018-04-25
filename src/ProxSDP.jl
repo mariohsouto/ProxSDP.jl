@@ -69,7 +69,7 @@ type Matrices
     Matrices(M, Mt, c) = new(M, Mt, c)
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-6)::CPResult
 
     if verbose
         println("======================================================================")
@@ -89,6 +89,23 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         opt = CPOptions(false, verbose)
         # Scale objective function
         c_orig, idx = preprocess!(affine_sets, dims, conic_sets)
+        for line in 1:dims.p
+            cont = 1
+            @inbounds for j in 1:dims.n, i in j:dims.n
+                if i != j
+                    affine_sets.A[line, cont] *= (sqrt(2.0) / 2.0)
+                end
+                cont += 1
+            end
+        end
+
+        cont = 1
+        @inbounds for j in 1:dims.n, i in j:dims.n
+            if i != j
+                affine_sets.c[cont] *= (sqrt(2.0) / 2.0)
+            end
+            cont += 1
+        end
 
         # Initialization
         pair = PrimalDual(dims)
@@ -171,6 +188,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             beta = min(beta * (1 + adapt_level), 1e+3)
             adapt_level *= adapt_decay  
         end
+    end
+
+    cont = 1
+    @inbounds for j in 1:dims.n, i in j:dims.n
+        if i != j
+            pair.x[cont] /= sqrt(2.0)
+        end
+        cont += 1
     end
 
     # Compute results
@@ -356,9 +381,9 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     ids = vec(X)
     offdiag_ids = setdiff(Set(ids), Set(diag(X)))
     c_orig = copy(aff.c)
-    for i in offdiag_ids
-        aff.c[i] /= 2.0
-    end  
+    # for i in offdiag_ids
+    #     aff.c[i] /= 2.0
+    # end  
 
     aff.A, aff.G, aff.c = aff.A[:, ord], aff.G[:, ord], aff.c[ord]
     return c_orig[ord], sortperm(ord)
@@ -373,13 +398,15 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     eig_tol = 0.0
     n = dims.n
-    iv = con.sdpcone[1][1]::Vector{Int}
-    im = con.sdpcone[1][2]::Vector{Int}
     @timeit "reshape1" begin
         cont = 1
         @inbounds for j in 1:n, i in j:n
-            a.m.data[i,j] = v[cont]
-            cont+=1
+            if i != j
+                a.m.data[i,j] = v[cont] / sqrt(2.0)
+            else
+                a.m.data[i,j] = v[cont]
+            end
+            cont += 1
         end
     end
 
@@ -398,12 +425,16 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
         if hasconverged(arc)
             @timeit "reshape2" begin
-                cont = 1
-                @inbounds for j in 1:n, i in j:n
-                    v[cont] = a.m.data[i,j]
-                    cont+=1
+            cont = 1
+            @inbounds for j in 1:n, i in j:n
+                if i != j
+                    v[cont] = a.m.data[i, j] * sqrt(2.0)
+                else
+                    v[cont] = a.m.data[i, j]
                 end
+                cont+=1
             end
+        end
             return target_rank, minimum(unsafe_getvalues(arc))
         end
     end
@@ -424,15 +455,15 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     @timeit "reshape2" begin
         cont = 1
         @inbounds for j in 1:n, i in j:n
-            v[cont] = a.m.data[i,j]
+            if i != j
+                v[cont] = a.m.data[i, j] * sqrt(2.0)
+            else
+                v[cont] = a.m.data[i, j]
+            end
             cont+=1
         end
     end
-    # if cont_ == 0
-    #     return target_rank, 0.0
-    # else
-    #     return target_rank, minimum(fact[:values])
-    # end
+
     return target_rank, 0.0
 end
 

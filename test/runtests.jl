@@ -13,9 +13,9 @@ if Base.libblas_name == "libmkl_rt"
      using MathOptInterfaceUtilities
      const MOIU = MathOptInterfaceUtilities
 else
-    using CSDP 
+    # using CSDP 
     # using SCS
-    # using Mosek
+    using Mosek
 end
 
 # MIMO ---------------------------------------------------------------
@@ -35,6 +35,14 @@ end
 #         mimo(CSDPSolver(objtol=1e-4, maxiter=100000), i)
 #     end
 # end
+
+# include("rand_sdp.jl")
+# if Base.libblas_name == "libmkl_rt"
+#     rand_sdp(ProxSDPSolverInstance(), 0)
+# else
+#     rand_sdp(MosekSolver(), 0)
+# end
+# rand_sdp(ProxSDPSolverInstance(), 0)
 
 
 # Graph equipartition problem -----------------------------------------
