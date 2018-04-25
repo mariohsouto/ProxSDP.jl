@@ -12,8 +12,8 @@ function rand_sdp(solver, seed)
     # Objective function
     c_sqrt = rand((n, n))
     C = c_sqrt * c_sqrt'
-    C[1, 2] /= 2.0
-    C[2, 1] = C[1, 2]
+    # C[1, 2] /= 2.0
+    # C[2, 1] = C[1, 2]
     @show C
     # Generate m-dimensional feasible system
     A, b = Dict(), Dict()
