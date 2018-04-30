@@ -159,6 +159,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
     update_cont = 0
     max_eig = 1.0
+    beta = 1.0
     
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
@@ -167,18 +168,19 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         @timeit "primal" target_rank, current_rank, max_eig, min_eig = primal_step!(pair, a, dims, conic_sets, k, mat, primal_step, arc, offdiag, max_eig)::Tuple{Int64, Int64, Float64, Float64}
         # Dual update 
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
+        # @timeit "linesearch" primal_step, dual_step, beta, theta = linesearch!(pair, a, dims, affine_sets, mat, primal_step, beta, theta)::Tuple{Float64, Float64, Float64, Float64}
         # Compute residuals and update old iterates
         @timeit "logging" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs)::Void
         # Print progress
         if mod(k, 100) == 0 && opt.verbose
             print_progress(k, primal_residual[k], dual_residual[k], current_rank, time0)::Void
-            @show primal_step, dual_step, adapt_level
+            # @show primal_step, dual_step, adapt_level
+            @show min_eig, max_eig, current_rank
         end
 
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
-            # println(max_eig / k)
             # if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -187,31 +189,26 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             # end
 
         # Check divergence
-        # elseif k > l && comb_residual[k - l] <= comb_residual[k] && rank_update > l
-        #     update_cont += 1
-        #     if update_cont > 5
-        #         rank_update, update_cont = 0, 0
-        #         target_rank = min(2 * target_rank, dims.n)
-        #     end
+        elseif k > l && comb_residual[k - l] <= comb_residual[k] && rank_update > l
+            update_cont += 1
+            if update_cont > 5
+                rank_update, update_cont = 0, 0
+                target_rank = min(2 * target_rank, dims.n)
+            end
 
         # Adaptive stepsizes  
         elseif primal_residual[k] > tol && dual_residual[k] < tol
             primal_step /= (1 - adapt_level)
             dual_step *= (1 - adapt_level)
+            beta = dual_step / primal_step
+            # beta *= (1 - adapt_level)
             adapt_level *= adapt_decay
         elseif primal_residual[k] < tol && dual_residual[k] > tol
             primal_step *= (1 - adapt_level)
             dual_step /= (1 - adapt_level)
+            beta = dual_step / primal_step
+            # beta /= (1 - adapt_level)
             adapt_level *= adapt_decay
-        elseif primal_residual[k] > 10.0 * dual_residual[k]
-            primal_step /= (1 - adapt_level)
-            dual_step *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-            rank_update = 0
-        elseif 10.0 * primal_residual[k] < dual_residual[k]
-            primal_step *= (1 - adapt_level)
-            dual_step /= (1 - adapt_level)
-            adapt_level *= adapt_decay 
         end
     end
 
@@ -245,6 +242,47 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     end
 
     return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, 0.0, 0.0, prim_obj)
+end
+
+function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, beta::Float64, theta::Float64)::Tuple{Float64, Float64, Float64, Float64}
+    max_iter_linesearch = 50
+    delta = 1.0 - 1e-1
+    mu = 0.9
+    primal_step_old = primal_step
+    primal_step = primal_step * sqrt(1.0 + theta)
+    pair.y_aux = copy(pair.y)
+
+    # Linesearch loop
+    for i = 1:max_iter_linesearch
+        # Inital guess for theta
+        theta = primal_step / primal_step_old
+        # Update dual variable
+        dual_step = primal_step * beta
+        @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)
+        # Check linesearch convergence
+        copy!(a.Mty_diff, a.Mty)
+        Base.LinAlg.axpy!(-1.0, a.Mty_old, a.Mty_diff)
+        copy!(a.y_diff, pair.y)
+        Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_diff)
+        if primal_step * sqrt(beta) * norm(a.Mty_diff) <= delta * norm(a.y_diff)
+            return primal_step, beta * primal_step, beta, theta
+        else
+            pair.y = copy(pair.y_aux)
+            primal_step *= mu
+            if primal_step < 1e-4
+                break
+            end
+        end
+    end
+
+    println(":")
+
+    primal_step = primal_step_old
+    theta = 1.0
+    dual_step = primal_step
+    @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)
+
+    return primal_step, beta * primal_step, beta, theta
 end
 
 function box_projection!(v::Array{Float64,1}, dims::Dims, aff::AffineSets, dual_step::Float64)::Void
@@ -287,12 +325,12 @@ end
 function diag_scaling(affine_sets::AffineSets, dims::Dims, M::SparseMatrixCSC{Float64,Int64}, Mt::SparseMatrixCSC{Float64,Int64})
 
     # Right conditioner
-    T = vec(sum(abs.(M), 1) .^ -.5)
+    T = vec(sum(abs.(M), 1) .^ -1.0)
     T[find(x-> x == Inf, T)] = 1.0
     T = spdiagm(T)
     
     # Left conditioner
-    S = vec(sum(abs.(M), 2) .^ -.5)
+    S = vec(sum(abs.(M), 2) .^ -1.0)
     S[find(x-> x == Inf, S)] = 1.0
     S = spdiagm(S)
 
@@ -439,9 +477,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     else
         @timeit "eigfact" begin
-            fact = eigfact!(a.m, max_eig / sqrt(k), Inf)
-            # fact = eigfact!(a.m, max_eig / (k - 99), Inf)
-            # fact = eigfact!(a.m, 0.0, Inf)
+            fact = eigfact!(a.m, max_eig * exp(-k / (0.5 * dims.n)), Inf)
             fill!(a.m.data, 0.0)
             current_rank = 0
             for i in 1:length(fact[:values])
