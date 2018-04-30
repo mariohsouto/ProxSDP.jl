@@ -1,6 +1,7 @@
+using StatsBase
 
-function quad_knapsack(solver)
-    srand(0)
+function quad_knapsack(solver, seed)
+    srand(seed)
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else
@@ -8,22 +9,26 @@ function quad_knapsack(solver)
     end
     
     # Instance size
-    n = 50
-    k = 10
+    n = 20
+    # k-item capacity
+    # k = Int(n / 10)
+    k = 1
+    # Frequency of nonzero weights
     delta = 0.5
 
-    # Weights and capacity
+    # Build weights and capacity
     a = zeros(n)
     for i in 1:n
         a[i] = rand(1:50)
     end
-    b = rand(50:sum(a))
+    a = ones(n)
+    b = rand(100:sum(a)+100)
 
     # Profits
     C = zeros((n, n))
     for i in 1:n
         for j in 1:n
-            if rand(0:1) == 1
+            if sample([1, 0],Weights([delta, 1.0 - delta])) == 1
                 c_ = - rand(1:100)
                 C[i, j] = c_
                 C[j, i] = c_
@@ -39,23 +44,27 @@ function quad_knapsack(solver)
     end
     @objective(model, Min, sum(C[i, j] * X[i+1, j+1] for i in 1:n, j in 1:n))
     # Capacity constraint
-    @constraint(model, cap, sum(a[i] * X[i+1, i+1] for i in 1:n) <= b)
+    # @constraint(model, cap, sum(a[i] * X[i+1, i+1] for i in 1:n) <= b)
     # k-item constraint
-    @constraint(model, k_knap, sum(X[i+1, i+1] for i in 1:n) == 100)
+    @constraint(model, k_knap, sum(X[i+1, i+1] for i in 1:n) == k)
 
-    @constraint(model, bla, X[1, 1] == 1)
+    # @constraint(model, bla, X[1, 1] == 1)
+
+    # @constraint(model, lb[i in 1:n+1, j in 1:n+1], X[i, j] >= 0.0)
+    # @constraint(model, ub[i in 1:n+1, j in 1:n+1], X[i, j] <= 1.0)
 
     if Base.libblas_name == "libmkl_rt"
         JuMP.attach(model, solver)
     end
-
+    tic()
     teste = JuMP.solve(model)
+    toc()
     if Base.libblas_name == "libmkl_rt"
         XX = getvalue2.(X)
     else
         XX = getvalue.(X)
     end
-    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-8])
+    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
     @show rank
     @show diag(XX)
 end

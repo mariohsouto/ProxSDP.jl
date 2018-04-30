@@ -38,4 +38,36 @@ function max_cut(solver, path)
     teste = JuMP.solve(m)
 
     # @show JuMP.resultvalue.(X)
+
+    # Goemans-Williamson rounding
+    best_obj = inf
+    for _ in 1:10
+        # Draw a vector uniformly distributed in the unit sphere
+        r = randn((dims.n, 1))
+        r /= norm(r)
+        # Define cuts S1 = {i | <x_i, v > >= 0} and S2 = {i | <x_i, v > < 0}
+        S1, S2 = [], []
+        for i in n
+            if dot(XX[:, i], r) >= 0.0
+                push!(S1, i)
+            else
+                push!(S2, i)
+            end
+        end
+        # Compute value defined by the cut(S1, S2)
+        obj = 0.0
+        for i in 1:n
+            for j in 1:n
+                if (i in S1 && j in S2) || (i in S2 and j in S1)
+                    obj += W[i, j]
+                end
+            end
+        end
+
+        # Save best incumbent
+        if obj < best_obj
+            best_obj = obj
+        end
+    end
+    @show best_obj
 end
