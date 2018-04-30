@@ -114,6 +114,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 cont += 1
             end
         end
+        for line in 1:dims.m
+            cont = 1
+            @inbounds for j in 1:dims.n, i in j:dims.n
+                if i != j
+                    affine_sets.G[line, cont] *= (sqrt(2.0) / 2.0)
+                end
+                cont += 1
+            end
+        end
 
         cont = 1
         @inbounds for j in 1:dims.n, i in j:dims.n
@@ -151,13 +160,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     update_cont = 0
     max_eig = 1.0
     
-
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
         # Primal update
         @timeit "primal" target_rank, current_rank, max_eig, min_eig = primal_step!(pair, a, dims, conic_sets, k, mat, primal_step, arc, offdiag, max_eig)::Tuple{Int64, Int64, Float64, Float64}
-        # target_rank = current_rank + 2
         # Dual update 
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
         # Compute residuals and update old iterates
@@ -172,7 +179,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
             # println(max_eig / k)
-            # if max_eig / k <= 1e-3
+            # if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
