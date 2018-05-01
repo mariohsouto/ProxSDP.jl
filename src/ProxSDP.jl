@@ -85,7 +85,7 @@ type Matrices
     Matrices(M, Mt, c, S, Sinv, SM, T, Tc, TMt) = new(M, Mt, c, S, Sinv, SM, T, Tc, TMt)
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(3 * 1e+5), tol=1e-4)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(3 * 1e+5), tol=1e-3)::CPResult
 
     if verbose
         println("======================================================================")
@@ -103,6 +103,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     tic()
     @timeit "Init" begin
         rhs_orig = vcat(affine_sets.b, affine_sets.h)
+        norm_c, norm_rhs = norm(affine_sets.c), norm(rhs_orig)
         opt = CPOptions(false, verbose)  
         # Scale objective function
         c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
@@ -154,16 +155,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         adapt_level = 0.9    # Factor by which the stepsizes will be balanced 
         adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 500              # Convergence check window
-        norm_c, norm_rhs = norm(affine_sets.c), norm(rhs_orig)
     end
 
     update_cont = 0
+    max_eig = 1.0 * dims.n
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:max_iter
 
         # Primal update
-        @timeit "primal" target_rank, min_eig = primal_step!(pair, a, dims, conic_sets, k, mat, primal_step, arc, offdiag)::Tuple{Int64, Float64}
+        @timeit "primal" target_rank, max_eig = primal_step!(pair, a, dims, conic_sets, k, mat, primal_step, arc, offdiag, max_eig)::Tuple{Int64, Float64}
         # Dual update 
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
         # Compute residuals and update old iterates
@@ -360,18 +361,18 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     return c_orig[ord], sortperm(ord), offdiag_ids
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, mat::Matrices, primal_step::Float64, arc::ARPACKAlloc, offdiag::Set)::Tuple{Int64, Float64}
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, conic_sets::ConicSets, target_rank::Int64, mat::Matrices, primal_step::Float64, arc::ARPACKAlloc, offdiag::Set, max_eig::Float64)::Tuple{Int64, Float64}
     
     # x = x - p_step * (Mty + c)
     Base.LinAlg.axpy!(-primal_step, a.Mty, pair.x)
     Base.LinAlg.axpy!(-primal_step, mat.c, pair.x)
 
     # Projection onto the psd cone
-    target_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank, arc, offdiag)::Tuple{Int64, Float64}
+    target_rank, max_eig = sdp_cone_projection!(pair.x, a, dims, conic_sets, target_rank, arc, offdiag, max_eig)::Tuple{Int64, Float64}
 
     A_mul_B!(a.Mx, mat.M, pair.x)
 
-    return target_rank, min_eig
+    return target_rank, max_eig
 end
 
 function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target_rank::Int64, time0::Float64)::Void
@@ -404,7 +405,7 @@ function print_progress(k::Int64, primal_res::Float64, dual_res::Float64, target
     return nothing
 end
 
-function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, k::Int64, arc::ARPACKAlloc, offdiag::Set)::Tuple{Int64, Float64}
+function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, con::ConicSets, k::Int64, arc::ARPACKAlloc, offdiag::Set, max_eig::Float64)::Tuple{Int64, Float64}
 
     eig_tol = 1e-6
     n = dims.n
@@ -422,7 +423,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     rank = 0
     @timeit "eigfact" begin
-        fact = eigfact!(a.m, max(1e-4, 100.0 * exp(-k / (0.5 * dims.n))), Inf)
+        fact = eigfact!(a.m, max(1e-4, max_eig * exp(-k / (0.5 * dims.n))), Inf)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
             if fact[:values][i] > 0.0
@@ -444,6 +445,6 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    return rank, 0.0
+    return rank, max_eig
 end
 end
