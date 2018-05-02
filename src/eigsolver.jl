@@ -138,7 +138,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)
 
-    arc.TOL = 1e-15 * ones(T, 1)
+    arc.TOL = 1e-10 * ones(T, 1)
 
     arc.v = Matrix{T}(arc.n, arc.ncv)
     arc.workd = Vector{T}(3*arc.n)
