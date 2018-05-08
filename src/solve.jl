@@ -101,8 +101,10 @@ function scalecoef(rows, coef, minus, s::MOI.PositiveSemidefiniteConeTriangle, r
     for i in 1:length(output)
         if rows[i] in diagidx
             output[i] *= scaling
+            # output[i] *= 1.0
         else
             output[i] *= scaling2
+            # output[i] *= 2.0
         end
     end
     output
@@ -188,7 +190,6 @@ function MOI.optimize!(instance::ProxSDPSolverInstance)
     preA = sparse(I, J, V, rows, cols)
     f = MOI.get(instance.data, MOI.ObjectiveFunction())
     c0 = full(sparsevec(_varmap(instance.varmap, f), f.coefficients, n))
-
     c = MOI.get(instance.data, MOI.ObjectiveSense()) == MOI.MaxSense ? -c0 : c0
     # @show instance.varmap
     # # @show cone

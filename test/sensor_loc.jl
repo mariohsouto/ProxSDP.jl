@@ -1,4 +1,3 @@
-
 function sensor_loc(solver, seed)
     srand(seed)
     if Base.libblas_name == "libmkl_rt"
@@ -33,11 +32,12 @@ function sensor_loc(solver, seed)
     # @constraint(model, lb_1[i in 1:n], X[i, n + 1] >= 0.0)
     # @constraint(model, ub_2[i in 1:n], X[n + 1, i] <= 1.0)
     # @constraint(model, lb_2[i in 1:n], X[n + 1, i] >= 0.0)
-    @constraint(model, ub_2[i in 1:n, j in 1:n], X[i, j] <= 1.0)
-    @constraint(model, lb_2[i in 1:n, j in 1:n], X[i, j] >= 0.0)
+    # @constraint(model, ub_2[i in 1:n, j in 1:n], X[i, j] <= 1.0)
+    # @constraint(model, lb_2[i in 1:n, j in 1:n], X[i, j] >= 0.0)
     @constraint(model, X[n + 1, n + 1] == 1.0)
     # Feasibility objective function
-    L = eye(n+1)
+    # L = eye(n+1)
+    # @objective(model, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
     @objective(model, Min, sum(0.0 * X[i, j] for i in 1:n+1, j in 1:n+1))
 
     # Solve

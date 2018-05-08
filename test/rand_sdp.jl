@@ -6,11 +6,13 @@ function rand_sdp(solver, seed)
         model = Model(solver=solver) 
     end
     
-    n = 100  # Instance size
-    m = 2  # Number of constraints
+    n = 15  # Instance size
+    m = 10  # Number of constraints
     # Objective function
     c_sqrt = rand((n, n))
     C = c_sqrt * c_sqrt'
+    # C[1, 2] *= 0.5
+    # C[2, 1] = C[1, 2]
     # Generate m-dimensional feasible system
     A, b = Dict(), Dict()
     X_ = randn((n, n))
@@ -28,6 +30,7 @@ function rand_sdp(solver, seed)
     end
     @objective(model, Min, sum(C[i, j] * X[i, j] for i in 1:n, j in 1:n))
     @constraint(model, ctr[k in 1:m], sum(A[k][i, j] * X[i, j] for i in 1:n, j in 1:n) == b[k])
+    # @constraint(model, bla, sum(C[i, j] * X[i, j] for i in 1:n, j in 1:n)<=0.1)
 
     if Base.libblas_name == "libmkl_rt"
         JuMP.attach(model, solver)
@@ -40,10 +43,10 @@ function rand_sdp(solver, seed)
         XX = getvalue.(X)
     end
 
-    minus_rank = length([eig for eig in eigfact(XX)[:values] if eig < -1e-8])
+    minus_rank = length([eig for eig in eigfact(XX)[:values] if eig < -1e-10])
     @show minus_rank
 
-    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-8])
+    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
     @show rank
 
     @show trace(C * XX)

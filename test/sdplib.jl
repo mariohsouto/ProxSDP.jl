@@ -23,7 +23,7 @@ function sdplib(solver, path)
     else
         c = [parse(Float64,string) for string in split(data[4, 1][2:end - 1], ",")]
     end
-    # n = abs(cum_blks[end])
+    n = abs(cum_blks[end])
     n = length(c)
     # n = 335
     F = Dict(i => spzeros(n, n) for i = 0:m)
@@ -80,50 +80,7 @@ function sdplib(solver, path)
     end
     rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
     @show rank
-
-    # @show eigfact(XX)
-    # @show typeof(XX)
-    # V = cholfact(XX)[:L]
-
-    # # Goemans-Williamson rounding
-    # best_obj = -Inf
-    # list_obj = []
-    # for _ in 1:10
-    #     # Draw a vector uniformly distributed in the unit sphere
-    #     r = randn((n, 1))
-    #     r /= norm(r)
-
-    #     # Define cuts S1 = {i | <Vi, v > >= 0} and S2 = {i | <Vi, v > < 0}
-    #     S1, S2 = [], []
-    #     for i in 1:n
-    #         if dot(V[i, :], r) >= 0.0
-    #             push!(S1, i)
-    #         else
-    #             push!(S2, i)
-    #         end
-    #     end
-    #     # @show S1, S2
-    #     # Compute value defined by the cut(S1, S2)
-    #     obj = 0.0
-    #     for i in 1:n
-    #         for j in 1:n
-    #             if i in S1 && j in S2
-    #                 obj += F[0][i, j]
-    #             elseif i in S2 && j in S1
-    #                 obj += F[0][i, j]
-    #             end
-    #         end
-    #     end
-    #     push!(list_obj, obj)
-
-    #     # Save best incumbent
-    #     if obj > best_obj
-    #         best_obj = obj
-    #     end
-    # end
-    # @show best_obj
-    # @show mean(list_obj)
-
+    @show trace(F[0] * XX)
 end
 
 getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])
