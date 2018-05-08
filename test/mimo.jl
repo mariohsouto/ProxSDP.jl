@@ -8,7 +8,7 @@ function mimo(solver, seed)
     end
     
     # Instance size
-    n = 500
+    n = 100
     m = 10 * n
     # Channel
     H = randn((m, n))
@@ -17,7 +17,7 @@ function mimo(solver, seed)
     # True signal
     s = rand([-1, 1], n)
     # Received signal
-    sigma = 1e-4
+    sigma = 10.0
     y = H * s + sigma * v
     L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
     if Base.libblas_name == "libmkl_rt"
@@ -28,19 +28,22 @@ function mimo(solver, seed)
     @objective(model, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
     @constraint(model, ctr[i in 1:n+1], X[i, i] == 1.0)
 
-    # @constraint(model, lb[i in 1:n+1, j in 1:n+1], X[i, j] >= - 1.0)
-    # @constraint(model, ub[i in 1:n+1, j in 1:n+1], X[i, j] <= 1.0)
+    @constraint(model, lb[i in 1:n+1, j in 1:n+1], X[i, j] >= - 1.0)
+    @constraint(model, ub[i in 1:n+1, j in 1:n+1], X[i, j] <= 1.0)
 
     if Base.libblas_name == "libmkl_rt"
         JuMP.attach(model, solver)
     end
 
+    tic()
     teste = JuMP.solve(model)
+    toc()
     if Base.libblas_name == "libmkl_rt"
         XX = getvalue2.(X)
     else
         XX = getvalue.(X)
     end
+    @show XX[1:n, end]
     x_hat = sign.(XX[1:n, end])
     println(x_hat-s)
     rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-4])

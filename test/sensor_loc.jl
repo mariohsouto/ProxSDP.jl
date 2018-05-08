@@ -7,7 +7,7 @@ function sensor_loc(solver, seed)
     end
     
     # Instance size
-    n = 50
+    n = 100
     m = 10 * n
     # Sensor true position
     x_true = rand((n, 1))
@@ -36,7 +36,8 @@ function sensor_loc(solver, seed)
     # @constraint(model, lb_2[i in 1:n, j in 1:n], X[i, j] >= 0.0)
     @constraint(model, X[n + 1, n + 1] == 1.0)
     # Feasibility objective function
-    L = eye(n+1)
+    # L = eye(n+1)
+    # @objective(model, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
     @objective(model, Min, sum(0.0 * X[i, j] for i in 1:n+1, j in 1:n+1))
 
     # Solve

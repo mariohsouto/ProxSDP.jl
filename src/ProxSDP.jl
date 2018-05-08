@@ -82,10 +82,11 @@ type Matrices
     T::SparseMatrixCSC{Float64,Int64}
     Tc::Vector{Float64}
     TMt::SparseMatrixCSC{Float64,Int64}
-    Matrices(M, Mt, c, S, Sinv, SM, T, Tc, TMt) = new(M, Mt, c, S, Sinv, SM, T, Tc, TMt)
+    Tinv::Vector{Float64}
+    Matrices(M, Mt, c, S, Sinv, SM, T, Tc, TMt, Tinv) = new(M, Mt, c, S, Sinv, SM, T, Tc, TMt, Tinv)
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(3 * 1e+5), tol=1e-4)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-5)::CPResult
 
     if verbose
         println("======================================================================")
@@ -102,10 +103,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time0 = time()
     tic()
     @timeit "Init" begin
-        rhs_orig = vcat(affine_sets.b, affine_sets.h)
+
         opt = CPOptions(false, verbose)  
         # Scale objective function
         c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
+        A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+        rhs_orig = vcat(affine_sets.b, affine_sets.h)
+
         for line in 1:dims.p
             cont = 1
             @inbounds for j in 1:dims.n, i in j:dims.n
@@ -143,8 +147,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
-        S, Sinv, SM, T, Tc, TMt = diag_scaling(affine_sets, dims, M, Mt)
-        mat = Matrices(SM, TMt, affine_sets.c, S, Sinv, SM, T, Tc, TMt)
+        S, Sinv, SM, T, Tc, TMt, Tinv = diag_scaling(affine_sets, dims, M, Mt)
+        mat = Matrices(SM, TMt, Tc, S, Sinv, SM, T, Tc, TMt, Tinv)
         
         # Stepsize parameters and linesearch parameters
         primal_step = 1.0
@@ -154,9 +158,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 500              # Convergence check window
         @show norm_c, norm_rhs = norm(affine_sets.c) / sqrt(2.0), norm(rhs)
+
+        pair.x[1] = 1.0
     end
 
     # Fixed-point loop
+    tic()
+    println("start CP")
     @timeit "CP loop" for k in 1:max_iter
 
         # Primal update
@@ -164,7 +172,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Dual update 
         @timeit "dual" dual_step!(pair, a, dims, affine_sets, mat, dual_step, theta)::Void
         # Compute residuals and update old iterates
-        @timeit "logging" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs)::Void
+        @timeit "logging" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs, mat)::Void
         # Print progress
         if mod(k, 1000) == 0 && opt.verbose
             print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
@@ -172,8 +180,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
         # Check convergence of inexact fixed-point
         rank_update += 1
-        if primal_residual[k] < tol && dual_residual[k] < tol && k > 100
-            if min_eig < tol 
+        if primal_residual[k] < tol && dual_residual[k] < tol
+            println(min_eig)
+            if min_eig < tol * 0.01
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
@@ -203,20 +212,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             primal_step *= (1 - adapt_level)
             dual_step /= (1 - adapt_level)
             adapt_level *= adapt_decay
-        elseif primal_residual[k] > 10.0 * dual_residual[k]
-            primal_step /= (1 - adapt_level)
-            dual_step *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-            rank_update = 0
-        elseif 10.0 * primal_residual[k] < dual_residual[k]
-            primal_step *= (1 - adapt_level)
-            dual_step /= (1 - adapt_level)
-            adapt_level *= adapt_decay 
         end
     end
 
-    pair.x = T * pair.x
-    pair.y = Sinv .* pair.y
+    toc()
 
     cont = 1
     @inbounds for j in 1:dims.n, i in j:dims.n
@@ -230,21 +229,21 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time_ = toq()
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
+    res_eq = norm(A_orig * pair.x - b_orig) / (1 + norm(b_orig))
 
     pair.x = pair.x[idx]
 
     if verbose
         println("----------------------------------------------------------------------")
         if converged
-            println(" Status = solved")
+            println(" Solution metrics [solved]:")
         else
-            println(" Status = ProxSDP failed to converge")
+            println(" Solution metrics [failed to converge]:")
         end
-        println(" Elapsed time = $(round(time_, 2))s")
-        println("----------------------------------------------------------------------")
-        println(" Primal objective = $(round(prim_obj, 4))")
-        println(" Dual objective = $(round(dual_obj, 4))")
-        println(" Duality gap = $(round(prim_obj - dual_obj, 4))")
+        println(" Primal objective = $(round(prim_obj, 6))")
+        println(" Dual objective = $(round(dual_obj, 6))")
+        println(" Duality gap = $(round(prim_obj - dual_obj, 6))")
+        println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
         println("======================================================================")
     end
 
@@ -263,15 +262,17 @@ function box_projection!(v::Array{Float64,1}, dims::Dims, aff::AffineSets, dual_
     return nothing
 end
 
-function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64, norm_c::Float64, norm_rhs::Float64)::Void    
+function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64, norm_c::Float64, norm_rhs::Float64, mat::Matrices)::Void    
     # Compute primal residual   
     Base.LinAlg.axpy!(-1.0, a.Mty, a.Mty_old)
+    a.Mty_old = mat.Tinv .* a.Mty_old
     Base.LinAlg.axpy!((1.0 / (1.0 + primal_step)), pair.x_old, a.Mty_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + primal_step)), pair.x, a.Mty_old)
     primal_residual[iter] = norm(a.Mty_old, 2) / (1.0 + norm_c)
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
+    a.Mx_old = mat.Sinv .* a.Mx_old
     Base.LinAlg.axpy!((1.0 / (1.0 + dual_step)), pair.y_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + dual_step)), pair.y, a.Mx_old)
     dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + norm_rhs)
@@ -304,23 +305,24 @@ function diag_scaling(affine_sets::AffineSets, dims::Dims, M::SparseMatrixCSC{Fl
 
     # Cache matrix multiplications
     Sinv = 1.0 ./ diag(S)
+    Tinv = 1.0 ./ diag(T)
     TMt = T * Mt
     Tc = T * affine_sets.c
     SM = S * M
 
-    affine_sets.c = T * affine_sets.c
+    # affine_sets.c = T * affine_sets.c
 
-    rhs = S * vcat(affine_sets.b, affine_sets.h)
-    # Projection onto = b
-    @inbounds @simd for i in 1:length(affine_sets.b)
-        affine_sets.b[i] = rhs[i]
-    end
-    # Projection onto <= h
-    @inbounds @simd for i in 1:length(affine_sets.h)
-        affine_sets.h[i] = rhs[dims.p+i]
-    end
+    # rhs = S * vcat(affine_sets.b, affine_sets.h)
+    # # Projection onto = b
+    # @inbounds @simd for i in 1:length(affine_sets.b)
+    #     affine_sets.b[i] = rhs[i]
+    # end
+    # # Projection onto <= h
+    # @inbounds @simd for i in 1:length(affine_sets.h)
+    #     affine_sets.h[i] = rhs[dims.p+i]
+    # end
 
-    return S, Sinv, SM, T, Tc, TMt
+    return S, Sinv, SM, T, Tc, TMt, Tinv
 end
 
 function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, dual_step::Float64, theta::Float64)::Void
@@ -334,8 +336,9 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets:
     Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
 
     copy!(a.y_half, pair.y)
+    a.y_half = mat.Sinv .* a.y_half
     @timeit "box" box_projection!(a.y_half, dims, affine_sets, dual_step)
-
+    a.y_half = mat.S * a.y_half
     Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
 
     A_mul_B!(a.Mty, mat.Mt, pair.y)
@@ -466,7 +469,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     current_rank = 0
     @timeit "eigfact" begin
-        fact = eigfact!(a.m, 1e-4, Inf)
+        # fact = eigfact!(a.m, 0.0, Inf)
+        fact = eigfact!(a.m)
         fill!(a.m.data, 0.0)
         for i in 1:length(fact[:values])
             if fact[:values][i] > 0.0
