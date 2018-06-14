@@ -20,8 +20,13 @@ type AffineSets{T}
     c::Vector{T}
 end
 
+type SDPSet
+    vec_i::Vector{Int}
+    mat_i::Vector{Int}
+end
+
 type ConicSets
-    sdpcone::Vector{Tuple{Vector{Int},Vector{Int}}}
+    sdpcone::Vector{SDPSet}
 end
 
 struct CPResult
