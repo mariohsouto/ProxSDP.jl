@@ -17,7 +17,6 @@ addons:
         - libglpk-dev
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia -e 'Pkg.add("MathOptInterface")'
     - julia -e 'Pkg.clone(pwd())'
     - julia -e 'Pkg.build("ProxSDP")'
     - julia -e 'Pkg.test("ProxSDP")'

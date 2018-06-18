@@ -2,14 +2,16 @@
 module ProxSDP
 
 using MathOptInterface, TimerOutputs
+using Compat
 
-include("mathoptinterface.jl")
+include("MOIWrapper.jl")
 include("eigsolver.jl")
 
 immutable Dims
     n::Int  # Size of primal variables
     p::Int  # Number of linear equalities
     m::Int  # Number of linear inequalities
+    s::Vector{Int} # Side of square matrices
 end
 
 type AffineSets{T}
@@ -47,36 +49,42 @@ end
 type PrimalDual
     x::Vector{Float64}
     x_old::Vector{Float64}
+
     y::Vector{Float64}
     y_old::Vector{Float64}
     y_aux::Vector{Float64}
+
     PrimalDual(dims) = new(
         zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.m+dims.p), zeros(dims.m+dims.p), zeros(dims.m+dims.p)
     )
 end
 
 type AuxiliaryData
-    m::Symmetric{Float64,Matrix{Float64}}
+    m::Vector{Symmetric{Float64,Matrix{Float64}}}
+
     Mty::Vector{Float64}
     Mty_old::Vector{Float64}
     Mty_diff::Vector{Float64}
+
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
 
     TMty::Vector{Float64}
     TMty_old::Vector{Float64}
+
     SMx::Vector{Float64}
     SMx_old::Vector{Float64}
     Sproj::Vector{Float64}
 
     y_half::Vector{Float64}
     y_diff::Vector{Float64}
-    AuxiliaryData(dims) = new(
-        Symmetric(zeros(dims.n, dims.n), :L), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2),
+    function AuxiliaryData(dims) 
+        new([Symmetric(zeros(i, i), :L) for i in dims.s], zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2),
         zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
         zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
         zeros(dims.p+dims.m), zeros(dims.p+dims.m)
     )
+    end
 end
 
 type Matrices
@@ -93,18 +101,22 @@ type Matrices
     Matrices(M, Mt, c, S, Sinv, SM, T, Tc, TMt, Tinv) = new(M, Mt, c, S, Sinv, SM, T, Tc, TMt, Tinv)
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
+function printheader()
+    println("======================================================================")
+    println("          ProxSDP : Proximal Semidefinite Programming Solver          ")
+    println("                 (c) Mario Souto and Joaquim D. Garcia, 2018          ")
+    println("                                                Beta version          ")
+    println("----------------------------------------------------------------------")
+    println(" Initializing Primal-Dual Hybrid Gradient method")
+    println("----------------------------------------------------------------------")
+    println("|  iter  | comb. res | prim. res |  dual res |    rank   |  time (s) |")
+    println("----------------------------------------------------------------------")
+end
+
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-6)::CPResult
 
     if verbose
-        println("======================================================================")
-        println("          ProxSDP : Proximal Semidefinite Programming Solver          ")
-        println("                 (c) Mario Souto and Joaquim D. Garcia, 2018          ")
-        println("                                                Beta version          ")
-        println("----------------------------------------------------------------------")
-        println(" Initializing Primal-Dual Hybrid Gradient method")
-        println("----------------------------------------------------------------------")
-        println("|  iter  | comb. res | prim. res |  dual res |    rank   |  time (s) |")
-        println("----------------------------------------------------------------------")
+        printheader()
     end
 
     time0 = time()
@@ -117,23 +129,23 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         rhs_orig = vcat(affine_sets.b, affine_sets.h)
 
-        for line in 1:dims.p
-            cont = 1
-            @inbounds for j in 1:dims.n, i in j:dims.n
-                if i != j
+        cont = 1
+        @inbounds for j in 1:dims.n, i in j:dims.n
+            if i != j
+                for line in 1:dims.p
                     affine_sets.A[line, cont] *= (sqrt(2.0) / 2.0)
                 end
-                cont += 1
             end
+            cont += 1
         end
-        for line in 1:dims.m
-            cont = 1
-            @inbounds for j in 1:dims.n, i in j:dims.n
-                if i != j
+        cont = 1
+        @inbounds for j in 1:dims.n, i in j:dims.n
+            if i != j
+                for line in 1:dims.m
                     affine_sets.G[line, cont] *= (sqrt(2.0) / 2.0)
                 end
-                cont += 1
             end
+            cont += 1
         end
         cont = 1
         @inbounds for j in 1:dims.n, i in j:dims.n
@@ -253,7 +265,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
         println("======================================================================")
     end
-
+@show pair.x
+@show pair.y
     return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, 0.0, 0.0, prim_obj)
 end
 
@@ -270,7 +283,7 @@ function box_projection!(v::Array{Float64,1}, dims::Dims, aff::AffineSets, dual_
 end
 
 function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64, norm_c::Float64, norm_rhs::Float64, mat::Matrices)::Void    
-    # Compute primal residual   
+    # Compute primal residual
     Base.LinAlg.axpy!(-1.0, a.Mty, a.Mty_old)
     a.Mty_old = mat.Tinv .* a.Mty_old
     Base.LinAlg.axpy!((1.0 / (1.0 + primal_step)), pair.x_old, a.Mty_old)
@@ -347,7 +360,6 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets:
     @timeit "box" box_projection!(a.y_half, dims, affine_sets, dual_step)
     a.y_half = mat.S * a.y_half
     Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
-
     A_mul_B!(a.Mty, mat.Mt, pair.y)
 
     return nothing
@@ -355,42 +367,54 @@ end
 
 function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     c_orig = zeros(1)
+    @show dims.n
     M = zeros(Int, dims.n, dims.n)
-    iv = conic_sets.sdpcone[1][1]
-    im = conic_sets.sdpcone[1][2]
-    for i in eachindex(iv)
-        M[im[i]] = iv[i]
+    if length(conic_sets.sdpcone) >= 1
+        iv = conic_sets.sdpcone[1].vec_i
+        im = conic_sets.sdpcone[1].mat_i
+        for i in eachindex(iv)
+            M[im[i]] = iv[i]
+        end
+        X = Symmetric(M, :L)
+
+        n = size(X)[1] # columns or line
+        cont = 1
+        sdp_vars = zeros(Int, div(n*(n+1), 2))
+        for j in 1:n, i in j:n
+            sdp_vars[cont] = X[i, j]
+            cont += 1
+        end
+
+        totvars = dims.n
+        extra_vars = collect(setdiff(Set(collect(1:totvars)),Set(sdp_vars)))
+        ord = vcat(sdp_vars, extra_vars)
+
+        ids = vec(X)
+        offdiag_ids = setdiff(Set(ids), Set(diag(X)))
+    else
+        ord = collect(1:dims.n)
+        offdiag_ids = Set{Int}()
     end
-    X = Symmetric(M, :L)
 
-    n = size(X)[1] # columns or line
-    cont = 1
-    sdp_vars = zeros(Int, div(n*(n+1), 2))
-    for j in 1:n, i in j:n
-        sdp_vars[cont] = X[i, j]
-        cont += 1
-    end
-
-    totvars = dims.n
-    extra_vars = collect(setdiff(Set(collect(1:totvars)),Set(sdp_vars)))
-    ord = vcat(sdp_vars, extra_vars)
-
-    ids = vec(X)
-    offdiag_ids = setdiff(Set(ids), Set(diag(X)))
     c_orig = copy(aff.c)
 
     aff.A, aff.G, aff.c = aff.A[:, ord], aff.G[:, ord], aff.c[ord]
     return c_orig[ord], sortperm(ord), offdiag_ids
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, target_rank::Int64, mat::Matrices, primal_step::Float64, arc::ARPACKAlloc, offdiag::Set)::Tuple{Int64, Float64}
-    
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, target_rank::Int64, mat::Matrices, primal_step::Float64, arc::ARPACKAlloc, offdiag::Set{Int})::Tuple{Int64, Float64}
+
+    min_eig = 0.0
+    current_rank = 0
+
     # x = x - p_step * (Mty + c)
     Base.LinAlg.axpy!(-primal_step, a.Mty, pair.x)
     Base.LinAlg.axpy!(-primal_step, mat.c, pair.x)
 
     # Projection onto the psd cone
-    current_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, target_rank, arc, offdiag)::Tuple{Int64, Float64}
+    if length(dims.s) == 1
+        current_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, target_rank, arc, offdiag)::Tuple{Int64, Float64}
+    end
 
     A_mul_B!(a.Mx, mat.M, pair.x)
 
@@ -429,15 +453,17 @@ end
 
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, target_rank::Int64, arc::ARPACKAlloc, offdiag::Set)::Tuple{Int64, Float64}
 
+    min_eig = 0.0
+
     # Build symmetric matrix X
     n = dims.n
     @timeit "reshape1" begin
         cont = 1
         @inbounds for j in 1:n, i in j:n
             if i != j
-                a.m.data[i,j] = v[cont] / sqrt(2.0)
+                a.m[1].data[i,j] = v[cont] / sqrt(2.0)
             else
-                a.m.data[i,j] = v[cont]
+                a.m[1].data[i,j] = v[cont]
             end
             cont += 1
         end
@@ -445,44 +471,34 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     if target_rank <= 16
         @timeit "eigs" begin 
-            eig!(arc, a.m, target_rank)
+            eig!(arc, a.m[1], target_rank)
             if hasconverged(arc)
-                fill!(a.m.data, 0.0)
+                fill!(a.m[1].data, 0.0)
                 current_rank = 0
                 for i in 1:target_rank
                     if unsafe_getvalues(arc)[i] > 0.0
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
-                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
+                        Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
                     end
                 end
             end
         end
-        if hasconverged(arc)
-            @timeit "reshape2" begin
-            cont = 1
-            @inbounds for j in 1:n, i in j:n
-                if i != j
-                    v[cont] = a.m.data[i, j] * sqrt(2.0)
-                else
-                    v[cont] = a.m.data[i, j]
-                end
-                cont += 1
-            end
-        end
-            return current_rank, minimum(unsafe_getvalues(arc))
-        end
     end
 
-    current_rank = 0
-    @timeit "eigfact" begin
-        # fact = eigfact!(a.m, 0.0, Inf)
-        fact = eigfact!(a.m)
-        fill!(a.m.data, 0.0)
-        for i in 1:length(fact[:values])
-            if fact[:values][i] > 0.0
-                current_rank += 1
-                Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m.data)
+    if hasconverged(arc)
+        min_eig = minimum(unsafe_getvalues(arc))
+    else
+        current_rank = 0
+        @timeit "eigfact" begin
+            # fact = eigfact!(a.m, 0.0, Inf)
+            fact = eigfact!(a.m[1])
+            fill!(a.m[1].data, 0.0)
+            for i in 1:length(fact[:values])
+                if fact[:values][i] > 0.0
+                    current_rank += 1
+                    Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m[1].data)
+                end
             end
         end
     end
@@ -491,14 +507,14 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         cont = 1
         @inbounds for j in 1:n, i in j:n
             if i != j
-                v[cont] = a.m.data[i, j] * sqrt(2.0)
+                v[cont] = a.m[1].data[i, j] * sqrt(2.0)
             else
-                v[cont] = a.m.data[i, j]
+                v[cont] = a.m[1].data[i, j]
             end
             cont+=1
         end
     end
 
-    return current_rank, 0.0
+    return current_rank, min_eig
 end
 end

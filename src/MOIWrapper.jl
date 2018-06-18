@@ -62,7 +62,7 @@ end
 mutable struct ProxSDPOptimizer <: MOI.AbstractOptimizer
     cone::ConeData
     maxsense::Bool
-    data::Union{Nothing, ModelData} # only non-Void between MOI.copy! and MOI.optimize!
+    data::Union{Void, ModelData} # only non-Void between MOI.copy! and MOI.optimize!
     sol::MOISolution
     function ProxSDPOptimizer()
         new(ConeData(), false, nothing, MOISolution())
@@ -133,9 +133,11 @@ function MOIU.allocateconstraint!(optimizer::ProxSDPOptimizer, f::F, s::S) where
 end
 
 # Vectorized length for matrix dimension n
-sympackedlen(n) = div(n*(n+1), 2)
+sympackedlen(n::Integer) = div(n*(n+1), 2)
+sympackedlen(A::Matrix) = sympackedlen(size(A)[1])
 # Matrix dimension for vectorized length n
-sympackeddim(n) = div(isqrt(1+8n) - 1, 2)
+sympackeddim(n::Integer) = div(isqrt(1+8n) - 1, 2)
+sympackeddim(v::Vector) = sympackeddim(length(v))
 trimap(i::Integer, j::Integer) = i < j ? trimap(j, i) : div((i-1)*i, 2) + j
 trimapL(i::Integer, j::Integer, n::Integer) = i < j ? trimapL(j, i, n) : i + div((2n-j) * (j-1), 2)
 function _sympackedto(x, n, mapfrom, mapto)
@@ -303,16 +305,24 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     if length(cone.p) > 0
         error("Power Cone constraints not supported")
     end
-    if cone.s > 1 || length(cone.sa) > 1
-        # error("Dual Exponential Cone constraints not supported")
+    if length(cone.sa) != 1
+        error("There must be exactely one SDP constraint")
     end
+
+    @show cone.s
+    @show cone.sa
 
     m = optimizer.data.m #rows
     n = optimizer.data.n #cols
+
+    if cone.s != n
+        error("The number of columns must be equal to the number of entries in the PSD matrix")
+    end
+
     preA = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
-    b = optimizer.data.b
+    preb = optimizer.data.b
     objconstant = optimizer.data.objconstant
-    c = optimizer.data.c # TODO (@joaquim) - change sign?
+    @show c = optimizer.data.c # TODO (@joaquim) - change sign?
     optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded to SCS
 
     TimerOutputs.reset_timer!()
@@ -320,29 +330,57 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
 
-    A = preA[1:cone.f,:]
-    G = preA[cone.f+1:cone.f+cone.l,:]
-    b = preb[1:cone.f]
-    h = preb[cone.f+1:cone.f+cone.l]
+    @show A = preA[1:cone.f,:]
+    @show full(A)
+    @show G = preA[cone.f+1:cone.f+cone.l,:]
+    @show full(G)
+
+    @show b = preb[1:cone.f]
+    @show h = preb[cone.f+1:cone.f+cone.l]
     aff = AffineSets(A, G, b, h, c)
 
     # Dimensions (of affine sets)
-    n_variables = sympackeddim(size(A)[2]) # primal
+    n_variables = size(A)[2] # primal
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
-    dims = Dims(n_variables, n_eqs, n_ineqs)
+    @show n_variables
+    @show dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
 
     # Build SDP Sets
-    Asdp = preA[cone.f+cone.l+1:end,:]
-    indices_sdp = Asdp.rowval
-    vec_inds = sortperm(indices_sdp)
-    mat_inds = matindices(sympackeddim(length(indices_sdp)))
-
     con = ConicSets(
-        SDPSet[
-            SDPSet(vec_inds, mat_inds)
-            ]
+        SDPSet[]
         )
+
+        # Asdp = preA[cone.f+cone.l+1:end,:]
+        # indices_sdp = Asdp.rowval
+    
+        # aff = AffineSets(A, G, b, h, c)
+        # con = ConicSets(Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
+
+    @show Asdp = preA[cone.f+cone.l+1:end,:]
+    first_ind = 1
+    @show inds = Asdp.rowval
+    for d in cone.sa
+        lines = sympackedlen(d)
+        indices_sdp = inds[first_ind:first_ind+lines-1]
+        vec_inds = sortperm(indices_sdp)#sort(indices_sdp)
+        # vec_inds = sortperm(indices_sdp)
+        mat_inds = matindices(sympackeddim(length(indices_sdp)))
+        newsdp = SDPSet(vec_inds, mat_inds)
+        push!(con.sdpcone, newsdp)
+        first_ind += lines
+    end
+
+    for i in 1:length(con.sdpcone)
+        for j in i+1:length(con.sdpcone)
+            if !isempty(setdiff(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i))
+                error("SDP cones must be disjoint")
+            end
+        end
+    end
+
+
+    @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
     sol = @timeit "Main" chambolle_pock(aff, con, dims)
@@ -351,7 +389,7 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     primal = sol.primal
     dual = sol.dual
     slack = sol.slack
-    objval = sol.objval + f.constant
+    objval = sol.objval + objconstant
 
     if true
         TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
@@ -366,7 +404,25 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
         close(f)
     end
 
-    optimizer.sol = MOISolution(ret_val, primal, dual, slack, objval)
+    optimizer.sol = MOISolution(ret_val, primal, dual, slack, (optimizer.maxsense ? -1 : 1) * objval)
+end
+
+function vech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
+    n = sympackeddim(v)
+    n1, n2 = size(out)
+    @assert n == n1 == n2
+    c = 0
+    for j in 1:n, i in j:n
+        c += 1
+        out[i,j] = v[c]
+    end
+    return out
+end
+function vech(v::AbstractVector{T}) where T
+    n = sympackeddim(v)
+    out = zeros(n, n)
+    vech!(out, v)
+    return out
 end
 
 #=
@@ -455,6 +511,10 @@ function MOI.get(optimizer::ProxSDPOptimizer, ::MOI.ConstraintDual, ci::CI{<:MOI
     offset = constroffset(optimizer, ci)
     rows = constrrows(optimizer, ci)
     unscalecoef(rows, reorderval(optimizer.sol.dual[offset .+ rows], S), S, length(rows))
+end
+
+function MOI.get(optimizer::ProxSDPOptimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.PositiveSemidefiniteConeTriangle
+    error("ProxSDP does not return duals for SDP constraints. Only linear constraints (equalities and inequalities) can be queried.")
 end
 
 MOI.canget(optimizer::ProxSDPOptimizer, ::MOI.ResultCount) = true
