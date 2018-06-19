@@ -407,18 +407,18 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     optimizer.sol = MOISolution(ret_val, primal, dual, slack, (optimizer.maxsense ? -1 : 1) * objval)
 end
 
-function vech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
+function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
     n = sympackeddim(v)
     n1, n2 = size(out)
     @assert n == n1 == n2
     c = 0
-    for j in 1:n, i in j:n
+    for j in 1:n, i in 1:j
         c += 1
         out[i,j] = v[c]
     end
     return out
 end
-function vech(v::AbstractVector{T}) where T
+function ivech(v::AbstractVector{T}) where T
     n = sympackeddim(v)
     out = zeros(n, n)
     vech!(out, v)
