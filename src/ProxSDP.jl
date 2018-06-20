@@ -176,14 +176,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Compute residuals and update old iterates
         @timeit "logging" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs, mat)::Void
         # Print progress
-        if mod(k, 1000) == 0 && opt.verbose
-            print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
+        if mod(k, 1) == 0 && opt.verbose
+            # print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], current_rank, time0)::Void
         end
 
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
-            println(min_eig)
             if min_eig < tol * 0.01
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -445,7 +445,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
                 fill!(a.m.data, 0.0)
                 current_rank = 0
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 0.0
+                    if unsafe_getvalues(arc)[i] > 1e-10
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m.data)
@@ -482,8 +482,9 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
+    cont = 1
     @timeit "reshape2" begin
-        cont = 1
+        
         @inbounds for j in 1:n, i in j:n
             if i != j
                 v[cont] = a.m.data[i, j] * sqrt(2.0)
