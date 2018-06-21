@@ -1,25 +1,15 @@
+function jump_mimo(solver, seed, n)
 
-function mimo(solver, seed)
-    srand(seed)
+    # n = 3
+    m = 10n
+    s, H, y, L = mimo_data(seed, m, n)
+
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else
         model = Model(solver=solver) 
     end
-    
-    # Instance size
-    n = 100
-    m = 10 * n
-    # Channel
-    H = randn((m, n))
-    # Gaussian noise
-    v = randn((m, 1))
-    # True signal
-    s = rand([-1, 1], n)
-    # Received signal
-    sigma = 10.0
-    y = H * s + sigma * v
-    L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
+
     if Base.libblas_name == "libmkl_rt"
         @variable(model, X[1:n+1, 1:n+1], PSD)
     else
@@ -43,18 +33,9 @@ function mimo(solver, seed)
     else
         XX = getvalue.(X)
     end
-    @show XX[1:n, end]
-    x_hat = sign.(XX[1:n, end])
-    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-7])
-    # @show eigfact(XX)[:values]
-    @show SNR
-    @show s
-    @show decode_error = sum(abs.(x_hat - s))
-    @show rank
-    @show norm(y - H * x_hat)
-    @show norm(y - H * s)
-    @show trace(L * XX) 
-    return rank, decode_error
+
+    mimo_eval(s,H,y,L,XX)
+
 end
 
 getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])

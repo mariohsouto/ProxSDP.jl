@@ -13,7 +13,7 @@ const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOpti
 
 # linear9test needs 1e-3 with SCS < 2.0 and 5e-1 with SCS 2.0
 # linear2test needs 1e-4
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
+# const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 # MOIT._lin1test(optimizer, config, true)
 
@@ -28,91 +28,91 @@ const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 @testset "LP in SDP EQ form" begin
 
-MOI.empty!(optimizer)
-@test MOI.isempty(optimizer)
+    MOI.empty!(optimizer)
+    @test MOI.isempty(optimizer)
 
-# add 10 variables - only diagonal is relevant
-X = MOI.addvariables!(optimizer, 10)
+    # add 10 variables - only diagonal is relevant
+    X = MOI.addvariables!(optimizer, 10)
 
-# add sdp constraints - only ensuring positivenesse of the diagonal
-vov = MOI.VectorOfVariables(X)
-cX = MOI.addconstraint!(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(4))
+    # add sdp constraints - only ensuring positivenesse of the diagonal
+    vov = MOI.VectorOfVariables(X)
+    cX = MOI.addconstraint!(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(4))
 
-c1 = MOI.addconstraint!(optimizer, 
-    MOI.ScalarAffineFunction([
-        MOI.ScalarAffineTerm(2.0, X[1]),
-        MOI.ScalarAffineTerm(1.0, X[3]),
-        MOI.ScalarAffineTerm(1.0, X[6])
-    ], 0.0), MOI.EqualTo(4.0))
+    c1 = MOI.addconstraint!(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(2.0, X[1]),
+            MOI.ScalarAffineTerm(1.0, X[3]),
+            MOI.ScalarAffineTerm(1.0, X[6])
+        ], 0.0), MOI.EqualTo(4.0))
 
-c2 = MOI.addconstraint!(optimizer, 
-    MOI.ScalarAffineFunction([
-        MOI.ScalarAffineTerm(1.0, X[1]),
-        MOI.ScalarAffineTerm(2.0, X[3]),
-        MOI.ScalarAffineTerm(1.0, X[10])
-    ], 0.0), MOI.EqualTo(4.0))
+    c2 = MOI.addconstraint!(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1]),
+            MOI.ScalarAffineTerm(2.0, X[3]),
+            MOI.ScalarAffineTerm(1.0, X[10])
+        ], 0.0), MOI.EqualTo(4.0))
 
-MOI.set!(optimizer, 
-    MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
-    MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[3]]), 0.0)
-    )
-MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
-MOI.optimize!(optimizer)
+    MOI.set!(optimizer, 
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[3]]), 0.0)
+        )
+    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
 
-obj = MOI.get(optimizer, MOI.ObjectiveValue())
+    obj = MOI.get(optimizer, MOI.ObjectiveValue())
 
-@test obj ≈ -9.33333 atol = 1e-2
+    @test obj ≈ -9.33333 atol = 1e-2
 
-Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
+    Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
 
-@test Xr ≈ [1.3333, .0, 1.3333, .0, .0, .0, .0, .0, .0, .0] atol = 1e-2
+    @test Xr ≈ [1.3333, .0, 1.3333, .0, .0, .0, .0, .0, .0, .0] atol = 1e-2
 
 end
 
 @testset "LP in SDP INEQ form" begin
 
-MOI.empty!(optimizer)
-@test MOI.isempty(optimizer)
+    MOI.empty!(optimizer)
+    @test MOI.isempty(optimizer)
 
-# add 10 variables - only diagonal is relevant
-X = MOI.addvariables!(optimizer, 3)
+    # add 10 variables - only diagonal is relevant
+    X = MOI.addvariables!(optimizer, 3)
 
-# add sdp constraints - only ensuring positivenesse of the diagonal
-vov = MOI.VectorOfVariables(X)
-cX = MOI.addconstraint!(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(2))
+    # add sdp constraints - only ensuring positivenesse of the diagonal
+    vov = MOI.VectorOfVariables(X)
+    cX = MOI.addconstraint!(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(2))
 
-c1 = MOI.addconstraint!(optimizer, 
-    MOI.ScalarAffineFunction([
-        MOI.ScalarAffineTerm(2.0, X[1]),
-        MOI.ScalarAffineTerm(1.0, X[3]),
-    ], 0.0), MOI.LessThan(4.0))
+    c1 = MOI.addconstraint!(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(2.0, X[1]),
+            MOI.ScalarAffineTerm(1.0, X[3]),
+        ], 0.0), MOI.LessThan(4.0))
 
-c2 = MOI.addconstraint!(optimizer, 
-    MOI.ScalarAffineFunction([
-        MOI.ScalarAffineTerm(1.0, X[1]),
-        MOI.ScalarAffineTerm(2.0, X[3]),
-    ], 0.0), MOI.LessThan(4.0))
+    c2 = MOI.addconstraint!(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1]),
+            MOI.ScalarAffineTerm(2.0, X[3]),
+        ], 0.0), MOI.LessThan(4.0))
 
-MOI.set!(optimizer, 
-    MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
-    MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([4.0, 3.0], [X[1], X[3]]), 0.0)
-    )
-MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
-MOI.optimize!(optimizer)
+    MOI.set!(optimizer, 
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([4.0, 3.0], [X[1], X[3]]), 0.0)
+        )
+    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
+    MOI.optimize!(optimizer)
 
-obj = MOI.get(optimizer, MOI.ObjectiveValue())
+    obj = MOI.get(optimizer, MOI.ObjectiveValue())
 
-@test obj ≈ 9.33333 atol = 1e-2
+    @test obj ≈ 9.33333 atol = 1e-2
 
-Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
+    Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
 
-@test Xr ≈ [1.3333, .0, 1.3333] atol = 1e-2
+    @test Xr ≈ [1.3333, .0, 1.3333] atol = 1e-2
 
-c1_d = MOI.get(optimizer, MOI.ConstraintDual(), c1)
-c2_d = MOI.get(optimizer, MOI.ConstraintDual(), c2)
+    c1_d = MOI.get(optimizer, MOI.ConstraintDual(), c1)
+    c2_d = MOI.get(optimizer, MOI.ConstraintDual(), c2)
 
-# SDP duasl error
-@test_throws ErrorException c2_d = MOI.get(optimizer, MOI.ConstraintDual(), cX)
+    # SDP duasl error
+    @test_throws ErrorException c2_d = MOI.get(optimizer, MOI.ConstraintDual(), cX)
 
 end
 
@@ -261,4 +261,10 @@ end
         @test 1.0001> abs(Xsq_s[i,j]) > 0.9999
     end
 
+end
+
+@testset "MIMO Sizes" begin
+    for i in 5:10
+        @testset "MIMO n = $(i)" moi_mimo(optimizer, i)
+    end
 end

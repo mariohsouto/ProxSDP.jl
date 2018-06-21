@@ -3,68 +3,79 @@ path = joinpath(dirname(@__FILE__), "..", "..")
 push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
 
-using JuMP
+# using JuMP
 using Base.Test
-import Base.isempty
+# import Base.isempty
 
-if Base.libblas_name == "libmkl_rt"
-    using ProxSDP
-    using MathOptInterface
-    const MOI = MathOptInterface
-    using MathOptInterfaceUtilities
-    const MOIU = MathOptInterfaceUtilities
+using ProxSDP, MathOptInterface, Base.Test
+
+# use_MOI = true
+use_MOI = false
+
+set_to_test = :MIMO
+# set_to_test = :RANDSDP
+# set_to_test = :SDPLIB
+
+@static if use_MOI#Base.libblas_name == "libmkl_rt"
+
+    include("moi_init.jl")
+    optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOptimizer())
 else
-    # using CSDP 
-    using SCS
+    using JuMP
+    using CSDP
+    optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
+    # using SCS
+    # optimizer = SCSSolver(eps=1e-4)
     # using Mosek
+    # optimizer = MosekSolver()
 end
 
-# include("sensor_loc.jl")
-# for seed in 1:1
-#     if Base.libblas_name == "libmkl_rt"
-#         sensor_loc(ProxSDPSolverInstance(), seed)
-#     else
-#         # sensor_loc(CSDPSolver(maxiter=100000), seed)
-#         sensor_loc(SCSSolver(max_iters=1000000, eps=1e-5), seed)
-#         # sensor_loc(MosekSolver(), seed)
-#     end
-# end
 
-# include("base.jl")
-# if Base.libblas_name == "libmkl_rt"
-#     base_sdp(ProxSDPSolverInstance(), 0)
-#     base_sdp2(ProxSDPSolverInstance(), 0)
-# else
-#     base_sdp(MosekSolver(), 0)
-#     base_sdp2(MosekSolver(), 0)
-#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
-#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
-# end
-
-# include("rand_sdp.jl")
-# if Base.libblas_name == "libmkl_rt"
-#     rand_sdp(ProxSDPSolverInstance(), 0)
-# else
-#     rand_sdp(MosekSolver(), 0)
-#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
-#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
-# end
-
-# rand_sdp(MosekSolver(), 0)
-
-include("mimo.jl")
-if Base.libblas_name == "libmkl_rt"
-    mimo(ProxSDPSolverInstance(), 0)
-    for i in 1:1
-        mimo(ProxSDPSolverInstance(), i)
+if use_MOI
+    if set_to_test == :MIMO
+        include("base_mimo.jl")
+        include("moi_mimo.jl")
+        moi_mimo(optimizer, 0, 5)
+        for i in 1:1
+            moi_mimo(optimizer, i, 5)
+        end
+    elseif set_to_test == :RANDSDP
+        include("base_randsdp.jl")
+        include("moi_randsdp.jl")
+        moi_randsdp(optimizer, 0, 5, 5)
+        for i in 1:1
+            moi_randsdp(optimizer, i, 5, 5)
+        end
+    elseif set_to_test == :SDPLIB
+        include("base_sdplib.jl")
+        include("moi_sdplib.jl")
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        for i in 1:1
+            moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        end
     end
 else
-    # mimo(MosekSolver(), 0)
-    mimo(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
-    # mimo(SCSSolver(eps=1e-4), 0)
-    for i in 1:1
-        mimo(CSDPSolver(objtol=1e-4, maxiter=100000), i)
-        # mimo(SCSSolver(eps=1e-4), i)
+    if set_to_test == :MIMO
+        include("base_mimo.jl")
+        include("jump_mimo.jl")
+        jump_mimo(optimizer, 0, 5)
+        for i in 1:1
+            jump_mimo(optimizer, i, 5)
+        end
+    elseif set_to_test == :RANDSDP
+        include("base_randsdp.jl")
+        include("jump_randsdp.jl")
+        jump_randsdp(optimizer, 0, 5, 5)
+        for i in 1:1
+            jump_randsdp(optimizer, i, 5, 5)
+        end
+    elseif set_to_test == :SDPLIB
+        include("base_sdplib.jl")
+        include("jump_sdplib.jl")
+        jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        for i in 1:1
+            jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        end
     end
 end
 
@@ -131,3 +142,37 @@ end
 #         end
 #     end
 # end
+
+
+# include("sensor_loc.jl")
+# for seed in 1:1
+#     if Base.libblas_name == "libmkl_rt"
+#         sensor_loc(ProxSDPSolverInstance(), seed)
+#     else
+#         # sensor_loc(CSDPSolver(maxiter=100000), seed)
+#         sensor_loc(SCSSolver(max_iters=1000000, eps=1e-5), seed)
+#         # sensor_loc(MosekSolver(), seed)
+#     end
+# end
+
+# include("base.jl")
+# if Base.libblas_name == "libmkl_rt"
+#     base_sdp(ProxSDPSolverInstance(), 0)
+#     base_sdp2(ProxSDPSolverInstance(), 0)
+# else
+#     base_sdp(MosekSolver(), 0)
+#     base_sdp2(MosekSolver(), 0)
+#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
+#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
+# end
+
+# include("rand_sdp.jl")
+# if Base.libblas_name == "libmkl_rt"
+#     rand_sdp(ProxSDPSolverInstance(), 0)
+# else
+#     rand_sdp(MosekSolver(), 0)
+#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
+#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
+# end
+
+# rand_sdp(MosekSolver(), 0)
