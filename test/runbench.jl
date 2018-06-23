@@ -10,7 +10,7 @@ using Base.Test
 using ProxSDP, MathOptInterface, Base.Test
 
 # use_MOI = true
-use_MOI = false
+use_MOI = true
 
 set_to_test = :MIMO
 # set_to_test = :RANDSDP
