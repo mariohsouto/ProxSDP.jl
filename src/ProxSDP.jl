@@ -113,7 +113,7 @@ function printheader()
     println("----------------------------------------------------------------------")
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-6)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
 
     if verbose
         printheader()
@@ -176,7 +176,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         adapt_level = 0.9    # Factor by which the stepsizes will be balanced 
         adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 500              # Convergence check window
-        @show norm_c, norm_rhs = norm(affine_sets.c) / sqrt(2.0), norm(rhs)
+        norm_c, norm_rhs = norm(affine_sets.c) / sqrt(2.0), norm(rhs)
 
         pair.x[1] = 1.0
     end
@@ -193,8 +193,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Compute residuals and update old iterates
         @timeit "logging" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs, mat)::Void
         # Print progress
-        if mod(k, 1) == 0 && opt.verbose
-            # print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
+        if mod(k, 100) == 0 && opt.verbose
             print_progress(k, primal_residual[k], dual_residual[k], current_rank, time0)::Void
         end
 
@@ -265,8 +264,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
         println("======================================================================")
     end
-@show pair.x
-@show pair.y
     return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, 0.0, 0.0, prim_obj)
 end
 
@@ -279,6 +276,7 @@ function box_projection!(v::Array{Float64,1}, dims::Dims, aff::AffineSets, dual_
     @inbounds @simd for i in 1:length(aff.h)
         v[dims.p+i] = min(v[dims.p+i] / dual_step, aff.h[i])
     end
+
     return nothing
 end
 
@@ -367,7 +365,6 @@ end
 
 function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     c_orig = zeros(1)
-    @show dims.n
     M = zeros(Int, dims.n, dims.n)
     if length(conic_sets.sdpcone) >= 1
         iv = conic_sets.sdpcone[1].vec_i

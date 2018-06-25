@@ -309,8 +309,8 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
         error("There must be exactely one SDP constraint")
     end
 
-    @show cone.s
-    @show cone.sa
+    # @show cone.s
+    # @show cone.sa
 
     m = optimizer.data.m #rows
     n = optimizer.data.n #cols
@@ -322,7 +322,7 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     preA = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
     preb = optimizer.data.b
     objconstant = optimizer.data.objconstant
-    @show c = optimizer.data.c # TODO (@joaquim) - change sign?
+    c = optimizer.data.c # TODO (@joaquim) - change sign?
     optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded to SCS
 
     TimerOutputs.reset_timer!()
@@ -330,21 +330,20 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
 
-    @show A = preA[1:cone.f,:]
-    @show full(A)
-    @show G = preA[cone.f+1:cone.f+cone.l,:]
-    @show full(G)
+    A = preA[1:cone.f,:]
+    # @show full(A)
+    G = preA[cone.f+1:cone.f+cone.l,:]
+    # @show full(G)
 
-    @show b = preb[1:cone.f]
-    @show h = preb[cone.f+1:cone.f+cone.l]
+    b = preb[1:cone.f]
+    h = preb[cone.f+1:cone.f+cone.l]
     aff = AffineSets(A, G, b, h, c)
 
     # Dimensions (of affine sets)
     n_variables = size(A)[2] # primal
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
-    @show n_variables
-    @show dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
+    dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
 
     # Build SDP Sets
     con = ConicSets(
@@ -357,9 +356,9 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
         # aff = AffineSets(A, G, b, h, c)
         # con = ConicSets(Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
 
-    @show Asdp = preA[cone.f+cone.l+1:end,:]
+    Asdp = preA[cone.f+cone.l+1:end,:]
     first_ind = 1
-    @show inds = Asdp.rowval
+    inds = Asdp.rowval
     for d in cone.sa
         lines = sympackedlen(d)
         indices_sdp = inds[first_ind:first_ind+lines-1]
@@ -380,7 +379,7 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     end
 
 
-    @show con.sdpcone
+    # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
     sol = @timeit "Main" chambolle_pock(aff, con, dims)

@@ -3,11 +3,10 @@ function moi_mimo(optimizer, seed, n)
     MOI.empty!(optimizer)
     @test MOI.isempty(optimizer)
 
-    # n = 3
     m = 10n
     s, H, y, L = mimo_data(seed, m, n)
 
-    nvars = ProxSDP.sympackedlen(n+1)
+    nvars = ProxSDP.sympackedlen(n + 1)
 
     X = MOI.addvariables!(optimizer, nvars)
 
@@ -42,5 +41,5 @@ function moi_mimo(optimizer, seed, n)
         @test 1.0001> abs(Xsq_s[i,j]) > 0.9999
     end
 
-    mimo_eval(s,H,y,L,Xsq_s)
+    mimo_eval(s, H, y, L, Xsq_s)
 end

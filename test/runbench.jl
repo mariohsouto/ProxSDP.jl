@@ -9,12 +9,10 @@ using Base.Test
 
 using ProxSDP, MathOptInterface, Base.Test
 
-# use_MOI = true
 use_MOI = true
-
-set_to_test = :MIMO
+# set_to_test = :MIMO
 # set_to_test = :RANDSDP
-# set_to_test = :SDPLIB
+set_to_test = :SDPLIB
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
 
@@ -35,11 +33,11 @@ if use_MOI
     if set_to_test == :MIMO
         include("base_mimo.jl")
         include("moi_mimo.jl")
-        include("sensor_loc.jl")
+        # include("sensor_loc.jl")
         moi_mimo(optimizer, 0, 5)
         for i in 1:1
             moi_mimo(optimizer, i, 5)
-            sensor_loc(optimizer, 0)
+            # sensor_loc(optimizer, 0)
         end
     elseif set_to_test == :RANDSDP
         include("base_randsdp.jl")
