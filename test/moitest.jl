@@ -264,7 +264,10 @@ end
 end
 
 @testset "MIMO Sizes" begin
-    for i in 5:10
-        @testset "MIMO n = $(i)" moi_mimo(optimizer, i)
+    include("moi_mimo.jl")
+    for i in 2:5
+        @testset "MIMO n = $(i)" begin 
+            moi_mimo(optimizer, 123, i)
+        end
     end
 end
