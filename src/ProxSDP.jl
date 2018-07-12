@@ -283,14 +283,12 @@ end
 function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, primal_step::Float64, dual_step::Float64, iter::Int64, norm_c::Float64, norm_rhs::Float64, mat::Matrices)::Void    
     # Compute primal residual
     Base.LinAlg.axpy!(-1.0, a.Mty, a.Mty_old)
-    a.Mty_old = mat.Tinv .* a.Mty_old
     Base.LinAlg.axpy!((1.0 / (1.0 + primal_step)), pair.x_old, a.Mty_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + primal_step)), pair.x, a.Mty_old)
     primal_residual[iter] = norm(a.Mty_old, 2) / (1.0 + norm_c)
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
-    a.Mx_old = mat.Sinv .* a.Mx_old
     Base.LinAlg.axpy!((1.0 / (1.0 + dual_step)), pair.y_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + dual_step)), pair.y, a.Mx_old)
     dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + norm_rhs)
@@ -319,7 +317,7 @@ function diag_scaling(affine_sets::AffineSets, dims::Dims, M::SparseMatrixCSC{Fl
     div[find(x-> x == 0.0, div)] = 1.0
     S = spdiagm(1.0 ./ div)
 
-    # S, T = speye(size(S)...), speye(size(T)...) 
+    S, T = speye(size(S)...), speye(size(T)...) 
 
     # Cache matrix multiplications
     Sinv = 1.0 ./ diag(S)
@@ -354,9 +352,7 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets:
     Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
 
     copy!(a.y_half, pair.y)
-    a.y_half = mat.Sinv .* a.y_half
     @timeit "box" box_projection!(a.y_half, dims, affine_sets, dual_step)
-    a.y_half = mat.S * a.y_half
     Base.LinAlg.axpy!(-dual_step, a.y_half, pair.y)
     A_mul_B!(a.Mty, mat.Mt, pair.y)
 
