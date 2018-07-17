@@ -122,38 +122,64 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time0 = time()
     tic()
     @timeit "Init" begin
-
-        opt = CPOptions(false, verbose)  
-        # Scale objective function
-        c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
-        A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
-        rhs_orig = vcat(affine_sets.b, affine_sets.h)
-
+    
+    opt = CPOptions(false, verbose)  
+    # Scale objective function
+    c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
+    A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+    rhs_orig = vcat(affine_sets.b, affine_sets.h)
+    
+    cont = 1
+    
+    @timeit "Scaling" begin
+        cte = (sqrt(2.0) / 2.0)
+        rows = rowvals(affine_sets.A)
+        m, n = size(affine_sets.A)
         cont = 1
-        @inbounds for j in 1:dims.n, i in j:dims.n
+        for j in 1:dims.n, i in j:dims.n
             if i != j
-                for line in 1:dims.p
-                    affine_sets.A[line, cont] *= (sqrt(2.0) / 2.0)
+                for line in nzrange(affine_sets.A, cont)
+                    affine_sets.A[rows[line], cont] *= cte
                 end
             end
             cont += 1
         end
+        rows = rowvals(affine_sets.G)
+        m, n = size(affine_sets.G)
         cont = 1
-        @inbounds for j in 1:dims.n, i in j:dims.n
+        for j in 1:dims.n, i in j:dims.n
             if i != j
-                for line in 1:dims.m
-                    affine_sets.G[line, cont] *= (sqrt(2.0) / 2.0)
+                for line in nzrange(affine_sets.G, cont)
+                    affine_sets.G[rows[line], cont] *= cte
                 end
             end
             cont += 1
         end
+        # @inbounds for j in 1:dims.n, i in j:dims.n
+        #     if i != j
+        #         for line in 1:dims.p
+        #             affine_sets.A[line, cont] *= cte
+        #         end
+        #     end
+        #     cont += 1
+        # end
+        # cont = 1
+        # @inbounds for j in 1:dims.n, i in j:dims.n
+        #     if i != j
+        #         for line in 1:dims.m
+        #             affine_sets.G[line, cont] *= cte
+        #         end
+        #     end
+        #     cont += 1
+        # end
         cont = 1
         @inbounds for j in 1:dims.n, i in j:dims.n
             if i != j
-                affine_sets.c[cont] *= (sqrt(2.0) / 2.0)
+                affine_sets.c[cont] *= cte
             end
             cont += 1
         end
+    end
 
         # Initialization
         pair = PrimalDual(dims)
