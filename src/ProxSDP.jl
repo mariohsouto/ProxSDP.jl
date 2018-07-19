@@ -67,10 +67,13 @@ type AuxiliaryData
     Mx_old::Vector{Float64}
     y_half::Vector{Float64}
     y_temp::Vector{Float64}
-    x_bar::Vector{Float64}
+    MtMx::Vector{Float64}
+    MtMx_old::Vector{Float64}
+    Mtrhs::Vector{Float64}
     function AuxiliaryData(dims) 
         new([Symmetric(zeros(i, i), :L) for i in dims.s], zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2),
-        zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.n*(dims.n+1)/2)
+        zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
+        zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2)
     )
     end
 end
@@ -103,38 +106,64 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time0 = time()
     tic()
     @timeit "Init" begin
-
-        opt = CPOptions(false, verbose)  
-        # Scale objective function
-        c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
-        A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
-        rhs_orig = vcat(affine_sets.b, affine_sets.h)
-
+    
+    opt = CPOptions(false, verbose)  
+    # Scale objective function
+    c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
+    A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+    rhs_orig = vcat(affine_sets.b, affine_sets.h)
+    
+    cont = 1
+    
+    @timeit "Scaling" begin
+        cte = (sqrt(2.0) / 2.0)
+        rows = rowvals(affine_sets.A)
+        m, n = size(affine_sets.A)
         cont = 1
-        @inbounds for j in 1:dims.n, i in j:dims.n
+        for j in 1:dims.n, i in j:dims.n
             if i != j
-                for line in 1:dims.p
-                    affine_sets.A[line, cont] *= (sqrt(2.0) / 2.0)
+                for line in nzrange(affine_sets.A, cont)
+                    affine_sets.A[rows[line], cont] *= cte
                 end
             end
             cont += 1
         end
+        rows = rowvals(affine_sets.G)
+        m, n = size(affine_sets.G)
         cont = 1
-        @inbounds for j in 1:dims.n, i in j:dims.n
+        for j in 1:dims.n, i in j:dims.n
             if i != j
-                for line in 1:dims.m
-                    affine_sets.G[line, cont] *= (sqrt(2.0) / 2.0)
+                for line in nzrange(affine_sets.G, cont)
+                    affine_sets.G[rows[line], cont] *= cte
                 end
             end
             cont += 1
         end
+        # @inbounds for j in 1:dims.n, i in j:dims.n
+        #     if i != j
+        #         for line in 1:dims.p
+        #             affine_sets.A[line, cont] *= cte
+        #         end
+        #     end
+        #     cont += 1
+        # end
+        # cont = 1
+        # @inbounds for j in 1:dims.n, i in j:dims.n
+        #     if i != j
+        #         for line in 1:dims.m
+        #             affine_sets.G[line, cont] *= cte
+        #         end
+        #     end
+        #     cont += 1
+        # end
         cont = 1
         @inbounds for j in 1:dims.n, i in j:dims.n
             if i != j
-                affine_sets.c[cont] *= (sqrt(2.0) / 2.0)
+                affine_sets.c[cont] *= cte
             end
             cont += 1
         end
+    end
 
         # Initialization
         pair = PrimalDual(dims)
@@ -148,6 +177,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
         mat = Matrices(M, Mt, affine_sets.c)
+        A_mul_B!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
         primal_step = max(1.0, sqrt(min(dims.n*(dims.n+1)/2, dims.m + dims.p)) / vecnorm(M))
@@ -196,7 +226,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l
+        elseif k > l && comb_residual[k - l] < 0.9 * comb_residual[k] && rank_update > l
             update_cont += 1
             if update_cont > 10
                 target_rank = min(2 * target_rank, dims.n)
@@ -280,6 +310,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     copy!(pair.y_old, pair.y)
     copy!(a.Mty_old, a.Mty)
     copy!(a.Mx_old, a.Mx)
+    copy!(a.MtMx_old, a.MtMx)
 
     return nothing
 end
@@ -287,37 +318,39 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, primal_step_old::Float64, beta::Float64)::Tuple{Float64, Float64}
     theta = 1.0
     cont = 0
-
-    
-
     for i in 1:100
+        cont += 1
         theta = primal_step / primal_step_old
 
         # a.y_half = pair.y + beta * primal_step * ((1 + theta) * a.Mx - theta * a.Mx_old)
-        copy!(a.y_half, pair.y)
-        Base.LinAlg.axpy!(beta * primal_step * (1 + theta), a.Mx, a.y_half)
-        Base.LinAlg.axpy!(-beta * primal_step * theta, a.Mx_old, a.y_half)
+        @timeit "linesearch 1" copy!(a.y_half, pair.y)
+        @timeit "linesearch 2" Base.LinAlg.axpy!(beta * primal_step * (1 + theta), a.Mx, a.y_half)
+        @timeit "linesearch 3" Base.LinAlg.axpy!(-beta * primal_step * theta, a.Mx_old, a.y_half)
 
         # a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, dims, affine_sets, beta * primal_step)
-        @timeit "linesearch 6" copy!(a.y_temp, a.y_half)
-        @timeit "linesearch 7" box_projection!(a.y_half, dims, affine_sets, beta * primal_step)
-        @timeit "linesearch 8" Base.LinAlg.axpy!(-beta * primal_step, a.y_half, a.y_temp)
-        # try to avoid this step
-        @timeit "linesearch 9" A_mul_B!(a.Mty, mat.Mt, a.y_temp)
+        @timeit "linesearch 4" copy!(a.y_temp, a.y_half)
+        @timeit "linesearch 5" box_projection!(a.y_half, dims, affine_sets, beta * primal_step)
+        @timeit "linesearch 6" Base.LinAlg.axpy!(-beta * primal_step, a.y_half, a.y_temp)
 
+        # Compute Mt * y for the linesearch stopping criteria
+        # @timeit "linesearch 9" A_mul_B!(a.Mty, mat.Mt, a.y_temp)
+        @timeit "linesearch 7" copy!(a.Mty, a.Mty_old)
+        @timeit "linesearch 8" Base.LinAlg.axpy!(beta * primal_step * (1 + theta), a.MtMx, a.Mty)
+        @timeit "linesearch 9" Base.LinAlg.axpy!(-beta * primal_step * theta, a.MtMx_old, a.Mty)
+        @timeit "linesearch 10" Base.LinAlg.axpy!(-beta * primal_step, a.Mtrhs, a.Mty)
+        
         # In-place norm
-        @timeit "linesearch 10" Base.LinAlg.axpy!(-1.0, a.Mty_old, a.Mty)
-        @timeit "linesearch 11" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
+        @timeit "linesearch 11" Base.LinAlg.axpy!(-1.0, a.Mty_old, a.Mty)
+        @timeit "linesearch 12" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
         y_norm = norm(a.y_temp)
         Mty_norm = norm(a.Mty)
-        if sqrt(beta) * primal_step * Mty_norm <= (1 - 1e-13) * y_norm
+        if sqrt(beta) * primal_step * Mty_norm <= (1 - 1e-15) * y_norm
             break
         else
-            primal_step *= 0.95
+            primal_step *= 0.9
         end
-
-        cont += 1
     end
+
     # @show cont
 
     # Reverte in-place norm
@@ -333,7 +366,6 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
 end
 
 function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, dual_step::Float64, theta::Float64)::Void
-
     # Compute intermediate dual variable (y_{k + 1/2})
     # pair.y = pair.y + dual_step * mat.M * (2.0 * pair.x - pair.x_old)
     @inbounds @simd for i in eachindex(pair.y)
@@ -388,19 +420,18 @@ end
 
 function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, target_rank::Int64, mat::Matrices, primal_step::Float64, arc::ARPACKAlloc, offdiag::Set{Int})::Tuple{Int64, Float64}
 
-    min_eig = 0.0
-    current_rank = 0
-
     # x = x - p_step * (Mty + c)
     Base.LinAlg.axpy!(-primal_step, a.Mty, pair.x)
     Base.LinAlg.axpy!(-primal_step, mat.c, pair.x)
 
     # Projection onto the psd cone
     if length(dims.s) == 1
-        current_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, target_rank, arc, offdiag)::Tuple{Int64, Float64}
+        @timeit "sdp proj" current_rank, min_eig = sdp_cone_projection!(pair.x, a, dims, target_rank, arc, offdiag)::Tuple{Int64, Float64}
     end
 
-    A_mul_B!(a.Mx, mat.M, pair.x)
+    @timeit "linesearch -1" A_mul_B!(a.Mx, mat.M, pair.x)
+    @timeit "linesearch 0" A_mul_B!(a.MtMx, mat.Mt, a.Mx)
+    
     return current_rank, min_eig
 end
 
@@ -436,15 +467,14 @@ end
 
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, target_rank::Int64, arc::ARPACKAlloc, offdiag::Set)::Tuple{Int64, Float64}
 
-    min_eig = 0.0
-
+    min_eig, current_rank, sqrt_2 = 0.0, 0, sqrt(2.0)
     # Build symmetric matrix X
     n = dims.n
     @timeit "reshape1" begin
         cont = 1
         @inbounds for j in 1:n, i in j:n
             if i != j
-                a.m[1].data[i,j] = v[cont] / sqrt(2.0)
+                a.m[1].data[i,j] = v[cont] / sqrt_2
             else
                 a.m[1].data[i,j] = v[cont]
             end
@@ -457,9 +487,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             eig!(arc, a.m[1], target_rank)
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
-                current_rank = 0
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 1e-10
+                    if unsafe_getvalues(arc)[i] > 1e-12
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -469,13 +498,14 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if hasconverged(arc)
-        min_eig = minimum(unsafe_getvalues(arc))
+    if target_rank <= 16 && hasconverged(arc)
+        @timeit "get min eig" min_eig = minimum(unsafe_getvalues(arc))
     else
-        current_rank = 0
+        min_eig = 0.0
         @timeit "eigfact" begin
-            # fact = eigfact!(a.m, 0.0, Inf)
-            fact = eigfact!(a.m[1])
+            current_rank = 0
+            fact = eigfact!(a.m[1], 1e-6, Inf)
+            # fact = eigfact!(a.m[1])
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0
@@ -488,17 +518,16 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     cont = 1
     @timeit "reshape2" begin
-        
         @inbounds for j in 1:n, i in j:n
             if i != j
-                v[cont] = a.m[1].data[i, j] * sqrt(2.0)
+                v[cont] = a.m[1].data[i, j] * sqrt_2
             else
                 v[cont] = a.m[1].data[i, j]
             end
-            cont+=1
+            cont += 1
         end
     end
 
-    return current_rank, min_eig
+    return max(current_rank, 1), min_eig
 end
 end

@@ -34,9 +34,9 @@ function moi_sdplib(optimizer, path)
     minus_rank = length([eig for eig in eigfact(Xsq_s)[:values] if eig < -1e-4])
     @test minus_rank == 0
 
-    @test trace(F[0] * Xsq_s) - obj < 1e-2
+    @test trace(F[0] * Xsq_s) - obj < 1e-1
     for i in 1:m
-        @test abs(trace(F[i] * Xsq_s)-c[i]) < 1e-2
+        @test abs(trace(F[i] * Xsq_s)-c[i]) < 1e-1
     end
 
     sdplib_eval(F,c,n,m,Xsq_s)

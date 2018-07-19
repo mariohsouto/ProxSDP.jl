@@ -264,6 +264,7 @@ end
 end
 
 @testset "MIMO Sizes" begin
+    include("base_mimo.jl")
     include("moi_mimo.jl")
     for i in 2:5
         @testset "MIMO n = $(i)" begin 
