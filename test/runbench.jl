@@ -9,7 +9,7 @@ using Base.Test
 
 using ProxSDP, MathOptInterface, Base.Test
 
-use_MOI = true
+use_MOI = false
 # set_to_test = :MIMO
 # set_to_test = :RANDSDP
 set_to_test = :SDPLIB
@@ -20,12 +20,12 @@ set_to_test = :SDPLIB
     optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOptimizer())
 else
     using JuMP
-    using CSDP
-    optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
+    # using CSDP
+    # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
     # using SCS
     # optimizer = SCSSolver(eps=1e-4)
-    # using Mosek
-    # optimizer = MosekSolver()
+    using Mosek
+    optimizer = MosekSolver()
 end
 
 

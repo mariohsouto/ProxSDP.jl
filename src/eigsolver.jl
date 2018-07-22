@@ -93,19 +93,19 @@ function unsafe_getvectors(arc::ARPACKAlloc)
     return arc.v
 end
 
-function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1)
+function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1, iter::Int64=1)
     arc = ARPACKAlloc{T}()
-    ARPACKAlloc_reset!(arc::ARPACKAlloc, Symmetric(eye(T,n,n)), 1)
+    ARPACKAlloc_reset!(arc::ARPACKAlloc, Symmetric(eye(T,n,n)), 1, 1)
     return arc
 end
 
-function ARPACKAlloc(A, nev::Integer)
+function ARPACKAlloc(A, nev::Integer, iter::Int64)
     arc = ARPACKAlloc{T}()
-    ARPACKAlloc_reset!(arc::ARPACKAlloc, A, nev)
+    ARPACKAlloc_reset!(arc::ARPACKAlloc, A, nev, 1)
     return arc
 end
 
-function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer) where T
+function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer, iter::Int64) where T
 
     tol = 0.0
     v0=zeros(eltype(A),(0,))
@@ -138,7 +138,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)
 
-    arc.TOL = 1e-7 * ones(T, 1)
+    arc.TOL = (1e-3 / iter) * ones(T, 1)
 
     arc.v = Matrix{T}(arc.n, arc.ncv)
     arc.workd = Vector{T}(3*arc.n)
@@ -176,7 +176,10 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     return nothing
 end
 
-function _AUPD!(arc::ARPACKAlloc)
+function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
+
+    arc.TOL = (1e-3 / iter) * ones(T, 1)
+
     while true
         Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
@@ -207,13 +210,13 @@ function _AUPD!(arc::ARPACKAlloc)
     return nothing
 end
 
-function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer) where T1
+function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64) where T1
 
     n = Base.LinAlg.checksquare(A)
     T = eltype(A)
 
     if eltype(arc.v) != T || n != arc.n || nev != arc.nev
-        return ARPACKAlloc_reset!(arc, A, nev)
+        return ARPACKAlloc_reset!(arc, A, nev, iter)
     end
 
     matvecA!(y, x) = A_mul_B!(y, A, x)
@@ -275,11 +278,11 @@ function _EUPD!(arc)
 end
 
 
-function eig!(arc, A, nev)
+function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64)::Void where T1
 
-    @timeit "_INIT!" _INIT!(arc, A, nev)
-    @timeit "_AUPD!" _AUPD!(arc)
-    @timeit "_EUPD!" _EUPD!(arc)
+    @timeit "_INIT!" _INIT!(arc, A, nev, iter)::Void
+    @timeit "_AUPD!" _AUPD!(arc, iter)::Void
+    @timeit "_EUPD!" _EUPD!(arc)::Void
 
     return nothing
 end
