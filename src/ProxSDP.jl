@@ -181,17 +181,19 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         
         # Stepsize parameters and linesearch parameters
         # primal_step = max(1.0, sqrt(min(dims.n*(dims.n+1)/2, dims.m + dims.p)) / vecnorm(M))
-        primal_step = sqrt(min(dims.n*(dims.n+1)/2, dims.m + dims.p)) / vecnorm(M)
+        @show primal_step = sqrt(min(dims.n^2, dims.m + dims.p)) / vecnorm(M)
+        # primal_step = 10.0
         primal_step_old = primal_step
         dual_step = primal_step
         theta = 1.0           # Overrelaxation parameter
-        adapt_level = 0.9     # Factor by which the stepsizes will be balanced 
+        adapt_level = 0.95     # Factor by which the stepsizes will be balanced 
         adapt_decay = 0.9     # Rate the adaptivity decreases over time
         l = 100               # Convergence check window
         norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
 
         pair.x[1] = 1.0
         beta = 1.0
+        min_beta, max_beta = 1e-3, 1e+3
     end
 
     # Fixed-point loop
@@ -206,12 +208,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs, mat)::Void
         # Print progress
         if mod(k, 100) == 0 && opt.verbose
-            print_progress(k, primal_residual[k], dual_residual[k], current_rank, time0)::Void
+            print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
         end
 
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
+            # @show min_eig
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -222,24 +225,53 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 if update_cont > 0
                     target_rank = min(2 * target_rank, dims.n)
                     rank_update, update_cont = 0, 0
+                    # println("update 1")
                 end
             end
 
         # Check divergence
         elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 10
+            if update_cont > 50
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
+                # println("update 2")
             end
 
         # Adaptive stepsizes  
-        elseif primal_residual[k] > tol && dual_residual[k] < tol
+        elseif primal_residual[k] > tol && dual_residual[k] < tol && k > l 
             beta *= (1 - adapt_level)
-            adapt_level *= adapt_decay
-        elseif primal_residual[k] < tol && dual_residual[k] > tol
+            if beta <= min_beta
+                beta = min_beta
+            else
+                adapt_level *= adapt_decay
+            end
+            # @show beta, adapt_level
+        elseif primal_residual[k] < tol && dual_residual[k] > tol && k > l
+            beta /= (1 - adapt_level)
+            if beta >= max_beta
+                beta = max_beta
+            else
+                adapt_level *= adapt_decay
+            end
+            # @show beta, adapt_level
+        elseif primal_residual[k] > 100 * dual_residual[k] && k > l
+            beta *= (1 - adapt_level)
+            if beta <= min_beta
+                beta = min_beta
+            else
+                adapt_level *= adapt_decay
+            end
+            # @show beta, adapt_level
+        elseif 100 * primal_residual[k] < dual_residual[k] && k > l
             beta /= (1 - adapt_level)
             adapt_level *= adapt_decay
+            if beta >= max_beta
+                beta = max_beta
+            else
+                adapt_level *= adapt_decay
+            end
+            # @show beta, adapt_level
         end
     end
 
@@ -318,6 +350,7 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, primal_step_old::Float64, beta::Float64)::Tuple{Float64, Float64}
     theta = 1.0
     cont = 0
+    # primal_step = primal_step * sqrt(1 + theta)
     for i in 1:100
         cont += 1
         theta = primal_step / primal_step_old
@@ -344,21 +377,18 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
         @timeit "linesearch 12" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
         y_norm = norm(a.y_temp)
         Mty_norm = norm(a.Mty)
-        if sqrt(beta) * primal_step * Mty_norm <= y_norm #(1 - 1e-16) * y_norm
+        if sqrt(beta) * primal_step * Mty_norm <= (1 - 1e-15) * y_norm
             break
         else
-            primal_step *= 0.9
+            primal_step *= 0.96
         end
     end
-
-    # @show cont
 
     # Reverte in-place norm
     Base.LinAlg.axpy!(1.0, a.Mty_old, a.Mty)
     Base.LinAlg.axpy!(1.0, pair.y_old, a.y_temp)
 
     copy!(pair.y, a.y_temp)
-    # Update primal step
     primal_step_old = primal_step
     primal_step = primal_step * sqrt(1 + theta)
 
@@ -503,9 +533,9 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     else
         min_eig = 0.0
         @timeit "eigfact" begin
+            println("eigfact")
             current_rank = 0
-            fact = eigfact!(a.m[1], 1e-10, Inf)
-            # fact = eigfact!(a.m[1])
+            fact = eigfact!(a.m[1], 1e-8, Inf)
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0

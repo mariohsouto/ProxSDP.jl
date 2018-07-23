@@ -9,7 +9,7 @@ using Base.Test
 
 using ProxSDP, MathOptInterface, Base.Test
 
-use_MOI = false
+use_MOI = true
 # set_to_test = :MIMO
 # set_to_test = :RANDSDP
 set_to_test = :SDPLIB
@@ -49,23 +49,27 @@ if use_MOI
     elseif set_to_test == :SDPLIB
         include("base_sdplib.jl")
         include("moi_sdplib.jl")
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "equalG11.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "equalG51.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp250-1.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp250-2.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp250-3.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp250-4.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp500-1.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp500-2.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp500-3.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp500-4.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "equalG11.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "equalG51.dat-s"))
 
         println("max_cut")
+        moi_sdplib(optimizer, joinpath(datapath, "mcp250-1.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp250-2.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp250-3.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp250-4.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG11.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG51.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
