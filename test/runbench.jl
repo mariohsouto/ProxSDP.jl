@@ -71,9 +71,13 @@ if use_MOI
         moi_sdplib(optimizer, joinpath(datapath, "mcp250-2.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "mcp250-3.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "mcp250-4.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp500-1.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp500-2.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp500-3.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp500-4.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG11.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG51.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
 
         
         # for i in 1:1
