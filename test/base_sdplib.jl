@@ -1,6 +1,8 @@
 function sdplib_data(path)
     # Read data from file
-    data = readdlm(path)
+    data = readdlm(path, use_mmap=true)
+
+    println("000")
 
     # Parse SDPLIB data
     m = data[1, 1]
@@ -15,6 +17,7 @@ function sdplib_data(path)
     else
         blks = parse.(Float64, split(data[3, 1][2:end - 1], ","))
     end
+    println("001")
     cum_blks = unshift!(cumsum(blks), 0)
     if isa(data[4, 1], Float64) || isa(data[4, 1], Int64) 
         c = data[4, :]
@@ -23,7 +26,9 @@ function sdplib_data(path)
     end
     n = abs(cum_blks[end])
     n = length(c)
+    println("002")
     # n = 335
+    println("111")
     F = Dict(i => spzeros(n, n) for i = 0:m)
     for k=5:size(data)[1]
         idx = cum_blks[data[k, 2]]
@@ -42,6 +47,7 @@ function sdplib_data(path)
             F[data[k, 1]][j, i] = data[k, 5]
         end
     end
+    println("222")
     return n, m, F, c
 end
 function sdplib_eval(F,c,n,m,XX)

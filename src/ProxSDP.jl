@@ -193,7 +193,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
 
         pair.x[1] = 1.0
         beta = 1.0
-        min_beta, max_beta = 1e-4, 1e+4
+        min_beta, max_beta = 1e-3, 1e+3
     end
     println("teste")
 
@@ -231,9 +231,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l
+        elseif k > l && comb_residual[k - l] < 0.9 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 30
+            if update_cont > 50
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
                 println("update 2")
@@ -378,7 +378,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
         @timeit "linesearch 12" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
         y_norm = norm(a.y_temp)
         Mty_norm = norm(a.Mty)
-        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-4) * y_norm
+        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-2) * y_norm
             break
         else
             primal_step *= 0.95
@@ -519,7 +519,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 0.1 * tol
+                    if unsafe_getvalues(arc)[i] > 1e-10 #0.1 * tol
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -543,7 +543,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         @timeit "eigfact" begin
             println("eigfact")
             current_rank = 0
-            fact = eigfact!(a.m[1], 0.1 * tol, Inf)
+            fact = eigfact!(a.m[1], 1e-10, Inf)
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0
