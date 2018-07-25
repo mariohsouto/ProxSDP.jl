@@ -1,5 +1,7 @@
 function moi_sdplib(optimizer, path)
 
+    println("running: $(path)")
+
     MOI.empty!(optimizer)
     @test MOI.isempty(optimizer)
 
@@ -13,14 +15,16 @@ function moi_sdplib(optimizer, path)
     Xsq = full(Symmetric(Xsq,:U))
 
     for k in 1:m
-        ctr_k = vec([MOI.ScalarAffineTerm(F[k][i,j], Xsq[i,j]) for i in 1:n, j in 1:n])
+        I,J,V=findnz(F[k])
+        ctr_k = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
             MOI.addconstraint!(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
     end
 
     vov = MOI.VectorOfVariables(X)
     cX = MOI.addconstraint!(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n))
 
-    objf_t = vec([MOI.ScalarAffineTerm(F[0][i,j], Xsq[i,j]) for i in 1:n, j in 1:n])
+    I,J,V=findnz(F[0])
+    objf_t = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
     MOI.set!(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
 
     MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)

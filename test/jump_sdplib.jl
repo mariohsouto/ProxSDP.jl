@@ -2,6 +2,8 @@
 function jump_sdplib(solver, path)
     tic()
 
+    println("running: $(path)")
+
     n, m, F, c = sdplib_data(path)
 
     # Build model
