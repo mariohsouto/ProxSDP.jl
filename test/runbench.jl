@@ -34,9 +34,10 @@ if use_MOI
         include("base_mimo.jl")
         include("moi_mimo.jl")
         # include("sensor_loc.jl")
-        moi_mimo(optimizer, 0, 100)
-        for i in 1:1
-            moi_mimo(optimizer, i, 100)
+        moi_mimo(optimizer, 0, 1000)
+        for n in 100:100:1000
+            @show n
+            moi_mimo(optimizer, 0, n)
             # sensor_loc(optimizer, 0)
         end
     elseif set_to_test == :RANDSDP
@@ -77,7 +78,7 @@ if use_MOI
         moi_sdplib(optimizer, joinpath(datapath, "mcp500-4.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG11.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG51.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
 
         
         # for i in 1:1
