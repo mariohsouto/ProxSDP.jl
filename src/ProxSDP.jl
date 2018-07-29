@@ -63,6 +63,7 @@ type AuxiliaryData
     m::Vector{Symmetric{Float64,Matrix{Float64}}}
     Mty::Vector{Float64}
     Mty_old::Vector{Float64}
+    Mty_aux::Vector{Float64}
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
     y_half::Vector{Float64}
@@ -72,8 +73,8 @@ type AuxiliaryData
     Mtrhs::Vector{Float64}
     function AuxiliaryData(dims) 
         new([Symmetric(zeros(i, i), :L) for i in dims.s], zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2),
-        zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m),
-        zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2)
+        zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m), 
+        zeros(dims.p+dims.m), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2)
     )
     end
 end
@@ -180,9 +181,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         A_mul_B!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
-        # primal_step = max(1.0, sqrt(min(dims.n*(dims.n+1)/2, dims.m + dims.p)) / vecnorm(M))
-        @show primal_step = sqrt(min(dims.n^2, dims.m + dims.p)) / vecnorm(M)
-        # primal_step = 10.0
+        primal_step = sqrt(min(dims.n*(dims.n+1)/2, dims.m + dims.p)) / vecnorm(M)
         primal_step_old = primal_step
         dual_step = primal_step
         theta = 1.0           # Overrelaxation parameter
@@ -191,11 +190,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         l = 100               # Convergence check window
         norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
 
-        pair.x[1] = 1.0
+        # pair.x[1] = 1.0
         beta = 1.0
-        min_beta, max_beta = 1e-3, 1e+3
+        min_beta, max_beta = 1e-4, 1e+4
     end
-    println("teste")
 
     # Fixed-point loop
     tic()
@@ -215,7 +213,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
-            @show min_eig
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -226,17 +223,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 if update_cont > 0
                     target_rank = min(2 * target_rank, dims.n)
                     rank_update, update_cont = 0, 0
-                    println("update 1")
                 end
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.9 * comb_residual[k] && rank_update > l
+        elseif k > l && comb_residual[k - l] < 0.7 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 50
+            if update_cont > 30
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
-                println("update 2")
             end
 
         # Adaptive stepsizes  
@@ -371,17 +366,22 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
         @timeit "linesearch 7" copy!(a.Mty, a.Mty_old)
         @timeit "linesearch 8" Base.LinAlg.axpy!(beta * primal_step * (1 + theta), a.MtMx, a.Mty)
         @timeit "linesearch 9" Base.LinAlg.axpy!(-beta * primal_step * theta, a.MtMx_old, a.Mty)
-        @timeit "linesearch 10" Base.LinAlg.axpy!(-beta * primal_step, a.Mtrhs, a.Mty)
+        if dims.m == 0
+            @timeit "linesearch 10" Base.LinAlg.axpy!(-beta * primal_step, a.Mtrhs, a.Mty)
+        else
+            @timeit "linesearch 10" A_mul_B!(a.Mty_aux, mat.Mt, a.y_half)
+            @timeit "linesearch 11" Base.LinAlg.axpy!(-beta * primal_step, a.Mty_aux, a.Mty)
+        end
         
         # In-place norm
-        @timeit "linesearch 11" Base.LinAlg.axpy!(-1.0, a.Mty_old, a.Mty)
-        @timeit "linesearch 12" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
+        @timeit "linesearch 12" Base.LinAlg.axpy!(-1.0, a.Mty_old, a.Mty)
+        @timeit "linesearch 13" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
         y_norm = norm(a.y_temp)
         Mty_norm = norm(a.Mty)
-        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-2) * y_norm
+        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-16) * y_norm
             break
         else
-            primal_step *= 0.95
+            primal_step *= 0.9
         end
     end
 
@@ -541,7 +541,6 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
     if target_rank > 16
         min_eig = 0.0
         @timeit "eigfact" begin
-            println("eigfact")
             current_rank = 0
             fact = eigfact!(a.m[1], 1e-10, Inf)
             fill!(a.m[1].data, 0.0)

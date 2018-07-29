@@ -10,10 +10,10 @@ function moi_mimo(optimizer, seed, n)
 
     X = MOI.addvariables!(optimizer, nvars)
 
-    # for i in 1:nvars
-    #     MOI.addconstraint!(optimizer, MOI.SingleVariable(X[i]), MOI.LessThan(1.0))
-    #     MOI.addconstraint!(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
-    # end
+    for i in 1:nvars
+        MOI.addconstraint!(optimizer, MOI.SingleVariable(X[i]), MOI.LessThan(1.0))
+        MOI.addconstraint!(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
+    end
 
     Xsq = Matrix{MOI.VariableIndex}(n+1,n+1)
     ProxSDP.ivech!(Xsq, X)

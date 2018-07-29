@@ -7,7 +7,7 @@ function mimo_data(seed, m, n)
     # True signal
     s = rand([-1, 1], n)
     # Received signal
-    sigma = .01
+    sigma = .0001
     y = H * s + sigma * v
     L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
     return s, H, y, L
