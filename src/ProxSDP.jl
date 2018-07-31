@@ -190,7 +190,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         l = 100               # Convergence check window
         norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
 
-        # pair.x[1] = 1.0
+        pair.x[1] = 1.0
         beta = 1.0
         min_beta, max_beta = 1e-4, 1e+4
     end
@@ -213,6 +213,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
+            println(min_eig)
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -229,7 +230,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Check divergence
         elseif k > l && comb_residual[k - l] < 0.7 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 30
+            if update_cont > 50
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
             end
@@ -295,9 +296,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         else
             println(" Solution metrics [failed to converge]:")
         end
-        println(" Primal objective = $(round(prim_obj, 6))")
-        println(" Dual objective = $(round(dual_obj, 6))")
-        println(" Duality gap = $(round(prim_obj - dual_obj, 6))")
+        println(" Primal objective = $(round(prim_obj, 5))")
+        println(" Dual objective = $(round(dual_obj, 5))")
+        println(" Duality gap (%) = $(round((prim_obj - dual_obj) / prim_obj * 100, 2)) %")
+        println(" Duality residual = $(round(prim_obj - dual_obj, 5))")
         println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
         println("======================================================================")
     end
@@ -323,12 +325,18 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     Base.LinAlg.axpy!((1.0 / (1.0 + primal_step)), pair.x_old, a.Mty_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + primal_step)), pair.x, a.Mty_old)
     primal_residual[iter] = norm(a.Mty_old, 2) / (1.0 + norm_c)
+    # Base.LinAlg.axpy!(-1.0, pair.x, pair.x_old)
+    # primal_residual[iter] = norm(pair.x_old, 2) / (1.0 + norm_c)
+    # primal_residual[iter] /= (1.0 + primal_step)
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
     Base.LinAlg.axpy!((1.0 / (1.0 + dual_step)), pair.y_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + dual_step)), pair.y, a.Mx_old)
     dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + norm_rhs)
+    # Base.LinAlg.axpy!(-1.0, pair.y, pair.y_old)
+    # dual_residual[iter] = norm(pair.y_old, 2) / (1.0 + norm_rhs)
+    # dual_residual[iter] /= (1.0 + dual_step)
 
     # Compute combined residual
     comb_residual[iter] = primal_residual[iter] + dual_residual[iter]
@@ -378,7 +386,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
         @timeit "linesearch 13" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
         y_norm = norm(a.y_temp)
         Mty_norm = norm(a.Mty)
-        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-16) * y_norm
+        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-10) * y_norm
             break
         else
             primal_step *= 0.9
@@ -519,7 +527,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 1e-10 #0.1 * tol
+                    if unsafe_getvalues(arc)[i] > 0.0001 * tol
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -529,20 +537,17 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if target_rank <= 16
-        if hasconverged(arc)
-            @timeit "get min eig" min_eig = minimum(unsafe_getvalues(arc))
-        else
-            # copy!(v, pair.x_old)
-            return max(current_rank, 1), min_eig
-        end
+    if target_rank <= 16 && !hasconverged(arc)
+        println("failed")
     end
 
-    if target_rank > 16
+    if target_rank <= 16 && hasconverged(arc)
+        @timeit "get min eig" min_eig = minimum(unsafe_getvalues(arc))
+    else
         min_eig = 0.0
         @timeit "eigfact" begin
             current_rank = 0
-            fact = eigfact!(a.m[1], 1e-10, Inf)
+            fact = eigfact!(a.m[1], tol * 0.0001, Inf)
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0

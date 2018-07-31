@@ -50,8 +50,8 @@ if use_MOI
     elseif set_to_test == :SDPLIB
         include("base_sdplib.jl")
         include("moi_sdplib.jl")
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
