@@ -213,7 +213,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol
-            println(min_eig)
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -228,9 +227,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.7 * comb_residual[k] && rank_update > l
+        elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 50
+            if update_cont > 30
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
             end
@@ -325,18 +324,12 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     Base.LinAlg.axpy!((1.0 / (1.0 + primal_step)), pair.x_old, a.Mty_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + primal_step)), pair.x, a.Mty_old)
     primal_residual[iter] = norm(a.Mty_old, 2) / (1.0 + norm_c)
-    # Base.LinAlg.axpy!(-1.0, pair.x, pair.x_old)
-    # primal_residual[iter] = norm(pair.x_old, 2) / (1.0 + norm_c)
-    # primal_residual[iter] /= (1.0 + primal_step)
 
     # Compute dual residual
     Base.LinAlg.axpy!(-1.0, a.Mx, a.Mx_old)
     Base.LinAlg.axpy!((1.0 / (1.0 + dual_step)), pair.y_old, a.Mx_old)
     Base.LinAlg.axpy!(-(1.0 / (1.0 + dual_step)), pair.y, a.Mx_old)
     dual_residual[iter] = norm(a.Mx_old, 2) / (1.0 + norm_rhs)
-    # Base.LinAlg.axpy!(-1.0, pair.y, pair.y_old)
-    # dual_residual[iter] = norm(pair.y_old, 2) / (1.0 + norm_rhs)
-    # dual_residual[iter] /= (1.0 + dual_step)
 
     # Compute combined residual
     comb_residual[iter] = primal_residual[iter] + dual_residual[iter]
@@ -354,7 +347,6 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, primal_step_old::Float64, beta::Float64)::Tuple{Float64, Float64}
     theta = 1.0
     cont = 0
-    # primal_step = primal_step * sqrt(1 + theta)
     for i in 1:100
         cont += 1
         theta = primal_step / primal_step_old
@@ -521,13 +513,13 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if target_rank <= 16
+    if target_rank <= 16 && dims.n > 100
         @timeit "eigs" begin 
             eig!(arc, a.m[1], target_rank, iter)
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 0.0001 * tol
+                    if unsafe_getvalues(arc)[i] > 1e-2 * tol
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -537,17 +529,13 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if target_rank <= 16 && !hasconverged(arc)
-        println("failed")
-    end
-
-    if target_rank <= 16 && hasconverged(arc)
+    if target_rank <= 16 && hasconverged(arc) && dims.n > 100
         @timeit "get min eig" min_eig = minimum(unsafe_getvalues(arc))
     else
         min_eig = 0.0
         @timeit "eigfact" begin
             current_rank = 0
-            fact = eigfact!(a.m[1], tol * 0.0001, Inf)
+            fact = eigfact!(a.m[1], tol * 1e-2, Inf)
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0
