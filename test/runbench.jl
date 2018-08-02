@@ -12,7 +12,8 @@ using ProxSDP, MathOptInterface, Base.Test
 use_MOI = true
 # set_to_test = :MIMO
 # set_to_test = :RANDSDP
-set_to_test = :SDPLIB
+# set_to_test = :SDPLIB
+set_to_test = :SENSORLOC
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
 
@@ -79,11 +80,12 @@ if use_MOI
         moi_sdplib(optimizer, joinpath(datapath, "maxG11.dat-s"))
         moi_sdplib(optimizer, joinpath(datapath, "maxG51.dat-s"))
         # moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
-
-        
         # for i in 1:1
         #     moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
         # end
+    elseif set_to_test == :SENSORLOC
+        include("moi_sensorloc.jl")
+        moi_sensorloc(optimizer, 123, 10)
     end
 else
     if set_to_test == :MIMO
