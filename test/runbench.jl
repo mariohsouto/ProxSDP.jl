@@ -82,6 +82,7 @@ if use_MOI
         #     moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
         # end
     elseif set_to_test == :SENSORLOC
+        include("base_sensorloc.jl")
         include("moi_sensorloc.jl")
         moi_sensorloc(optimizer, 123, 10)
     end
@@ -107,6 +108,10 @@ else
         for i in 1:1
             jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
         end
+    elseif set_to_test == :SENSORLOC
+        include("base_sensorloc.jl")
+        include("jump_sensorloc.jl")
+        jump_sensorloc(optimizer, 123, 10)
     end
 end
 
