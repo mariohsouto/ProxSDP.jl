@@ -7,8 +7,6 @@ datapath = joinpath(dirname(@__FILE__), "data")
 using Base.Test
 # import Base.isempty
 
-using ProxSDP, MathOptInterface, Base.Test
-
 use_MOI = true
 # set_to_test = :MIMO
 # set_to_test = :RANDSDP
@@ -16,17 +14,17 @@ use_MOI = true
 set_to_test = :SENSORLOC
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
-
+    using ProxSDP, MathOptInterface
     include("moi_init.jl")
     optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOptimizer())
 else
     using JuMP
-    # using CSDP
-    # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
+    using CSDP
+    optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
     # using SCS
     # optimizer = SCSSolver(eps=1e-4)
-    using Mosek
-    optimizer = MosekSolver()
+    # using Mosek
+    # optimizer = MosekSolver()
 end
 
 
@@ -84,6 +82,7 @@ if use_MOI
         #     moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
         # end
     elseif set_to_test == :SENSORLOC
+        include("base_sensorloc.jl")
         include("moi_sensorloc.jl")
         moi_sensorloc(optimizer, 123, 10)
     end
@@ -109,6 +108,10 @@ else
         for i in 1:1
             jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
         end
+    elseif set_to_test == :SENSORLOC
+        include("base_sensorloc.jl")
+        include("jump_sensorloc.jl")
+        jump_sensorloc(optimizer, 123, 10)
     end
 end
 

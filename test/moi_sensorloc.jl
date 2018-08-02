@@ -4,17 +4,7 @@ function moi_sensorloc(optimizer, seed, n)
     MOI.empty!(optimizer)
     @test MOI.isempty(optimizer)
 
-    # Instance size
-    m = 10 * n
-    # Sensor true position
-    x_true = rand((n, 1))
-    # Anchor positions
-    a = Dict(i => rand((n, 1)) for i in 1:m)
-    d = Dict(i => norm(x_true - a[i]) for i in 1:m)
-    A = Dict()
-    for i in 1:m
-        A[i] = [hcat(eye(n), -a[i]); hcat(-a[i]', 0.0)]
-    end
+    m, x_true, a, d, A = sensorloc_data(seed, n)
 
     nvars = ProxSDP.sympackedlen(n + 1)
 
@@ -47,8 +37,7 @@ function moi_sensorloc(optimizer, seed, n)
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
-    @show norm(x_true - Xsq_s[1:n, end])
-    @show rank = length([eig for eig in eigfact(Xsq_s)[:values] if eig > 1e-7])
+    sensorloc_eval(n, m, x_true, Xsq_s)
 
     return nothing
 end
