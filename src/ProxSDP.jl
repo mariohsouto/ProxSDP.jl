@@ -187,7 +187,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         primal_step_old = primal_step
         dual_step = primal_step
         theta = 1.0           # Overrelaxation parameter
-        adapt_level = 0.5     # Factor by which the stepsizes will be balanced 
+        adapt_level = 0.9     # Factor by which the stepsizes will be balanced 
         adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 100               # Convergence check window
         norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
