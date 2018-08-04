@@ -8,7 +8,7 @@ function sensor_loc(solver, seed)
     
     # Instance size
     n = 100
-    m = 10 * n
+    m = 100 * n
     # Sensor true position
     x_true = rand((n, 1))
     # Anchor positions

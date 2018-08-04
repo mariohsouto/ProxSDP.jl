@@ -181,18 +181,25 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         A_mul_B!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
-        primal_step = sqrt(min(dims.n*(dims.n+1)/2, dims.m + dims.p)) / vecnorm(M)
+        primal_step = sqrt(min(dims.n^2, dims.m + dims.p)) / vecnorm(M)
+        # primal_step = 1.0
+        # @show primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
         primal_step_old = primal_step
         dual_step = primal_step
         theta = 1.0           # Overrelaxation parameter
-        adapt_level = 0.9     # Factor by which the stepsizes will be balanced 
-        adapt_decay = 0.9     # Rate the adaptivity decreases over time
+        adapt_level = 0.5     # Factor by which the stepsizes will be balanced 
+        adapt_decay = 0.9    # Rate the adaptivity decreases over time
         l = 100               # Convergence check window
         norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
 
         pair.x[1] = 1.0
         beta = 1.0
         min_beta, max_beta = 1e-4, 1e+4
+        window = 100
+        analysis = false
+        if analysis
+            window = 1            
+        end
     end
 
     # Fixed-point loop
@@ -206,13 +213,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Compute residuals and update old iterates
         compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs, mat)::Void
         # Print progress
-        if mod(k, 100) == 0 && opt.verbose
+
+        if mod(k, window) == 0 && opt.verbose
             print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
         end
 
         # Check convergence of inexact fixed-point
         rank_update += 1
-        if primal_residual[k] < tol && dual_residual[k] < tol
+        if primal_residual[k] < tol && dual_residual[k] < tol && k > 10
             if min_eig < tol
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
@@ -227,9 +235,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l
+        elseif k > l && comb_residual[k - l] < 0.7 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 30
+            if update_cont > 20
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
             end
@@ -242,7 +250,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             else
                 adapt_level *= adapt_decay
             end
-            # @show beta, adapt_level
+            if analysis
+                @show beta, adapt_level
+            end
         elseif primal_residual[k] < tol && dual_residual[k] > tol && k > l
             beta /= (1 - adapt_level)
             if beta >= max_beta
@@ -250,7 +260,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             else
                 adapt_level *= adapt_decay
             end
-            # @show beta, adapt_level
+            if analysis
+                @show beta, adapt_level
+            end
         elseif primal_residual[k] > 100 * dual_residual[k] && k > l
             beta *= (1 - adapt_level)
             if beta <= min_beta
@@ -258,7 +270,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             else
                 adapt_level *= adapt_decay
             end
-            # @show beta, adapt_level
+            if analysis
+                @show beta, adapt_level
+            end
         elseif 100 * primal_residual[k] < dual_residual[k] && k > l
             beta /= (1 - adapt_level)
             adapt_level *= adapt_decay
@@ -267,7 +281,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             else
                 adapt_level *= adapt_decay
             end
-            # @show beta, adapt_level
+            if analysis
+                @show beta, adapt_level
+            end
         end
     end
 
@@ -378,10 +394,10 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
         @timeit "linesearch 13" Base.LinAlg.axpy!(-1.0, pair.y_old, a.y_temp)
         y_norm = norm(a.y_temp)
         Mty_norm = norm(a.Mty)
-        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-10) * y_norm
+        if sqrt(beta) * primal_step * Mty_norm <= (1.0 - 1e-2) * y_norm
             break
         else
-            primal_step *= 0.9
+            primal_step *= 0.95
         end
     end
 
@@ -519,7 +535,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 1e-2 * tol
+                    if unsafe_getvalues(arc)[i] > tol * 1e-4
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -535,7 +551,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         min_eig = 0.0
         @timeit "eigfact" begin
             current_rank = 0
-            fact = eigfact!(a.m[1], tol * 1e-2, Inf)
+            fact = eigfact!(a.m[1], tol * 1e-4, Inf)
+            # fact = eigfact!(a.m[1])
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0

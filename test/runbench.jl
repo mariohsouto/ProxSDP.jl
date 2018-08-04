@@ -27,14 +27,13 @@ else
     # optimizer = MosekSolver()
 end
 
-
 if use_MOI
     if set_to_test == :MIMO
         include("base_mimo.jl")
         include("moi_mimo.jl")
         # include("sensor_loc.jl")
-        moi_mimo(optimizer, 0, 10)
-        for n in [10,10]
+        moi_mimo(optimizer, 0, 100)
+        for n in 100:100:1000
             @show n
             moi_mimo(optimizer, 0, n)
             # sensor_loc(optimizer, 0)
@@ -84,14 +83,14 @@ if use_MOI
     elseif set_to_test == :SENSORLOC
         include("base_sensorloc.jl")
         include("moi_sensorloc.jl")
-        moi_sensorloc(optimizer, 123, 10)
+        moi_sensorloc(optimizer, 123, 200)
     end
 else
     if set_to_test == :MIMO
         include("base_mimo.jl")
         include("jump_mimo.jl")
-        jump_mimo(optimizer, 0, 5)
-        for i in 1:1
+        jump_mimo(optimizer, 0, 100)
+        for i in 100:100:1000
             jump_mimo(optimizer, i, 5)
         end
     elseif set_to_test == :RANDSDP
