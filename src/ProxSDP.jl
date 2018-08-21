@@ -98,7 +98,7 @@ function printheader()
     println("----------------------------------------------------------------------")
 end
 
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-4)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Dims, verbose=true, max_iter=Int(1e+5), tol=1e-3)::CPResult
 
     if verbose
         printheader()
@@ -113,7 +113,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
     A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
     rhs_orig = vcat(affine_sets.b, affine_sets.h)
-    
+    norm_c, norm_rhs = norm(c_orig), norm(rhs_orig)
     cont = 1
     
     @timeit "Scaling" begin
@@ -188,13 +188,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         dual_step = primal_step
         theta = 1.0           # Overrelaxation parameter
         adapt_level = 0.9     # Factor by which the stepsizes will be balanced 
-        adapt_decay = 0.9    # Rate the adaptivity decreases over time
+        adapt_decay = 0.9     # Rate the adaptivity decreases over time
         l = 100               # Convergence check window
-        norm_c, norm_rhs = norm(affine_sets.c), norm(rhs)
-
         pair.x[1] = 1.0
-        beta = 1.0
-        min_beta, max_beta = 1e-4, 1e+4
+        beta, theta = 1.0, 1.0
+        min_beta, max_beta = 1e-3, 1e+3
         window = 100
         analysis = false
         if analysis
@@ -209,7 +207,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Primal update
         @timeit "primal" current_rank, min_eig = primal_step!(pair, a, dims, target_rank, mat, primal_step, arc, offdiag, k, tol)::Tuple{Int64, Float64}
         # Linesearch
-        primal_step, primal_step_old = linesearch!(pair, a, dims, affine_sets, mat, primal_step, primal_step_old, beta)::Tuple{Float64, Float64}
+        # @timeit "dual" dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, dual_step::Float64, theta::Float64)::Void
+        primal_step, primal_step_old, theta = linesearch!(pair, a, dims, affine_sets, mat, primal_step, primal_step_old, beta, theta)::Tuple{Float64, Float64, Float64}
         # Compute residuals and update old iterates
         compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, primal_step, dual_step, k, norm_c, norm_rhs, mat)::Void
         # Print progress
@@ -221,7 +220,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Check convergence of inexact fixed-point
         rank_update += 1
         if primal_residual[k] < tol && dual_residual[k] < tol && k > 10
-            if min_eig < tol
+            if min_eig < tol * 0.1
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
@@ -231,15 +230,17 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 if update_cont > 0
                     target_rank = min(2 * target_rank, dims.n)
                     rank_update, update_cont = 0, 0
+                    # adapt_level = 0.9
                 end
             end
 
         # Check divergence
-        elseif k > l && comb_residual[k - l] < 0.7 * comb_residual[k] && rank_update > l
+        elseif k > l && comb_residual[k - l] < 0.8 * comb_residual[k] && rank_update > l
             update_cont += 1
-            if update_cont > 20
+            if update_cont > 30
                 target_rank = min(2 * target_rank, dims.n)
                 rank_update, update_cont = 0, 0
+                # adapt_level = 0.9
             end
 
         # Adaptive stepsizes  
@@ -251,7 +252,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 adapt_level *= adapt_decay
             end
             if analysis
-                @show beta, adapt_level
+                @show primal_step, adapt_level
             end
         elseif primal_residual[k] < tol && dual_residual[k] > tol && k > l
             beta /= (1 - adapt_level)
@@ -261,7 +262,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 adapt_level *= adapt_decay
             end
             if analysis
-                @show beta, adapt_level
+                @show primal_step, adapt_level
             end
         elseif primal_residual[k] > 100 * dual_residual[k] && k > l
             beta *= (1 - adapt_level)
@@ -271,18 +272,17 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
                 adapt_level *= adapt_decay
             end
             if analysis
-                @show beta, adapt_level
+                @show primal_step, adapt_level
             end
         elseif 100 * primal_residual[k] < dual_residual[k] && k > l
             beta /= (1 - adapt_level)
-            adapt_level *= adapt_decay
             if beta >= max_beta
                 beta = max_beta
             else
                 adapt_level *= adapt_decay
             end
             if analysis
-                @show beta, adapt_level
+                @show primal_step, adapt_level
             end
         end
     end
@@ -313,7 +313,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         end
         println(" Primal objective = $(round(prim_obj, 5))")
         println(" Dual objective = $(round(dual_obj, 5))")
-        println(" Duality gap (%) = $(round((prim_obj - dual_obj) / prim_obj * 100, 2)) %")
+        println(" Duality gap (%) = $(round((prim_obj - dual_obj) / abs(prim_obj) * 100, 2)) %")
         println(" Duality residual = $(round(prim_obj - dual_obj, 5))")
         println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
         println("======================================================================")
@@ -360,9 +360,10 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     return nothing
 end
 
-function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, primal_step_old::Float64, beta::Float64)::Tuple{Float64, Float64}
-    theta = 1.0
+function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, primal_step::Float64, primal_step_old::Float64, beta::Float64, theta::Float64)::Tuple{Float64, Float64, Float64}
+    # theta = 1.0
     cont = 0
+    primal_step = primal_step * sqrt(1 + theta)
     for i in 1:100
         cont += 1
         theta = primal_step / primal_step_old
@@ -407,9 +408,8 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
 
     copy!(pair.y, a.y_temp)
     primal_step_old = primal_step
-    primal_step = primal_step * sqrt(1 + theta)
 
-    return primal_step, primal_step_old
+    return primal_step, primal_step_old, theta
 end
 
 function dual_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets::AffineSets, mat::Matrices, dual_step::Float64, theta::Float64)::Void
@@ -535,7 +535,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > tol * 1e-4
+                    if unsafe_getvalues(arc)[i] > 1e-6
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -551,8 +551,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         min_eig = 0.0
         @timeit "eigfact" begin
             current_rank = 0
-            fact = eigfact!(a.m[1], tol * 1e-4, Inf)
-            # fact = eigfact!(a.m[1])
+            # fact = eigfact!(a.m[1],  1e-8, Inf)
+            fact = eigfact!(a.m[1])
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0
