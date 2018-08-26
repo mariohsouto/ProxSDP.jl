@@ -33,7 +33,7 @@ if use_MOI
         include("moi_mimo.jl")
         # include("sensor_loc.jl")
         moi_mimo(optimizer, 0, 100)
-        for n in 100:100:1000
+        for n in [2000, 3000, 4000, 5000]
             @show n
             moi_mimo(optimizer, 0, n)
             # sensor_loc(optimizer, 0)

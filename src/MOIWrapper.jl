@@ -310,8 +310,6 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
         error("There must be exactely one SDP constraint")
     end
 
-println("Before moving data")
-
     # @show cone.s
     # @show cone.sa
 
@@ -347,7 +345,6 @@ println("Before moving data")
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
     dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
-println("star conic stuff")
     # Build SDP Sets
     con = ConicSets(
         SDPSet[]
@@ -381,7 +378,6 @@ println("star conic stuff")
         end
     end
 
-println("g to solver")
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
