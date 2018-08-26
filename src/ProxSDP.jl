@@ -107,64 +107,44 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time0 = time()
     tic()
     @timeit "Init" begin
-    
-    opt = CPOptions(false, verbose)  
-    # Scale objective function
-    c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
-    A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
-    rhs_orig = vcat(affine_sets.b, affine_sets.h)
-    norm_c, norm_rhs = norm(c_orig), norm(rhs_orig)
-    cont = 1
-    
-    @timeit "Scaling" begin
-        cte = (sqrt(2.0) / 2.0)
-        rows = rowvals(affine_sets.A)
-        m, n = size(affine_sets.A)
-        cont = 1
-        for j in 1:dims.n, i in j:dims.n
-            if i != j
-                for line in nzrange(affine_sets.A, cont)
-                    affine_sets.A[rows[line], cont] *= cte
+        opt = CPOptions(false, verbose)  
+        # Scale objective function
+        c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
+        A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+        rhs_orig = vcat(affine_sets.b, affine_sets.h)
+        norm_c, norm_rhs = norm(c_orig), norm(rhs_orig)
+        @timeit "Scaling" begin
+            cte = (sqrt(2.0) / 2.0)
+            rows = rowvals(affine_sets.A)
+            m, n = size(affine_sets.A)
+            cont = 1
+            for j in 1:dims.n, i in j:dims.n
+                if i != j
+                    for line in nzrange(affine_sets.A, cont)
+                        affine_sets.A[rows[line], cont] *= cte
+                    end
                 end
+                cont += 1
             end
-            cont += 1
-        end
-        rows = rowvals(affine_sets.G)
-        m, n = size(affine_sets.G)
-        cont = 1
-        for j in 1:dims.n, i in j:dims.n
-            if i != j
-                for line in nzrange(affine_sets.G, cont)
-                    affine_sets.G[rows[line], cont] *= cte
+            rows = rowvals(affine_sets.G)
+            m, n = size(affine_sets.G)
+            cont = 1
+            for j in 1:dims.n, i in j:dims.n
+                if i != j
+                    for line in nzrange(affine_sets.G, cont)
+                        affine_sets.G[rows[line], cont] *= cte
+                    end
                 end
+                cont += 1
             end
-            cont += 1
-        end
-        # @inbounds for j in 1:dims.n, i in j:dims.n
-        #     if i != j
-        #         for line in 1:dims.p
-        #             affine_sets.A[line, cont] *= cte
-        #         end
-        #     end
-        #     cont += 1
-        # end
-        # cont = 1
-        # @inbounds for j in 1:dims.n, i in j:dims.n
-        #     if i != j
-        #         for line in 1:dims.m
-        #             affine_sets.G[line, cont] *= cte
-        #         end
-        #     end
-        #     cont += 1
-        # end
-        cont = 1
-        @inbounds for j in 1:dims.n, i in j:dims.n
-            if i != j
-                affine_sets.c[cont] *= cte
+            cont = 1
+            @inbounds for j in 1:dims.n, i in j:dims.n
+                if i != j
+                    affine_sets.c[cont] *= cte
+                end
+                cont += 1
             end
-            cont += 1
         end
-    end
 
         # Initialization
         pair = PrimalDual(dims)
@@ -182,8 +162,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         
         # Stepsize parameters and linesearch parameters
         primal_step = sqrt(min(dims.n^2, dims.m + dims.p)) / vecnorm(M)
-        # primal_step = 1.0
-        # @show primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
         primal_step_old = primal_step
         dual_step = primal_step
         theta = 1.0           # Overrelaxation parameter
@@ -286,8 +264,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             end
         end
     end
-
-    toc()
+    
     cont = 1
     @inbounds for j in 1:dims.n, i in j:dims.n
         if i != j
@@ -297,7 +274,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     end
 
     # Compute results
-    time_ = toq()
+    time_ = toc()
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
     res_eq = norm(A_orig * pair.x - b_orig) / (1 + norm(b_orig))
@@ -551,8 +528,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         min_eig = 0.0
         @timeit "eigfact" begin
             current_rank = 0
-            # fact = eigfact!(a.m[1],  1e-8, Inf)
-            fact = eigfact!(a.m[1])
+            fact = eigfact!(a.m[1],  1e-8, Inf)
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0

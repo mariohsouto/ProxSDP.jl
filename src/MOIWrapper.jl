@@ -81,7 +81,7 @@ MOI.canaddvariable(optimizer::ProxSDPOptimizer) = false
 
 MOI.supports(::ProxSDPOptimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
 MOI.supportsconstraint(::ProxSDPOptimizer, ::Type{<:SF}, ::Type{<:SS}) = true
-MOI.copy!(dest::ProxSDPOptimizer, src::MOI.ModelLike; copynames=true) = MOIU.allocateload!(dest, src, copynames)
+MOI.copy!(dest::ProxSDPOptimizer, src::MOI.ModelLike; copynames=false) = MOIU.allocateload!(dest, src, copynames)
 
 using Compat.SparseArrays
 
@@ -171,20 +171,21 @@ _scalecoef(rows, coef, minus, ::Type{<:MOI.AbstractSet}, d, rev) = minus ? -coef
 _scalecoef(rows, coef, minus, ::Union{Type{<:MOI.LessThan}, Type{<:MOI.Nonpositives}}, d, rev) = minus ? coef : -coef
 function _scalecoef(rows, coef, minus, ::Type{MOI.PositiveSemidefiniteConeTriangle}, d, rev)
     scaling = minus ? -1 : 1
-    scaling2 = rev ? scaling / √2 : scaling * √2
-    output = copy(coef)
-    diagidx = BitSet()
-    for i in 1:d
-        push!(diagidx, trimap(i, i))
-    end
-    for i in 1:length(output)
-        if rows[i] in diagidx
-            output[i] *= scaling
-        else
-            output[i] *= scaling2
-        end
-    end
-    output
+    scaling * coef
+    # scaling2 = rev ? scaling / √2 : scaling * √2
+    # output = copy(coef)
+    # diagidx = BitSet()
+    # for i in 1:d
+    #     push!(diagidx, trimap(i, i))
+    # end
+    # for i in 1:length(output)
+    #     if rows[i] in diagidx
+    #         output[i] *= scaling
+    #     else
+    #         output[i] *= scaling2
+    #     end
+    # end
+    # output
 end
 # Unscale the coefficients in `coef` with respective rows in `rows` for a set `s` and multiply by `-1` if `minus` is `true`.
 scalecoef(rows, coef, minus, s) = _scalecoef(rows, coef, minus, typeof(s), _dim(s), false)
@@ -344,7 +345,6 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
     dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
-
     # Build SDP Sets
     con = ConicSets(
         SDPSet[]
@@ -377,7 +377,6 @@ function MOI.optimize!(optimizer::ProxSDPOptimizer)
             end
         end
     end
-
 
     # @show con.sdpcone
 
