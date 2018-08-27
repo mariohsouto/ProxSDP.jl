@@ -138,7 +138,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)
 
-    arc.TOL = 1e-12 * ones(T, 1)
+    # arc.TOL = 1e-10 * ones(T, 1)
 
     arc.v = Matrix{T}(arc.n, arc.ncv)
     arc.workd = Vector{T}(3*arc.n)
@@ -178,7 +178,7 @@ end
 
 function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
 
-    # arc.TOL = max((1e-7 / iter), 1e-10) * ones(T, 1)
+    arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
     
     while true
         Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
