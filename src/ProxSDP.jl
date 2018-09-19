@@ -340,7 +340,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, affine_sets
     # theta = 1.0
     cont = 0
     primal_step = primal_step * sqrt(1 + theta)
-    for i in 1:100
+    for i in 1:1000
         cont += 1
         theta = primal_step / primal_step_old
 
@@ -511,7 +511,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
             if hasconverged(arc)
                 fill!(a.m[1].data, 0.0)
                 for i in 1:target_rank
-                    if unsafe_getvalues(arc)[i] > 1e-6
+                    if unsafe_getvalues(arc)[i] > 0.0
                         current_rank += 1
                         vec = unsafe_getvectors(arc)[:, i]
                         Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc)[i], vec, vec, 1.0, a.m[1].data)
@@ -527,8 +527,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         min_eig = 0.0
         @timeit "eigfact" begin
             current_rank = 0
-            fact = eigfact!(a.m[1], 1e-6, Inf)
-            # fact = eigfact!(a.m[1])
+            # fact = eigfact!(a.m[1], 1e-6, Inf)
+            fact = eigfact!(a.m[1])
             fill!(a.m[1].data, 0.0)
             for i in 1:length(fact[:values])
                 if fact[:values][i] > 0.0

@@ -5,10 +5,10 @@ datapath = joinpath(dirname(@__FILE__), "data")
 using Base.Test
 # import Base.isempty
 
-use_MOI = false
-set_to_test = :MIMO
+use_MOI = true
+# set_to_test = :MIMO
 # set_to_test = :RANDSDP
-# set_to_test = :SDPLIB
+set_to_test = :SDPLIB
 # set_to_test = :SENSORLOC
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
