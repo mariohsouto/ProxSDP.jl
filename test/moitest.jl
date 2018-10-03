@@ -7,9 +7,9 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-MOIU.@model ProxSDPModelData () (EqualTo, GreaterThan, LessThan) (Zeros, Nonnegatives, Nonpositives, PositiveSemidefiniteConeTriangle) () (SingleVariable,) (ScalarAffineFunction,) (VectorOfVariables,) (VectorAffineFunction,)
+MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
-const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOptimizer())
+const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
 
 # linear9test needs 1e-3 with SCS < 2.0 and 5e-1 with SCS 2.0
 # linear2test needs 1e-4
@@ -29,34 +29,34 @@ const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOpti
 @testset "LP in SDP EQ form" begin
 
     MOI.empty!(optimizer)
-    @test MOI.isempty(optimizer)
+    @test MOI.is_empty(optimizer)
 
     # add 10 variables - only diagonal is relevant
-    X = MOI.addvariables!(optimizer, 10)
+    X = MOI.add_variables(optimizer, 10)
 
     # add sdp constraints - only ensuring positivenesse of the diagonal
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.addconstraint!(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(4))
+    cX = MOI.add_constraint(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(4))
 
-    c1 = MOI.addconstraint!(optimizer, 
+    c1 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
             MOI.ScalarAffineTerm(2.0, X[1]),
             MOI.ScalarAffineTerm(1.0, X[3]),
             MOI.ScalarAffineTerm(1.0, X[6])
         ], 0.0), MOI.EqualTo(4.0))
 
-    c2 = MOI.addconstraint!(optimizer, 
+    c2 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
             MOI.ScalarAffineTerm(1.0, X[1]),
             MOI.ScalarAffineTerm(2.0, X[3]),
             MOI.ScalarAffineTerm(1.0, X[10])
         ], 0.0), MOI.EqualTo(4.0))
 
-    MOI.set!(optimizer, 
+    MOI.set(optimizer, 
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[3]]), 0.0)
         )
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
@@ -72,32 +72,32 @@ end
 @testset "LP in SDP INEQ form" begin
 
     MOI.empty!(optimizer)
-    @test MOI.isempty(optimizer)
+    @test MOI.is_empty(optimizer)
 
     # add 10 variables - only diagonal is relevant
-    X = MOI.addvariables!(optimizer, 3)
+    X = MOI.add_variables(optimizer, 3)
 
     # add sdp constraints - only ensuring positivenesse of the diagonal
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.addconstraint!(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(2))
+    cX = MOI.add_constraint(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(2))
 
-    c1 = MOI.addconstraint!(optimizer, 
+    c1 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
             MOI.ScalarAffineTerm(2.0, X[1]),
             MOI.ScalarAffineTerm(1.0, X[3]),
         ], 0.0), MOI.LessThan(4.0))
 
-    c2 = MOI.addconstraint!(optimizer, 
+    c2 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
             MOI.ScalarAffineTerm(1.0, X[1]),
             MOI.ScalarAffineTerm(2.0, X[3]),
         ], 0.0), MOI.LessThan(4.0))
 
-    MOI.set!(optimizer, 
+    MOI.set(optimizer, 
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([4.0, 3.0], [X[1], X[3]]), 0.0)
         )
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
@@ -127,38 +127,31 @@ end
     # X = ⎜       ⎟           y = 2
     #     ⎝ 1   1 ⎠
     MOI.empty!(optimizer)
-    @test MOI.isempty(optimizer)
+    @test MOI.is_empty(optimizer)
 
-    X = MOI.addvariables!(optimizer, 3)
+    X = MOI.add_variables(optimizer, 3)
 
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.addconstraint!(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
 
-    c = MOI.addconstraint!(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, X[2])], 0.0), MOI.EqualTo(1.0))
+    c = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, X[2])], 0.0), MOI.EqualTo(1.0))
 
-    MOI.set!(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end]]), 0.0))
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end]]), 0.0))
 
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
     MOI.optimize!(optimizer)
 
-    @test MOI.canget(optimizer, MOI.TerminationStatus())
     @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.Success
 
-    @test MOI.canget(optimizer, MOI.PrimalStatus())
     @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FeasiblePoint
-    @test MOI.canget(optimizer, MOI.DualStatus())
     @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FeasiblePoint
 
-    @test MOI.canget(optimizer, MOI.ObjectiveValue())
     @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2 atol=1e-2
 
     Xv = ones(3)
-    @test MOI.canget(optimizer, MOI.VariablePrimal(), MOI.VariableIndex)
     @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
-    # @test MOI.canget(optimizer, MOI.ConstraintPrimal(), typeof(cX))
     # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
 
-    # @test MOI.canget(optimizer, MOI.ConstraintDual(), typeof(c))
     # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
     # @show MOI.get(optimizer, MOI.ConstraintDual(), c)
 
@@ -167,33 +160,33 @@ end
 @testset "SDP from Wikipedia" begin
     # https://en.wikipedia.org/wiki/Semidefinite_programming
     MOI.empty!(optimizer)
-    @test MOI.isempty(optimizer)
+    @test MOI.is_empty(optimizer)
 
-    X = MOI.addvariables!(optimizer, 6)
+    X = MOI.add_variables(optimizer, 6)
 
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.addconstraint!(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(3))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(3))
 
-    cd1 = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[1]), MOI.EqualTo(1.0))
-    cd2 = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[3]), MOI.EqualTo(1.0))
-    cd3 = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[6]), MOI.EqualTo(1.0))
+    cd1 = MOI.add_constraint(optimizer, MOI.SingleVariable(X[1]), MOI.EqualTo(1.0))
+    cd2 = MOI.add_constraint(optimizer, MOI.SingleVariable(X[3]), MOI.EqualTo(1.0))
+    cd3 = MOI.add_constraint(optimizer, MOI.SingleVariable(X[6]), MOI.EqualTo(1.0))
 
-    c12_ub = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[2]), MOI.LessThan(-0.1))
-    c12_lb = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[2]), MOI.GreaterThan(-0.2))
+    c12_ub = MOI.add_constraint(optimizer, MOI.SingleVariable(X[2]), MOI.LessThan(-0.1))
+    c12_lb = MOI.add_constraint(optimizer, MOI.SingleVariable(X[2]), MOI.GreaterThan(-0.2))
 
-    c23_ub = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[5]), MOI.LessThan(0.5))
-    c23_lb = MOI.addconstraint!(optimizer, MOI.SingleVariable(X[5]), MOI.GreaterThan(0.4))
+    c23_ub = MOI.add_constraint(optimizer, MOI.SingleVariable(X[5]), MOI.LessThan(0.5))
+    c23_lb = MOI.add_constraint(optimizer, MOI.SingleVariable(X[5]), MOI.GreaterThan(0.4))
 
-    MOI.set!(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[4]]), 0.0))
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[4]]), 0.0))
 
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
 
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
     @test obj ≈ -0.978 atol=1e-2
 
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
 
     MOI.optimize!(optimizer)
 
@@ -221,17 +214,17 @@ end
     L = [hcat(H' * H, -H' * y); hcat(-y' * H, y' * y)]
 
     MOI.empty!(optimizer)
-    @test MOI.isempty(optimizer)
+    @test MOI.is_empty(optimizer)
 
     nvars = ProxSDP.sympackedlen(n+1)
 
-    X = MOI.addvariables!(optimizer, nvars)
+    X = MOI.add_variables(optimizer, nvars)
 
     @show typeof(X)
 
     for i in 1:nvars
-        MOI.addconstraint!(optimizer, MOI.SingleVariable(X[i]), MOI.LessThan(1.0))
-        MOI.addconstraint!(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
+        MOI.add_constraint(optimizer, MOI.SingleVariable(X[i]), MOI.LessThan(1.0))
+        MOI.add_constraint(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
     end
 
     Xsq = Matrix{MOI.VariableIndex}(n+1,n+1)
@@ -239,17 +232,17 @@ end
     @show Xsq = full(Symmetric(Xsq,:U))
 
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.addconstraint!(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n+1))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n+1))
 
 
     for i in 1:n+1
-        MOI.addconstraint!(optimizer, MOI.SingleVariable(Xsq[i,i]), MOI.EqualTo(1.0))
+        MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[i,i]), MOI.EqualTo(1.0))
     end
 
     objf_t = vec([MOI.ScalarAffineTerm(L[i,j], Xsq[i,j]) for i in 1:n+1, j in 1:n+1])
-    MOI.set!(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
 
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
 
     MOI.optimize!(optimizer)
 
@@ -270,5 +263,33 @@ end
         @testset "MIMO n = $(i)" begin 
             moi_mimo(optimizer, 123, i)
         end
+    end
+end
+
+@testset "RANDSDP Sizes" begin
+    include("base_randsdp.jl")
+    include("moi_randsdp.jl")
+    for n in 10:12, m in 10:12
+        @testset "RANDSDP n=$n, m=$m" begin 
+            moi_randsdp(optimizer, 123, n, m, atol = 1e-1)
+        end
+    end
+end
+
+@testset "SDPLIB Sizes" begin
+    datapath = joinpath(dirname(@__FILE__), "data")
+    include("base_sdplib.jl")
+    include("moi_sdplib.jl")
+    @testset "EQPART" begin
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
+    end
+    @testset "MAX CUT" begin
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"))
     end
 end

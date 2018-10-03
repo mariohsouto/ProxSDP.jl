@@ -3,13 +3,13 @@ function moi_sdplib(optimizer, path)
     println("running: $(path)")
 
     MOI.empty!(optimizer)
-    @test MOI.isempty(optimizer)
+    @test MOI.is_empty(optimizer)
 
     n, m, F, c = sdplib_data(path)
 
     nvars = ProxSDP.sympackedlen(n)
 
-    X = MOI.addvariables!(optimizer, nvars)
+    X = MOI.add_variables(optimizer, nvars)
     Xsq = Matrix{MOI.VariableIndex}(n,n)
     ProxSDP.ivech!(Xsq, X)
     Xsq = full(Symmetric(Xsq,:U))
@@ -17,20 +17,20 @@ function moi_sdplib(optimizer, path)
     for k in 1:m
         I,J,V=findnz(F[k])
         ctr_k = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
-            MOI.addconstraint!(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
+            MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
     end
 
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.addconstraint!(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n))
 
     I,J,V=findnz(F[0])
     objf_t = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
-    MOI.set!(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
-    MOI.set!(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
 
     # for i in 1:nvars
-    #     MOI.addconstraint!(optimizer, MOI.SingleVariable(Xsq[i]), MOI.LessThan(1.0))
-    #     MOI.addconstraint!(optimizer, MOI.SingleVariable(Xsq[i]), MOI.GreaterThan(-1.0))
+    #     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[i]), MOI.LessThan(1.0))
+    #     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[i]), MOI.GreaterThan(-1.0))
     # end
 
     MOI.optimize!(optimizer)

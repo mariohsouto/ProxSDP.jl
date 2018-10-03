@@ -3,7 +3,7 @@ push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
 # using JuMP
 using Base.Test
-# import Base.isempty
+# import Base.is_empty
 
 use_MOI = true
 # set_to_test = :MIMO
@@ -14,7 +14,7 @@ set_to_test = :SDPLIB
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
     include("moi_init.jl")
-    optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOptimizer())
+    optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
 else
     using JuMP
     using CSDP
