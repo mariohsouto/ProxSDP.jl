@@ -1,4 +1,3 @@
-using StatsBase
 
 function moi_sensorloc(optimizer, seed, n)
 
@@ -35,7 +34,7 @@ function moi_sensorloc(optimizer, seed, n)
     for i in 1:n
         for j in 1:i - 1
             count_all += 1
-            if sample([true, false], WeightVec([0.1, 0.9]))
+            if rand() > 0.9
                 count += 1
                 e = zeros(n, 1)
                 e[i] = 1.0
