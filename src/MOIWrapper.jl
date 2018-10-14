@@ -61,8 +61,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     maxsense::Bool
     data::Union{Nothing, ModelData} # only non-Void between MOI.copy_to and MOI.optimize!
     sol::MOISolution
-    function Optimizer()
-        new(ConeData(), false, nothing, MOISolution())
+
+    params::Vector{Any}
+    function Optimizer(args=Any[])
+        new(ConeData(), false, nothing, MOISolution(), args)
     end
 end
 
@@ -320,6 +322,10 @@ end
 matindices(n::Integer) = find(tril(trues(n,n)))
 
 function MOI.optimize!(optimizer::Optimizer)
+
+    # parse options
+    options = Options(optimizer.params)
+
     cone = optimizer.cone
 
     if cone.q > 0
@@ -412,7 +418,7 @@ function MOI.optimize!(optimizer::Optimizer)
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = @timeit "Main" chambolle_pock(aff, con, dims)
+    sol = @timeit "Main" chambolle_pock(aff, con, dims, options.log_verbose, options.max_iter, options.tol)
 
     ret_val = sol.status
     primal = sol.primal
@@ -420,7 +426,7 @@ function MOI.optimize!(optimizer::Optimizer)
     slack = sol.slack
     objval = sol.objval + objconstant
 
-    if true
+    if options.timer_verbose
         TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
         print("\n")
         TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
