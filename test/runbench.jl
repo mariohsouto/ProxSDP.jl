@@ -5,7 +5,7 @@ datapath = joinpath(dirname(@__FILE__), "data")
 using Base.Test
 # import Base.isempty
 
-use_MOI = true
+use_MOI = false
 # set_to_test = :MIMO
 # set_to_test = :RANDSDP
 # set_to_test = :SDPLIB
@@ -17,10 +17,10 @@ set_to_test = :SENSORLOC
     optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDPOptimizer())
 else
     using JuMP
-    using CSDP
-    optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
-    # using SCS
-    # optimizer = SCSSolver(eps=1e-4, verbose=true)
+    # using CSDP
+    # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
+    using SCS
+    optimizer = SCSSolver(eps=1e-4, verbose=true)
     # using Mosek
     # optimizer = MosekSolver()
 end
