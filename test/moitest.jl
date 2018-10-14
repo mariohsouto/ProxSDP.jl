@@ -293,3 +293,12 @@ end
         moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"))
     end
 end
+
+@testset "Sensor Localization" begin
+    include("base_sensorloc.jl")
+    include("moi_sensorloc.jl")
+    for n in 20:5:30
+        @show n
+        moi_sensorloc(optimizer, 0, n)
+    end
+end

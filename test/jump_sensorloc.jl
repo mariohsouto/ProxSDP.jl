@@ -1,6 +1,8 @@
+using StatsBase
+
 function jump_sensorloc(solver, seed, n)
 
-    m, x_true, a, d, A = sensorloc_data(seed, n)
+    m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
     if Base.libblas_name == "libmkl_rt"
         model = Model()
@@ -10,14 +12,44 @@ function jump_sensorloc(solver, seed, n)
 
     # Build SDP problem
     if Base.libblas_name == "libmkl_rt"
-        @variable(model, X[1:n+1, 1:n+1], PSD)
+        @variable(model, X[1:n+2, 1:n+2], PSD)
     else
-        @variable(model, X[1:n+1, 1:n+1], SDP)
+        @variable(model, X[1:n+2, 1:n+2], SDP)
     end
-    # Distance constraints
-    @constraint(model, ctr[i in 1:m], sum(A[i] .* X) == d[i]^2 - norm(a[i])^2)
-    #
-    @constraint(model, X[n + 1, n + 1] == 1.0)
+
+    # Constraint with distances from anchors to sensors
+    for k in 1:m
+        for j in 1:n
+            e = zeros(n, 1)
+            e[j] = -1.0
+            v = vcat(a[k], e)
+            V = v * v'
+            @constraint(model, sum(V .* X) == d_bar[k, j]^2)
+        end
+    end
+
+    # Constraint with distances from sensors to sensors
+    count, count_all = 0, 0
+    for i in 1:n
+        for j in 1:i - 1
+            count_all += 1
+            if sample([true, false], WeightVec([0.1, 0.9]))
+                count += 1
+                e = zeros(n, 1)
+                e[i] = 1.0
+                e[j] = -1.0
+                v = vcat(zeros(2, 1), e)
+                V = v * v'
+                @constraint(model, sum(V .* X) == d[i, j]^2)
+            end
+        end   
+    end
+    @show count_all, count
+
+    @constraint(model, X[1, 1] == 1.0)
+    @constraint(model, X[1, 2] == 0.0)
+    @constraint(model, X[2, 1] == 0.0)
+    @constraint(model, X[2, 2] == 1.0)
 
     # Feasibility objective function
     # L = eye(n+1)
