@@ -23,11 +23,7 @@ Currently ProxSDP only works with **Julia 0.6.x**
 
 To add ProxSDP run:
 
-`Pkg.clone("https://github.com/mariohsouto/ProxSDP.jl")`
-
-To add the required dependencies run:
-
-`Pkg.build("ProxSDP")`
+`Pkg.add("ProxSDP")`
 
 ### Building problems with JuMP.jl
 
