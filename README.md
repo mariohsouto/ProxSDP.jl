@@ -85,6 +85,17 @@ JuMP.result_value(y)
 
 ### Referencing
 
+The first version of the paper can be found [here](https://arxiv.org/abs/1810.05231).
+
+```
+@article{souto2018exploiting,
+  title={Exploiting Low-Rank Structure in Semidefinite Programming by Approximate Operator Splitting},
+  author={Souto, Mario and Garcia, Joaquim D and Veiga, {\'A}lvaro},
+  journal={arXiv preprint arXiv:1810.05231},
+  year={2018}
+}
+```
+
 ### TODO
 
 - Add support for multiple SDP Variables
