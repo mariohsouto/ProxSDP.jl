@@ -14,7 +14,8 @@ set_to_test = :SENSORLOC
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
     include("moi_init.jl")
-    optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
+    # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
+    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true)
 else
     using JuMP
     # using CSDP
