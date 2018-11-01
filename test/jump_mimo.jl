@@ -1,4 +1,4 @@
-function jump_mimo(solver, seed, n)
+function jump_mimo(solver, seed, n, verbose = false)
 
     # n = 3
     m = 10n
@@ -41,8 +41,9 @@ function jump_mimo(solver, seed, n)
         XX = getvalue.(X)
     end
 
-    mimo_eval(s,H,y,L,XX)
+    verbose && mimo_eval(s,H,y,L,XX)
 
+    return nothing
 end
 
 # getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])

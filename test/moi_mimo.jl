@@ -1,7 +1,9 @@
-function moi_mimo(optimizer, seed, n)
+function moi_mimo(optimizer, seed, n; verbose = false, test = false)
 
     MOI.empty!(optimizer)
-    @test MOI.is_empty(optimizer)
+    if test
+        @test MOI.is_empty(optimizer)
+    end
 
     m = 10n
     s, H, y, L = mimo_data(seed, m, n)
@@ -37,9 +39,13 @@ function moi_mimo(optimizer, seed, n)
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
-    for i in 1:n+1, j in 1:n+1
-        @test 1.01> abs(Xsq_s[i,j]) > 0.99
+    if test
+        for i in 1:n+1, j in 1:n+1
+            @test 1.01> abs(Xsq_s[i,j]) > 0.99
+        end
     end
 
-    mimo_eval(s, H, y, L, Xsq_s)
+    verbose && mimo_eval(s, H, y, L, Xsq_s)
+
+    return ProxSDP.get_solution(optimizer)
 end

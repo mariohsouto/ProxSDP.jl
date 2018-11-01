@@ -47,6 +47,5 @@ function sdplib_eval(F,c,n,m,XX)
     rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
     @show rank
     @show trace(F[0] * XX)
-
     nothing
 end

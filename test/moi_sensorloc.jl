@@ -1,10 +1,11 @@
 
-function moi_sensorloc(optimizer, seed, n)
+function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
 
     srand(seed)
     MOI.empty!(optimizer)
-    @test MOI.is_empty(optimizer)
-
+    if test
+        @test MOI.is_empty(optimizer)
+    end
     # Generate randomized problem data
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
@@ -46,8 +47,9 @@ function moi_sensorloc(optimizer, seed, n)
             end
         end
     end
-    @show count_all, count
-
+    if verbose
+        @show count_all, count
+    end
     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 1]), MOI.EqualTo(1.0))
     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 2]), MOI.EqualTo(0.0))
     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 1]), MOI.EqualTo(0.0))
@@ -67,7 +69,7 @@ function moi_sensorloc(optimizer, seed, n)
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
-    sensorloc_eval(n, m, x_true, Xsq_s)
+    verbose && sensorloc_eval(n, m, x_true, Xsq_s)
 
-    return nothing
+    return ProxSDP.get_solution(optimizer)
 end

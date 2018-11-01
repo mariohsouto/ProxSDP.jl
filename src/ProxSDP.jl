@@ -12,6 +12,9 @@ MOIU.@model _ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (M
 
 Solver(;args...) = MOIU.CachingOptimizer(_ProxSDPModelData{Float64}(), ProxSDP.Optimizer(args))
 
+function get_solution(opt::MOIU.CachingOptimizer{Optimizer,_ProxSDPModelData{Float64}})
+    return opt.optimizer.sol
+end
 
 # --------------------------------
 mutable struct Options
@@ -79,6 +82,9 @@ struct CPResult
     primal_residual::Float64
     dual_residual::Float64
     objval::Float64
+    dual_objval::Float64
+    gap::Float64
+    time::Float64
 end
 
 struct CPOptions
@@ -315,11 +321,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     end
 
     # Compute results
-    time_ = toc()
+    time_ = toq()
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
     res_eq = norm(A_orig * pair.x - b_orig) / (1 + norm(b_orig))
-
+    res_dual = prim_obj - dual_obj
+    gap = (prim_obj - dual_obj) / abs(prim_obj) * 100
     pair.x = pair.x[idx]
 
     if opt.verbose
@@ -331,12 +338,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         end
         println(" Primal objective = $(round(prim_obj, 5))")
         println(" Dual objective = $(round(dual_obj, 5))")
-        println(" Duality gap (%) = $(round((prim_obj - dual_obj) / abs(prim_obj) * 100, 2)) %")
-        println(" Duality residual = $(round(prim_obj - dual_obj, 5))")
+        println(" Duality gap (%) = $(round(gap, 2)) %")
+        println(" Duality residual = $(round(res_dual, 5))")
         println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
+        println(" time elapsed = $(round(time_, 6))")
         println("======================================================================")
     end
-    return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, 0.0, 0.0, prim_obj)
+    return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, res_eq, res_dual, prim_obj, dual_obj, gap, time_)
 end
 
 function box_projection!(v::Array{Float64,1}, dims::Dims, aff::AffineSets, dual_step::Float64)::Void
