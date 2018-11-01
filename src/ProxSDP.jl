@@ -12,7 +12,7 @@ MOIU.@model _ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (M
 
 Solver(;args...) = MOIU.CachingOptimizer(_ProxSDPModelData{Float64}(), ProxSDP.Optimizer(args))
 
-function get_solution(opt::MOIU.CachingOptimizer{Optimizer,_ProxSDPModelData{Float64}})
+function get_solution(opt::MOIU.CachingOptimizer{Optimizer,T}) where T
     return opt.optimizer.sol
 end
 
