@@ -14,10 +14,15 @@ mutable struct MOISolution
     primal::Vector{Float64}
     dual::Vector{Float64}
     slack::Vector{Float64}
+    primal_residual::Float64
+    dual_residual::Float64
     objval::Float64
+    dual_objval::Float64
+    gap::Float64
+    time::Float64
 end
 MOISolution() = MOISolution(0, # SCS_UNFINISHED
-                      Float64[], Float64[], Float64[], NaN)
+                      Float64[], Float64[], Float64[], NaN, NaN, NaN, NaN, NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is passed to SCS
@@ -61,8 +66,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     maxsense::Bool
     data::Union{Nothing, ModelData} # only non-Void between MOI.copy_to and MOI.optimize!
     sol::MOISolution
-    function Optimizer()
-        new(ConeData(), false, nothing, MOISolution())
+
+    params::Vector{Any}
+    function Optimizer(args=Any[])
+        new(ConeData(), false, nothing, MOISolution(), args)
     end
 end
 
@@ -320,6 +327,10 @@ end
 matindices(n::Integer) = find(tril(trues(n,n)))
 
 function MOI.optimize!(optimizer::Optimizer)
+
+    # parse options
+    options = Options(optimizer.params)
+
     cone = optimizer.cone
 
     if cone.q > 0
@@ -412,7 +423,7 @@ function MOI.optimize!(optimizer::Optimizer)
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = @timeit "Main" chambolle_pock(aff, con, dims)
+    sol = @timeit "Main" chambolle_pock(aff, con, dims, options.log_verbose, options.max_iter, options.tol)
 
     ret_val = sol.status
     primal = sol.primal
@@ -420,7 +431,7 @@ function MOI.optimize!(optimizer::Optimizer)
     slack = sol.slack
     objval = sol.objval + objconstant
 
-    if true
+    if options.timer_verbose
         TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
         print("\n")
         TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
@@ -433,7 +444,7 @@ function MOI.optimize!(optimizer::Optimizer)
         close(f)
     end
 
-    optimizer.sol = MOISolution(ret_val, primal, dual, slack, (optimizer.maxsense ? -1 : 1) * objval)
+    optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval, sol.dual_objval, sol.gap, sol.time)
 end
 
 function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T

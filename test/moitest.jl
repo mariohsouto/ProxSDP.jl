@@ -11,21 +11,6 @@ MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MO
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
 
-# linear9test needs 1e-3 with SCS < 2.0 and 5e-1 with SCS 2.0
-# linear2test needs 1e-4
-# const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
-
-# MOIT._lin1test(optimizer, config, true)
-
-# @testset "Continuous linear problems" begin
-#     # AlmostSuccess for linear9 with SCS 2
-#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config, ["linear9"])
-# end
-
-# @testset "Continuous conic problems" begin
-#     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.LogDet{Float64}(optimizer)), config, ["rsoc", "geomean", "psds", "rootdet", "logdets"])
-# end
-
 @testset "LP in SDP EQ form" begin
 
     MOI.empty!(optimizer)
@@ -261,7 +246,7 @@ end
     include("moi_mimo.jl")
     for i in 2:5
         @testset "MIMO n = $(i)" begin 
-            moi_mimo(optimizer, 123, i)
+            moi_mimo(optimizer, 123, i, test = true)
         end
     end
 end
@@ -271,7 +256,7 @@ end
     include("moi_randsdp.jl")
     for n in 10:12, m in 10:12
         @testset "RANDSDP n=$n, m=$m" begin 
-            moi_randsdp(optimizer, 123, n, m, atol = 1e-1)
+            moi_randsdp(optimizer, 123, n, m, test = true, atol = 1e-1)
         end
     end
 end
@@ -281,15 +266,24 @@ end
     include("base_sdplib.jl")
     include("moi_sdplib.jl")
     @testset "EQPART" begin
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"), test = true)
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"), test = true)
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
+        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
     end
     @testset "MAX CUT" begin
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"))
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"), test = true)
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
+        moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)
+    end
+end
+
+@testset "Sensor Localization" begin
+    include("base_sensorloc.jl")
+    include("moi_sensorloc.jl")
+    for n in 20:5:30
+        @show n
+        moi_sensorloc(optimizer, 0, n, test = true)
     end
 end

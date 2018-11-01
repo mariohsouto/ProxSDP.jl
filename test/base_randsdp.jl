@@ -19,15 +19,13 @@ function randsdp_data(seed, m, n)
     return A, b, C
 end
 function randsdp_eval(A,b,C,n,m,XX)
-    minus_rank = length([eig for eig in eigfact(XX)[:values] if eig < -1e-10])
-    #@show minus_rank
+    @show minus_rank = length([eig for eig in eigfact(XX)[:values] if eig < -1e-10])
 
-    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
-    #@show rank
+    @show rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
 
-    #@show trace(C * XX)
+    @show trace(C * XX)
     for i in 1:m
-        #@show trace(A[i] * XX)-b[i]
+        @show trace(A[i] * XX)-b[i]
     end
 
     nothing

@@ -7,6 +7,49 @@ using Compat
 include("MOIWrapper.jl")
 include("eigsolver.jl")
 
+
+MOIU.@model _ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
+
+Solver(;args...) = MOIU.CachingOptimizer(_ProxSDPModelData{Float64}(), ProxSDP.Optimizer(args))
+
+function get_solution(opt::MOIU.CachingOptimizer{Optimizer,_ProxSDPModelData{Float64}})
+    return opt.optimizer.sol
+end
+
+# --------------------------------
+mutable struct Options
+    log_verbose::Bool
+    timer_verbose::Bool
+    max_iter::Int
+    tol::Float64
+    function Options()
+        new(false,
+            false, 
+            Int(1e+5),
+            1e-3)
+    end
+end
+function Options(args)
+    options = Options()
+    parse_args!(options, args)
+    return options
+end
+function parse_args!(options, args)
+    for i in args
+        parse_arg!(options, i)
+    end
+    return nothing
+end
+function parse_arg!(options::Options, arg)
+    fields = fieldnames(Options)
+    name = arg[1]
+    value = arg[2]
+    if name in fields
+        setfield!(options, name, value)
+    end
+    return nothing
+end
+
 immutable Dims
     n::Int  # Size of primal variables
     p::Int  # Number of linear equalities
@@ -39,6 +82,9 @@ struct CPResult
     primal_residual::Float64
     dual_residual::Float64
     objval::Float64
+    dual_objval::Float64
+    gap::Float64
+    time::Float64
 end
 
 struct CPOptions
@@ -140,7 +186,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     time0 = time()
     tic()
     @timeit "Init" begin
-        opt = CPOptions(false, verbose)  
+        opt = CPOptions(false, verbose)
         # Scale objective function
         c_orig, idx, offdiag = preprocess!(affine_sets, dims, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
@@ -204,7 +250,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             if min_eig < tol || target_rank > 16 || dims.n < 100
                 converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
-                print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
+                if opt.verbose
+                    print_progress(k, primal_residual[k], dual_residual[k], target_rank, time0)::Void
+                end
                 break
             elseif rank_update > l
                 update_cont += 1
@@ -275,14 +323,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     end
 
     # Compute results
-    time_ = toc()
+    time_ = toq()
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
     res_eq = norm(A_orig * pair.x - b_orig) / (1 + norm(b_orig))
-
+    res_dual = prim_obj - dual_obj
+    gap = (prim_obj - dual_obj) / abs(prim_obj) * 100
     pair.x = pair.x[idx]
 
-    if verbose
+    if opt.verbose
         println("----------------------------------------------------------------------")
         if converged
             println(" Solution metrics [solved]:")
@@ -291,12 +340,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         end
         println(" Primal objective = $(round(prim_obj, 5))")
         println(" Dual objective = $(round(dual_obj, 5))")
-        println(" Duality gap (%) = $(round((prim_obj - dual_obj) / abs(prim_obj) * 100, 2)) %")
-        println(" Duality residual = $(round(prim_obj - dual_obj, 5))")
+        println(" Duality gap (%) = $(round(gap, 2)) %")
+        println(" Duality residual = $(round(res_dual, 5))")
         println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
+        println(" time elapsed = $(round(time_, 6))")
         println("======================================================================")
     end
-    return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, 0.0, 0.0, prim_obj)
+    return CPResult(Int(converged), pair.x, pair.y, 0.0*pair.x, res_eq, res_dual, prim_obj, dual_obj, gap, time_)
 end
 
 function box_projection!(v::Array{Float64,1}, dims::Dims, aff::AffineSets, dual_step::Float64)::Void

@@ -6,254 +6,206 @@ using Base.Test
 # import Base.is_empty
 
 use_MOI = true
-# set_to_test = :MIMO
-# set_to_test = :RANDSDP
-set_to_test = :SDPLIB
-# set_to_test = :SENSORLOC
+sets_to_test = Symbol[]
+push!(sets_to_test, :MIMO)
+push!(sets_to_test, :RANDSDP)
+push!(sets_to_test, :SDPLIB)
+push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
     include("moi_init.jl")
-    optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
+    # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
+    optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
 else
     using JuMP
-    using CSDP
-    optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
-    # using SCS
-    # optimizer = SCSSolver(eps=1e-4, verbose=true)
+    # using CSDP
+    # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
+    using SCS
+    optimizer = SCSSolver(eps=1e-4, verbose=true)
     # using Mosek
     # optimizer = MosekSolver()
 end
 
+NOW = replace("$(now())",":","_")
+FILE = open(joinpath(dirname(@__FILE__),"proxsdp_bench_$(NOW).log"),"w")
+println(FILE, "class, prob_ref, time, p_obj, d_obj, p_res, d_res")
+function println2(FILE, class::String, ref::String, sol::ProxSDP.MOISolution)
+    println(FILE, "$class, $ref, $(sol.time), $(sol.objval), $(sol.dual_objval), $(sol.primal_residual), $(sol.dual_residual)")
+    flush(FILE)
+end
+println2(FILE, class::String, ref::String, sol::Void) = nothing
+
+RANDSDP_TEST_SET = 1:1
+SENSORLOC_TEST_SET = 50:50:300
+MIMO_TEST_SET = [100, 500, 1000, 2000, 3000, 4000, 5000]
+GPP_TEST_SET = [
+    "gpp124-1.dat-s",
+    "gpp124-1.dat-s",
+    "gpp124-2.dat-s",
+    "gpp124-3.dat-s",
+    "gpp124-4.dat-s",
+    "gpp250-1.dat-s",
+    "gpp250-2.dat-s",
+    "gpp250-3.dat-s",
+    "gpp250-4.dat-s",
+    "gpp500-1.dat-s",
+    "gpp500-2.dat-s",
+    "gpp500-3.dat-s",
+    "gpp500-4.dat-s",
+    "equalG11.dat-s",
+    "equalG51.dat-s",
+]
+MAXCUT_TEST_SET = [
+    "mcp124-1.dat-s",
+    "mcp124-1.dat-s",
+    "mcp124-2.dat-s",
+    "mcp124-3.dat-s",
+    "mcp124-4.dat-s",
+    "mcp250-1.dat-s",
+    "mcp250-2.dat-s",
+    "mcp250-3.dat-s",
+    "mcp250-4.dat-s",
+    "mcp500-1.dat-s",
+    "mcp500-2.dat-s",
+    "mcp500-3.dat-s",
+    "mcp500-4.dat-s",
+    "maxG11.dat-s"  ,
+    "maxG51.dat-s"  ,
+    "maxG32.dat-s"  ,
+    "maxG55.dat-s"  ,
+    "maxG60.dat-s"  ,
+]
+if true
+    RANDSDP_TEST_SET = 1:1
+    SENSORLOC_TEST_SET = 50:50:200#300
+    MIMO_TEST_SET = [100, 500, 1000, 2000]#, 3000, 4000, 5000]
+    GPP_TEST_SET = [
+        "gpp124-1.dat-s",
+        "gpp124-1.dat-s",
+        "gpp124-2.dat-s",
+        "gpp124-3.dat-s",
+        "gpp124-4.dat-s",
+        "gpp250-1.dat-s",
+        "gpp250-2.dat-s",
+        "gpp250-3.dat-s",
+        "gpp250-4.dat-s",
+        "gpp500-1.dat-s",
+        "gpp500-2.dat-s",
+        "gpp500-3.dat-s",
+        "gpp500-4.dat-s",
+        # "equalG11.dat-s",
+        # "equalG51.dat-s",
+    ]
+    MAXCUT_TEST_SET = [
+        "mcp124-1.dat-s",
+        "mcp124-1.dat-s",
+        "mcp124-2.dat-s",
+        "mcp124-3.dat-s",
+        "mcp124-4.dat-s",
+        "mcp250-1.dat-s",
+        "mcp250-2.dat-s",
+        "mcp250-3.dat-s",
+        "mcp250-4.dat-s",
+        "mcp500-1.dat-s",
+        "mcp500-2.dat-s",
+        "mcp500-3.dat-s",
+        "mcp500-4.dat-s",
+        "maxG11.dat-s"  ,
+        "maxG51.dat-s"  ,
+        # "maxG32.dat-s"  ,
+        # "maxG55.dat-s"  ,
+        # "maxG60.dat-s"  ,
+    ]
+end
+
 if use_MOI
-    if set_to_test == :MIMO
-        include("base_mimo.jl")
-        include("moi_mimo.jl")
-        # include("sensor_loc.jl")
-        moi_mimo(optimizer, 0, 100)
-        # for n in [100, 500, 1000, 2000, 3000, 4000, 5000]
-        for n in [4000, 5000]
-            @show n
-            moi_mimo(optimizer, 0, n)
-            # sensor_loc(optimizer, 0)
-        end
-    elseif set_to_test == :RANDSDP
+    if :RANDSDP in sets_to_test
         include("base_randsdp.jl")
         include("moi_randsdp.jl")
+        println("RANDSDP")
         moi_randsdp(optimizer, 0, 5, 5)
-        for i in 1:1
-            moi_randsdp(optimizer, i, 5, 5)
+        for i in RANDSDP_TEST_SET
+            @show i
+            sol = moi_randsdp(optimizer, i, 5, 5)
+            println2(FILE, "RANDSDP", "$i", sol)
         end
-    elseif set_to_test == :SDPLIB
-        include("base_sdplib.jl")
-        include("moi_sdplib.jl")
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp250-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "gpp500-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "equalG11.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "equalG51.dat-s"))
-
-        println("max_cut")
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp250-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp250-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp250-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp250-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp500-1.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp500-2.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp500-3.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "mcp500-4.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG11.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG51.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG55.dat-s"))
-        moi_sdplib(optimizer, joinpath(datapath, "maxG60.dat-s"))
-
-
-        # for i in 1:1
-        #     moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        # end
-    elseif set_to_test == :SENSORLOC
+    end
+    if :MIMO in sets_to_test
+        include("base_mimo.jl")
+        include("moi_mimo.jl")
+        println("MIMO")
+        moi_mimo(optimizer, 0, 100)
+        for n in MIMO_TEST_SET
+            @show n
+            sol = moi_mimo(optimizer, 0, n)
+            println2(FILE, "MIMO", "$n", sol)
+        end
+    end
+    if :SENSORLOC in sets_to_test
         include("base_sensorloc.jl")
         include("moi_sensorloc.jl")
-        moi_sensorloc(optimizer, 123, 200)
+        println("SENSORLOC")
+        for n in SENSORLOC_TEST_SET
+            @show n
+            sol = moi_sensorloc(optimizer, 0, n)
+            println2(FILE, "SENSORLOC", "$n", sol)
+        end
+    end
+    if :SDPLIB in sets_to_test
+        include("base_sdplib.jl")
+        include("moi_sdplib.jl")
+        println("gpp")
+        for name in GPP_TEST_SET
+            println(name)
+            sol = moi_sdplib(optimizer, joinpath(datapath, name))
+            println2(FILE, "SDPLIB_gp", name, sol)
+        end
+        println("max_cut")
+        for name in MAXCUT_TEST_SET
+            println(name)
+            sol = moi_sdplib(optimizer, joinpath(datapath, name))
+            println2(FILE, "SDPLIB_mc", name, sol)
+        end
     end
 else
-    if set_to_test == :MIMO
-        include("base_mimo.jl")
-        include("jump_mimo.jl")
-        jump_mimo(optimizer, 0, 10)
-
-        for i in [100, 500, 1000, 2000, 3000, 4000, 5000]
-            @show i
-            tic()
-            jump_mimo(optimizer, 0, i)
-            toc()
-        end
-    elseif set_to_test == :RANDSDP
+    if :RANDSDP in sets_to_test
         include("base_randsdp.jl")
         include("jump_randsdp.jl")
         jump_randsdp(optimizer, 0, 5, 5)
-        for i in 1:1
+        for i in RANDSDP_TEST_SET
             jump_randsdp(optimizer, i, 5, 5)
         end
-    elseif set_to_test == :SDPLIB
+    end
+    if :MIMO in sets_to_test
+        include("base_mimo.jl")
+        include("jump_mimo.jl")
+        jump_mimo(optimizer, 0, 10)
+        for n in MIMO_TEST_SET
+            @show n
+            jump_mimo(optimizer, 0, n)
+        end
+    end
+    if :SDPLIB in sets_to_test
         include("base_sdplib.jl")
         include("jump_sdplib.jl")
-        # jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        # for i in 1:1
-        #     jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        # end
-        jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp250-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp250-2.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp250-3.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp250-4.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp500-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp500-2.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp500-3.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "gpp500-4.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "equalG11.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "equalG51.dat-s"))
-
-        println("max_cut")
-        jump_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp250-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp250-2.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp250-3.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp250-4.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp500-1.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp500-2.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp500-3.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "mcp500-4.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "maxG11.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "maxG51.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "maxG32.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "maxG55.dat-s"))
-        jump_sdplib(optimizer, joinpath(datapath, "maxG60.dat-s"))
-    elseif set_to_test == :SENSORLOC
+        for name in GPP_TEST_SET
+            jump_sdplib(optimizer, joinpath(datapath, name))
+        end
+        println2("max_cut")
+        for name in MAXCUT_TEST_SET
+            jump_sdplib(optimizer, joinpath(datapath, name))
+        end
+    end
+    if :SENSORLOC in sets_to_test
         include("base_sensorloc.jl")
         include("jump_sensorloc.jl")
-        jump_sensorloc(optimizer, 123, 100)
+        jump_sensorloc(optimizer, 0, 10)
+        for n in SENSORLOC_TEST_SET
+            @show n
+            jump_sensorloc(optimizer, 0, n)
+        end
     end
 end
 
-# include("sdplib.jl")
-# @testset "MIMO" begin
-#     paths = String[]
-
-#     # Graph equipartition problem
-#     # push!(paths, "data/gpp124-1.dat-s")
-#     # push!(paths, "data/gpp124-1.dat-s")
-#     # push!(paths, "data/gpp124-2.dat-s")
-#     # push!(paths, "data/gpp124-3.dat-s")
-#     # push!(paths, "data/gpp124-4.dat-s")
-#     # push!(paths, "data/gpp250-1.dat-s")
-#     # push!(paths, "data/gpp250-2.dat-s")
-#     # push!(paths, "data/gpp250-3.dat-s")
-#     # push!(paths, "data/gpp250-4.dat-s")
-#     # push!(paths, "data/gpp500-1.dat-s")
-#     # push!(paths, "data/gpp500-2.dat-s")
-#     # push!(paths, "data/gpp500-3.dat-s")
-#     # push!(paths, "data/gpp500-4.dat-s")
-#     # push!(paths, "data/equalG11.dat-s")
-#     # push!(paths, "data/equalG51.dat-s")
-
-#     # Truss topology
-#     push!(paths, "data/arch0.dat-s")
-#     push!(paths, "data/arch0.dat-s")
-#     push!(paths, "data/arch2.dat-s")
-#     push!(paths, "data/arch2.dat-s")
-#     push!(paths, "data/arch4.dat-s")
-#     push!(paths, "data/arch8.dat-s")
-
-#     # Max-Cut
-#     # push!(paths, "data/mcp250-1.dat-s")
-#     # push!(paths, "data/mcp250-1.dat-s")
-#     # push!(paths, "data/mcp250-2.dat-s")
-#     # push!(paths, "data/mcp250-3.dat-s")
-#     # push!(paths, "data/mcp250-4.dat-s")
-#     # push!(paths, "data/mcp500-1.dat-s")
-#     # push!(paths, "data/mcp500-2.dat-s")
-#     # push!(paths, "data/mcp500-3.dat-s")
-#     # push!(paths, "data/mcp500-4.dat-s")
-#     # push!(paths, "data/maxG11.dat-s")
-#     # push!(paths, "data/maxG51.dat-s")
-#     # push!(paths, "data/maxG32.dat-s")
-
-#     # push!(paths, "data/truss1.dat-s")
-#     # push!(paths, "data/truss2.dat-s")
-#     # push!(paths, "data/truss3.dat-s")
-#     # push!(paths, "data/truss4.dat-s")
-#     # push!(paths, "data/truss5.dat-s")
-#     # push!(paths, "data/truss6.dat-s")
-#     # push!(paths, "data/truss7.dat-s")
-
-#     for path in paths
-#         @show path
-#         if Base.libblas_name == "libmkl_rt"
-#             sdplib(ProxSDPSolverInstance(), path)
-#         else
-#             # sdplib(CSDPSolver(objtol=1e-4, maxiter=100000), path)
-#             # sdplib(SCSSolver(max_iters=1000000, eps=1e-4), path)
-#             # sdplib(SCSSolver(eps=1e-4), path)
-#             sdplib(MosekSolver(), path)
-#         end
-#     end
-# end
-
-
-# include("sensor_loc.jl")
-# for seed in 1:1
-#     if Base.libblas_name == "libmkl_rt"
-#         sensor_loc(ProxSDPSolverInstance(), seed)
-#     else
-#         # sensor_loc(CSDPSolver(maxiter=100000), seed)
-#         sensor_loc(SCSSolver(max_iters=1000000, eps=1e-5), seed)
-#         # sensor_loc(MosekSolver(), seed)
-#     end
-# end
-
-# include("base.jl")
-# if Base.libblas_name == "libmkl_rt"
-#     base_sdp(ProxSDPSolverInstance(), 0)
-#     base_sdp2(ProxSDPSolverInstance(), 0)
-# else
-#     base_sdp(MosekSolver(), 0)
-#     base_sdp2(MosekSolver(), 0)
-#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
-#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
-# end
-
-# include("rand_sdp.jl")
-# if Base.libblas_name == "libmkl_rt"
-#     rand_sdp(ProxSDPSolverInstance(), 0)
-# else
-#     rand_sdp(MosekSolver(), 0)
-#     # rand_sdp(CSDPSolver(objtol=1e-4, maxiter=100000), 0)
-#     # rand_sdp(SCSSolver(eps=1e-4, max_iters=100000), 0)
-# end
-
-# rand_sdp(MosekSolver(), 0)
+close(FILE)
