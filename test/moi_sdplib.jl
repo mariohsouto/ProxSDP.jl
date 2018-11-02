@@ -1,9 +1,12 @@
-function moi_sdplib(optimizer, path)
+function moi_sdplib(optimizer, path; verbose = false, test = false)
 
-    println("running: $(path)")
-
+    if verbose
+        println("running: $(path)")
+    end
     MOI.empty!(optimizer)
-    @test MOI.is_empty(optimizer)
+    if test
+        @test MOI.is_empty(optimizer)
+    end
 
     n, m, F, c = sdplib_data(path)
 
@@ -37,12 +40,15 @@ function moi_sdplib(optimizer, path)
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
     minus_rank = length([eig for eig in eigfact(Xsq_s)[:values] if eig < -1e-4])
-    @test minus_rank == 0
-
+    if test
+        @test minus_rank == 0
+    end
     # @test trace(F[0] * Xsq_s) - obj < 1e-1
     # for i in 1:m
     #     @test abs(trace(F[i] * Xsq_s)-c[i]) < 1e-1
     # end
 
-    sdplib_eval(F,c,n,m,Xsq_s)
+    verbose && sdplib_eval(F,c,n,m,Xsq_s)
+
+    return ProxSDP.get_solution(optimizer)
 end

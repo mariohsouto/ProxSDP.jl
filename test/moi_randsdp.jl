@@ -1,7 +1,9 @@
-function moi_randsdp(optimizer, seed, n, m; atol = 1e-2)
+function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol = 1e-2)
 
     MOI.empty!(optimizer)
-    @test MOI.is_empty(optimizer)
+    if test
+        @test MOI.is_empty(optimizer)
+    end
 
     A, b, C = randsdp_data(seed, m, n)
 
@@ -33,15 +35,18 @@ function moi_randsdp(optimizer, seed, n, m; atol = 1e-2)
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
     minus_rank = length([eig for eig in eigfact(Xsq_s)[:values] if eig < -1e-4])
-    @test minus_rank == 0
-
+    if test
+        @test minus_rank == 0
+    end
     # rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
     # @show rank
-
-    @test trace(C * Xsq_s) - obj < atol
-    for i in 1:m
-        @test abs(trace(A[i] * Xsq_s)-b[i])/(1+abs(b[i])) < atol
+    if test
+        @test trace(C * Xsq_s) - obj < atol
+        for i in 1:m
+            @test abs(trace(A[i] * Xsq_s)-b[i])/(1+abs(b[i])) < atol
+        end
     end
+    verbose && randsdp_eval(A,b,C,n,m,Xsq_s)
 
-    randsdp_eval(A,b,C,n,m,Xsq_s)
+    return ProxSDP.get_solution(optimizer)
 end

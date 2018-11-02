@@ -1,5 +1,5 @@
 
-function jump_sdplib(solver, path)
+function jump_sdplib(solver, path, verbose = false)
     tic()
 
     println("running: $(path)")
@@ -40,7 +40,9 @@ function jump_sdplib(solver, path)
         XX = getvalue.(X)
     end
 
-    sdplib_eval(F,c,n,m,XX)
+    verbose && sdplib_eval(F,c,n,m,XX)
+
+    return nothing
 end
 
 getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])

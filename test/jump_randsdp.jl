@@ -1,4 +1,4 @@
-function jump_randsdp(solver, seed, n, m)
+function jump_randsdp(solver, seed, n, m, verbose = false)
 
     A, b, C = randsdp_data(seed, m, n)
 
@@ -28,7 +28,9 @@ function jump_randsdp(solver, seed, n, m)
         XX = getvalue.(X)
     end
 
-    randsdp_eval(A,b,C,n,m,XX)
+    verbose && randsdp_eval(A,b,C,n,m,XX)
+
+    return nothing
 end
 
 getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])

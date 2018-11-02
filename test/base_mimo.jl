@@ -21,6 +21,5 @@ function mimo_eval(s, H, y, L, XX)
     @show norm(y - H * x_hat)
     @show norm(y - H * s)
     @show trace(L * XX)
-
     return nothing
 end

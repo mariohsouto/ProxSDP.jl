@@ -14,10 +14,15 @@ mutable struct MOISolution
     primal::Vector{Float64}
     dual::Vector{Float64}
     slack::Vector{Float64}
+    primal_residual::Float64
+    dual_residual::Float64
     objval::Float64
+    dual_objval::Float64
+    gap::Float64
+    time::Float64
 end
 MOISolution() = MOISolution(0, # SCS_UNFINISHED
-                      Float64[], Float64[], Float64[], NaN)
+                      Float64[], Float64[], Float64[], NaN, NaN, NaN, NaN, NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is passed to SCS
@@ -439,7 +444,7 @@ function MOI.optimize!(optimizer::Optimizer)
         close(f)
     end
 
-    optimizer.sol = MOISolution(ret_val, primal, dual, slack, (optimizer.maxsense ? -1 : 1) * objval)
+    optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval, sol.dual_objval, sol.gap, sol.time)
 end
 
 function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T

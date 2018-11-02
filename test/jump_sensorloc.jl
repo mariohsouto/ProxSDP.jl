@@ -1,5 +1,5 @@
 
-function jump_sensorloc(solver, seed, n)
+function jump_sensorloc(solver, seed, n, verbose)
 
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
@@ -43,7 +43,9 @@ function jump_sensorloc(solver, seed, n)
             end
         end   
     end
-    @show count_all, count
+    if verbose
+        @show count_all, count
+    end
 
     @constraint(model, X[1, 1] == 1.0)
     @constraint(model, X[1, 2] == 0.0)
@@ -68,7 +70,7 @@ function jump_sensorloc(solver, seed, n)
         XX = getvalue.(X)
     end
 
-    sensorloc_eval(n, m, x_true, XX)
+    verbose && sensorloc_eval(n, m, x_true, XX)
 
     return nothing
 end

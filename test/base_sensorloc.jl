@@ -21,5 +21,5 @@ end
 function sensorloc_eval(n, m, x_true, XX)
     @show norm(x_true - XX[1:2, 3:n + 2])
     @show rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-7])
-    nothing
+    return nothing
 end
