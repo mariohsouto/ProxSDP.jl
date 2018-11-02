@@ -134,7 +134,7 @@ type PrimalDual
 
     PrimalDual(dims) = new(
         zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.m+dims.p), zeros(dims.m+dims.p), zeros(dims.m+dims.p)
-    )
+    )#INCORRECT
 end
 
 type AuxiliaryData
@@ -153,7 +153,7 @@ type AuxiliaryData
         new([Symmetric(zeros(i, i), :L) for i in dims.s], zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2),
         zeros(dims.n*(dims.n+1)/2), zeros(dims.p+dims.m), zeros(dims.p+dims.m), zeros(dims.p+dims.m), 
         zeros(dims.p+dims.m), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2), zeros(dims.n*(dims.n+1)/2)
-    )
+    )#INCORRECT
     end
 end
 
@@ -211,7 +211,7 @@ function norm_scaling(affine_sets::AffineSets, dims::Dims)
     rows = rowvals(affine_sets.A)
     m, n = size(affine_sets.A)
     cont = 1
-    for j in 1:dims.n, i in j:dims.n
+    for j in 1:dims.n, i in j:dims.n#INCORRECT
         if i != j
             for line in nzrange(affine_sets.A, cont)
                 affine_sets.A[rows[line], cont] *= cte
@@ -222,7 +222,7 @@ function norm_scaling(affine_sets::AffineSets, dims::Dims)
     rows = rowvals(affine_sets.G)
     m, n = size(affine_sets.G)
     cont = 1
-    for j in 1:dims.n, i in j:dims.n
+    for j in 1:dims.n, i in j:dims.n#INCORRECT
         if i != j
             for line in nzrange(affine_sets.G, cont)
                 affine_sets.G[rows[line], cont] *= cte
@@ -231,7 +231,7 @@ function norm_scaling(affine_sets::AffineSets, dims::Dims)
         cont += 1
     end
     cont = 1
-    @inbounds for j in 1:dims.n, i in j:dims.n
+    @inbounds for j in 1:dims.n, i in j:dims.n#INCORRECT
         if i != j
             affine_sets.c[cont] *= cte
         end
@@ -277,6 +277,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         pair = PrimalDual(dims)
         a = AuxiliaryData(dims)
         arc = ARPACKAlloc(Float64, 1)
+
         primal_residual, dual_residual, comb_residual = zeros(opt.max_iter), zeros(opt.max_iter), zeros(opt.max_iter)
 
         # Diagonal scaling
@@ -315,7 +316,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         # Check convergence of inexact fixed-point
         p.rank_update += 1
         if primal_residual[k] < opt.tol_primal && dual_residual[k] < opt.tol_dual && k > 50
-            if p.min_eig < opt.tol_eig || p.target_rank > opt.max_target_rank_krylov_eigs || dims.n < opt.min_size_krylov_eigs
+            if p.min_eig < opt.tol_eig || p.target_rank > opt.max_target_rank_krylov_eigs || dims.n < opt.min_size_krylov_eigs#INCORRECT
                 p.converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 if opt.log_verbose
@@ -325,7 +326,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
             elseif p.rank_update > p.window
                 p.update_cont += 1
                 if p.update_cont > 0
-                    p.target_rank = min(2 * p.target_rank, dims.n)
+                    p.target_rank = min(2 * p.target_rank, dims.n)#INCORRECT
                     p.rank_update, p.update_cont = 0, 0
                 end
             end
@@ -334,7 +335,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
         elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 30
-                p.target_rank = min(2 * p.target_rank, dims.n)
+                p.target_rank = min(2 * p.target_rank, dims.n)#INCORRECT
                 p.rank_update, p.update_cont = 0, 0
             end
 
@@ -383,7 +384,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, dims::Di
     end
 
     cont = 1
-    @inbounds for j in 1:dims.n, i in j:dims.n
+    @inbounds for j in 1:dims.n, i in j:dims.n#INCORRECT
         if i != j
             pair.x[cont] /= sqrt(2.0)
         end
@@ -522,7 +523,7 @@ end
 
 function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
     c_orig = zeros(1)
-    M = zeros(Int, dims.n, dims.n)
+    M = zeros(Int, dims.n, dims.n) #INCORRECT
     if length(conic_sets.sdpcone) >= 1
         iv = conic_sets.sdpcone[1].vec_i
         im = conic_sets.sdpcone[1].mat_i
@@ -539,14 +540,14 @@ function preprocess!(aff::AffineSets, dims::Dims, conic_sets::ConicSets)
             cont += 1
         end
 
-        totvars = dims.n
+        totvars = dims.n#INCORRECT
         extra_vars = collect(setdiff(Set(collect(1:totvars)),Set(sdp_vars)))
         ord = vcat(sdp_vars, extra_vars)
 
         ids = vec(X)
         offdiag_ids = setdiff(Set(ids), Set(diag(X)))
     else
-        ord = collect(1:dims.n)
+        ord = collect(1:dims.n)#INCORRECT
         offdiag_ids = Set{Int}()
     end
 
@@ -562,7 +563,7 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, dims::Dims, mat::Matri
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
     # Projection onto the psd cone
-    if length(dims.s) == 1
+    if length(dims.s) == 1#INCORRECT
         @timeit "sdp proj" sdp_cone_projection!(pair.x, a, dims, arc, offdiag, pair, opt, p)
     end
 
@@ -606,7 +607,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
 
     p.min_eig, current_rank, sqrt_2 = 0.0, 0, sqrt(2.0)
     # Build symmetric matrix X
-    n = dims.n
+    n = dims.n#INCORRECT
     @timeit "reshape1" begin
         cont = 1
         @inbounds for j in 1:n, i in j:n
@@ -619,7 +620,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if p.target_rank <= opt.max_target_rank_krylov_eigs && dims.n > opt.min_size_krylov_eigs
+    if p.target_rank <= opt.max_target_rank_krylov_eigs && dims.n > opt.min_size_krylov_eigs #INCORRECT
         @timeit "eigs" begin 
             eig!(arc, a.m[1], p.target_rank, p.iter)
             if hasconverged(arc)
@@ -635,7 +636,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, dims::Dims, 
         end
     end
 
-    if p.target_rank <= opt.max_target_rank_krylov_eigs && hasconverged(arc) && dims.n > opt.min_size_krylov_eigs
+    if p.target_rank <= opt.max_target_rank_krylov_eigs && hasconverged(arc) && dims.n > opt.min_size_krylov_eigs #INCORRECT
         @timeit "get min eig" p.min_eig = minimum(unsafe_getvalues(arc))
     else
         p.min_eig = 0.0
