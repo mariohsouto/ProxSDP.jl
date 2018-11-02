@@ -205,8 +205,6 @@ end
 
     X = MOI.add_variables(optimizer, nvars)
 
-    @show typeof(X)
-
     for i in 1:nvars
         MOI.add_constraint(optimizer, MOI.SingleVariable(X[i]), MOI.LessThan(1.0))
         MOI.add_constraint(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
@@ -214,7 +212,7 @@ end
 
     Xsq = Matrix{MOI.VariableIndex}(n+1,n+1)
     ProxSDP.ivech!(Xsq, X)
-    @show Xsq = full(Symmetric(Xsq,:U))
+    Xsq = full(Symmetric(Xsq,:U))
 
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n+1))
@@ -283,7 +281,7 @@ end
     include("base_sensorloc.jl")
     include("moi_sensorloc.jl")
     for n in 20:5:30
-        @show n
+        # @show n
         moi_sensorloc(optimizer, 0, n, test = true)
     end
 end

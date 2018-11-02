@@ -423,7 +423,7 @@ function MOI.optimize!(optimizer::Optimizer)
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = @timeit "Main" chambolle_pock(aff, con, dims, options.log_verbose, options.max_iter, options.tol)
+    sol = @timeit "Main" chambolle_pock(aff, con, dims, options)
 
     ret_val = sol.status
     primal = sol.primal
