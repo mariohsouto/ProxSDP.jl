@@ -15,13 +15,8 @@ addons:
         - liblapack-dev
         - libgmp-dev
         - libglpk-dev
-script:
-    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia -e 'Pkg.clone(pwd())'
-    - julia -e 'Pkg.build("ProxSDP")'
-    - julia -e 'Pkg.test("ProxSDP")'
 after_success:
-- julia -e 'cd(Pkg.dir("ProxSDP")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+- julia -e 'cd(Pkg.dir("ProxSDP")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
 - echo $TRAVIS_JULIA_VERSION
 env:
 - CODECOV_TOKEN="257536e4-7c71-4d18-b459-443db91d2870"
