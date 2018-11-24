@@ -348,9 +348,9 @@ function MOI.optimize!(optimizer::Optimizer)
     if length(cone.p) > 0
         error("Power Cone constraints not supported")
     end
-    if length(cone.sa) != 1
-        error("There must be exactely one SDP constraint")
-    end
+    # if length(cone.sa) >= 0
+    #     error("There must be exactely one SDP constraint")
+    # end
 
     # @show cone.s
     # @show cone.sa
@@ -380,13 +380,12 @@ function MOI.optimize!(optimizer::Optimizer)
 
     b = preb[1:cone.f]
     h = preb[cone.f+1:cone.f+cone.l]
-    aff = AffineSets(A, G, b, h, c)
-
     # Dimensions (of affine sets)
     n_variables = size(A)[2] # primal
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
-    dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
+    aff = AffineSets(n_variables, n_eqs, n_ineqs, A, G, b, h, c)
+
     # Build SDP Sets
     con = ConicSets(
         SDPSet[]
@@ -407,7 +406,10 @@ function MOI.optimize!(optimizer::Optimizer)
         vec_inds = sortperm(indices_sdp)#sort(indices_sdp)
         # vec_inds = sortperm(indices_sdp)
         mat_inds = matindices(sympackeddim(length(indices_sdp)))
-        newsdp = SDPSet(vec_inds, mat_inds)
+        tri_len = length(vec_inds)
+        sq_side = sympackeddim(tri_len)
+        sq_len = sq_side*sq_side
+        newsdp = SDPSet(vec_inds, mat_inds, tri_len, sq_len, sq_side)
         push!(con.sdpcone, newsdp)
         first_ind += lines
     end
@@ -423,7 +425,7 @@ function MOI.optimize!(optimizer::Optimizer)
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = @timeit "Main" chambolle_pock(aff, con, dims, options)
+    sol = @timeit "Main" chambolle_pock(aff, con, options)
 
     ret_val = sol.status
     primal = sol.primal
