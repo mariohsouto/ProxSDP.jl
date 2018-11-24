@@ -10,6 +10,115 @@ const MOIU = MOI.Utilities
 MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
+const optimizer2 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000_000))
+
+# const optimizer = MOIU.CachingOptimizer(SDModelData{Float64}(), CSDP.Optimizer(printlevel=0))
+const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
+
+@testset "Continuous Linear" begin
+    # linear10 is poorly conditioned
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer2), config, ["linear8a", "linear8b", "linear8c", "linear12", "linear10"])
+end
+# @testset "Continuous Conic" begin
+#     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(MOIB.RSOCtoPSD{Float64}(MOIB.SOCtoPSD{Float64}(optimizer)))), config, ["psds", "rootdets", "logdet", "exp", "lin3", "lin4"])
+# end
+
+
+@testset "Simple LP" begin
+
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    # add 10 variables - only diagonal is relevant
+    X = MOI.add_variables(optimizer, 2)
+
+    # add sdp constraints - only ensuring positivenesse of the diagonal
+    vov = MOI.VectorOfVariables(X)
+
+    c1 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(2.0, X[1]),
+            MOI.ScalarAffineTerm(1.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    c2 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1]),
+            MOI.ScalarAffineTerm(2.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    b1 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1])
+        ], 0.0), MOI.GreaterThan(0.0))
+
+    b2 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[2])
+        ], 0.0), MOI.GreaterThan(0.0))
+
+    MOI.set(optimizer, 
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[2]]), 0.0)
+        )
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
+
+    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    @test obj ≈ -9.33333 atol = 1e-2
+
+    Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
+
+    @test Xr ≈ [1.3333, 1.3333] atol = 1e-2
+
+end
+
+@testset "Simple LP with 2 1D SDP" begin
+
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    # add 10 variables - only diagonal is relevant
+    X = MOI.add_variables(optimizer, 2)
+
+    # add sdp constraints - only ensuring positivenesse of the diagonal
+    vov = MOI.VectorOfVariables(X)
+
+    c1 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(2.0, X[1]),
+            MOI.ScalarAffineTerm(1.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    c2 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1]),
+            MOI.ScalarAffineTerm(2.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    b1 = MOI.add_constraint(optimizer, 
+        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[1]])), MOI.PositiveSemidefiniteConeTriangle(1))
+
+    b2 = MOI.add_constraint(optimizer, 
+        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[2]])), MOI.PositiveSemidefiniteConeTriangle(1))
+
+    MOI.set(optimizer, 
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[2]]), 0.0)
+        )
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
+
+    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    @test obj ≈ -9.33333 atol = 1e-2
+
+    Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
+
+    @test Xr ≈ [1.3333, 1.3333] atol = 1e-2
+
+end
 
 @testset "LP in SDP EQ form" begin
 
@@ -135,6 +244,54 @@ end
 
     Xv = ones(3)
     @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
+    # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
+
+    # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
+    # @show MOI.get(optimizer, MOI.ConstraintDual(), c)
+
+end
+
+@testset "Double SDP from MOI" begin
+    # solve simultaneously two of these:
+    # min X[1,1] + X[2,2]    max y
+    #     X[2,1] = 1         [0   y/2     [ 1  0
+    #                         y/2 0    <=   0  1]
+    #     X >= 0              y free
+    # Optimal solution:
+    #
+    #     ⎛ 1   1 ⎞
+    # X = ⎜       ⎟           y = 2
+    #     ⎝ 1   1 ⎠
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    X = MOI.add_variables(optimizer, 3)
+    Y = MOI.add_variables(optimizer, 3)
+
+    vov = MOI.VectorOfVariables(X)
+    vov2 = MOI.VectorOfVariables(Y)
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
+    cY = MOI.add_constraint(optimizer, vov2, MOI.PositiveSemidefiniteConeTriangle(2))
+
+    c = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, X[2])], 0.0), MOI.EqualTo(1.0))
+    c2 = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Y[2])], 0.0), MOI.EqualTo(1.0))
+
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end], Y[1], Y[end]]), 0.0))
+
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
+
+    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.Success
+
+    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FeasiblePoint
+    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FeasiblePoint
+
+    @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2*2 atol=1e-2
+
+    Xv = ones(3)
+    @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
+    Yv = ones(3)
+    @test MOI.get(optimizer, MOI.VariablePrimal(), Y) ≈ Yv atol=1e-2
     # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
 
     # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2

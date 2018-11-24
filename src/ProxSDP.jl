@@ -87,15 +87,15 @@ function parse_arg!(options::Options, arg)
     return nothing
 end
 
-type AffineSets{T}
+type AffineSets
     n::Int  # Size of primal variables
     p::Int  # Number of linear equalities
     m::Int  # Number of linear inequalities
     A::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
     G::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
-    b::Vector{T}
-    h::Vector{T}
-    c::Vector{T}
+    b::Vector{Float64}
+    h::Vector{Float64}
+    c::Vector{Float64}
 end
 
 type SDPSet
@@ -270,6 +270,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Scale objective function
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+        G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
         rhs_orig = vcat(affine_sets.b, affine_sets.h)
         @timeit "Norm Scaling" norm_scaling(affine_sets, conic_sets)
         # Initialization
@@ -280,10 +281,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         primal_residual, dual_residual, comb_residual = zeros(opt.max_iter), zeros(opt.max_iter), zeros(opt.max_iter)
 
         # Diagonal scaling
+        # @show affine_sets.A, affine_sets.G
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
         mat = Matrices(M, Mt, affine_sets.c)
+        # @show a.Mtrhs, mat.Mt, rhs
         A_mul_B!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
@@ -351,7 +354,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.adapt_level *= opt.adapt_decay
             end
             if analysis
-                @show p.beta, p.adapt_level
+                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
         elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
@@ -361,7 +364,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.adapt_level *= opt.adapt_decay
             end
             if analysis
-                @show p.beta, p.adapt_level
+                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
         elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
             p.beta *= (1 - p.adapt_level)
@@ -371,7 +374,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.adapt_level *= opt.adapt_decay
             end
             if analysis
-                @show p.beta, p.adapt_level
+                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
         elseif opt.residual_relative_diff * primal_residual[k] < dual_residual[k] && k > p.window
             p.beta /= (1 - p.adapt_level)
@@ -381,7 +384,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.adapt_level *= opt.adapt_decay
             end
             if analysis
-                @show p.beta, p.adapt_level
+                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
         end
     end
@@ -398,7 +401,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     time_ = time() - p.time0
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
-    res_eq = norm(A_orig * pair.x - b_orig) / (1 + norm(b_orig))
+    slack = A_orig * pair.x - b_orig
+    slack2 = G_orig * pair.x - h_orig
+    res_eq = norm(slack) / (1 + norm(b_orig))
     res_dual = prim_obj - dual_obj
     gap = (prim_obj - dual_obj) / abs(prim_obj) * 100
     pair.x = pair.x[var_ordering]
@@ -418,7 +423,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         println(" time elapsed = $(round(time_, 6))")
         println("======================================================================")
     end
-    return CPResult(Int(p.converged), pair.x, pair.y, 0.0*pair.x, res_eq, res_dual, prim_obj, dual_obj, gap, time_)
+    return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack, slack2), res_eq, res_dual, prim_obj, dual_obj, gap, time_)
 end
 
 function convergedrank(p::Params, cones::ConicSets, opt::Options)
@@ -631,7 +636,10 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
         end
     end
     for (idx, sdp) in enumerate(cones.sdpcone)
-        if p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
+        if sdp.sq_side == 1
+            a.m[idx][1] = max(0.0, a.m[idx][1])
+            p.min_eig[idx] = a.m[idx][1]
+        elseif p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
             @timeit "eigs" begin 
                 eig!(arc[idx], a.m[idx], p.target_rank[idx], p.iter)
                 if hasconverged(arc[idx])

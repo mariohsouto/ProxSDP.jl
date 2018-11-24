@@ -7,7 +7,7 @@ const VI = MOI.VariableIndex
 const MOIU = MOI.Utilities
 
 const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle}
+const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle}
 
 mutable struct MOISolution
     ret_val::Int
@@ -71,6 +71,9 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     function Optimizer(args=Any[])
         new(ConeData(), false, nothing, MOISolution(), args)
     end
+    function Optimizer(;args...)
+        new(ConeData(), false, nothing, MOISolution(), args)
+    end
 end
 
 function MOI.is_empty(optimizer::Optimizer)
@@ -85,6 +88,7 @@ MOIU.needs_allocate_load(instance::Optimizer) = true
 
 function MOI.supports(::Optimizer,
                       ::Union{MOI.ObjectiveSense,
+                              MOI.ObjectiveFunction{MOI.SingleVariable},
                               MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
                               MOI.VariablePrimalStart})
     return true
@@ -295,7 +299,10 @@ end
 function MOIU.allocate(optimizer::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense)
     optimizer.maxsense = sense == MOI.MaxSense
 end
-function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction, ::MOI.ScalarAffineFunction) end
+function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction,
+    ::MOI.Union{MOI.SingleVariable,
+                MOI.ScalarAffineFunction{Float64}})
+end
 
 function MOIU.load(optimizer::Optimizer, ::MOI.VariablePrimalStart,
                    vi::MOI.VariableIndex, value::Float64)
@@ -313,11 +320,21 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ConstraintDualStart,
     rows = constrrows(optimizer, ci)
     optimizer.sol.primal[offset .+ rows] .= value
 end
-function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense) end
-function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction, f::MOI.ScalarAffineFunction)
-    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms), optimizer.data.n))
+function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense)
+end
+function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
+               f::MOI.SingleVariable)
+MOIU.load(optimizer,
+          MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+          MOI.ScalarAffineFunction{Float64}(f))
+end
+function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
+               f::MOI.ScalarAffineFunction)
+    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
+                        optimizer.data.n))
     optimizer.data.objconstant = f.constant
     optimizer.data.c = optimizer.maxsense ? -c0 : c0
+    return nothing
 end
 
 #=
@@ -358,9 +375,9 @@ function MOI.optimize!(optimizer::Optimizer)
     m = optimizer.data.m #rows
     n = optimizer.data.n #cols
 
-    if cone.s != n
-        error("The number of columns must be equal to the number of entries in the PSD matrix")
-    end
+    # if cone.s != n
+    #     error("The number of columns must be equal to the number of entries in the PSD matrix")
+    # end
 
     preA = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
     preb = optimizer.data.b
@@ -369,6 +386,10 @@ function MOI.optimize!(optimizer::Optimizer)
     optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded to SCS
 
     TimerOutputs.reset_timer!()
+
+#     @show preA
+#     @show full(preA)
+# @show cone
 
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
@@ -403,7 +424,8 @@ function MOI.optimize!(optimizer::Optimizer)
     for d in cone.sa
         lines = sympackedlen(d)
         indices_sdp = inds[first_ind:first_ind+lines-1]
-        vec_inds = sortperm(indices_sdp)#sort(indices_sdp)
+        vec_inds = sortperm(indices_sdp)+first_ind-1#sort(indices_sdp)
+        # @show vec_inds2 = sortperm(indices_sdp)#sort(indices_sdp)
         # vec_inds = sortperm(indices_sdp)
         mat_inds = matindices(sympackeddim(length(indices_sdp)))
         tri_len = length(vec_inds)
@@ -416,7 +438,9 @@ function MOI.optimize!(optimizer::Optimizer)
 
     for i in 1:length(con.sdpcone)
         for j in i+1:length(con.sdpcone)
-            if !is_empty(setdiff(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i))
+            # @show con.sdpcone[i].vec_i
+            # @show con.sdpcone[j].vec_i
+            if length(intersect(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i)) > 0
                 error("SDP cones must be disjoint")
             end
         end
@@ -431,7 +455,7 @@ function MOI.optimize!(optimizer::Optimizer)
     primal = sol.primal
     dual = sol.dual
     slack = sol.slack
-    objval = sol.objval + objconstant
+    objval = sol.objval
 
     if options.timer_verbose
         TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
@@ -446,7 +470,7 @@ function MOI.optimize!(optimizer::Optimizer)
         close(f)
     end
 
-    optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval, sol.dual_objval, sol.gap, sol.time)
+    optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval+objconstant, sol.dual_objval, sol.gap, sol.time)
 end
 
 function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
