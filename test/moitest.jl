@@ -7,22 +7,28 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
+MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
 const optimizer2 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000_000))
+const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 1_00_000))
 
 # const optimizer = MOIU.CachingOptimizer(SDModelData{Float64}(), CSDP.Optimizer(printlevel=0))
 const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
-
 @testset "Continuous Linear" begin
-    # linear10 is poorly conditioned
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer2), config, ["linear8a", "linear8b", "linear8c", "linear12", "linear10"])
+# linear10 is poorly conditioned
+MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer2), config, ["linear8a", "linear8b", "linear8c", "linear12", "linear10"])
 end
+const config_conic = MOIT.TestConfig(atol=1e-1, rtol=1e-1, duals = false)
 # @testset "Continuous Conic" begin
-#     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(MOIB.RSOCtoPSD{Float64}(MOIB.SOCtoPSD{Float64}(optimizer)))), config, ["psds", "rootdets", "logdet", "exp", "lin3", "lin4"])
+#     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(MOIB.RSOCtoPSD{Float64}(MOIB.SOCtoPSD{Float64}(optimizer)))), config_conic, ["psds", "rootdets", "logdet", "exp", "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"])
 # end
-
+@testset "Continuous Conic" begin
+    MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(optimizer3)), config_conic, ["psdt1v","psdt1f","psdt0f","soc2p", "soc2n", "rsoc", "psds", "rootdet", "geomean", "logdet", "exp", "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"])
+end
+# psdt2 is VAFF in cone
+# psdt1v is soc interc sdp
+# need to creat dummy vars and ctrs
 
 @testset "Simple LP" begin
 
