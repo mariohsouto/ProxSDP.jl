@@ -19,11 +19,13 @@ end
 # --------------------------------
 mutable struct Options
     log_verbose::Bool
+    log_freq::Int
     timer_verbose::Bool
     max_iter::Int
     tol_primal::Float64
     tol_dual::Float64
     tol_eig::Float64
+    tol_soc::Float64
 
     initial_theta::Float64
     initial_beta::Float64
@@ -39,17 +41,20 @@ mutable struct Options
 
     max_linsearch_steps::Int
 
+    full_eig_decomp::Bool
     max_target_rank_krylov_eigs::Int
     min_size_krylov_eigs::Int
 
     function Options()
         opt = new()
         opt.log_verbose = false
+        opt.log_freq = 100
         opt.timer_verbose = false
         opt.max_iter = Int(1e+5)
         opt.tol_primal = 1e-3
         opt.tol_dual = 1e-3
         opt.tol_eig = 1e-3
+        opt.tol_soc = 1e-3
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
@@ -65,8 +70,11 @@ mutable struct Options
 
         opt.max_linsearch_steps = 1000
 
+        opt.full_eig_decomp = false
+
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
+
         return opt
     end
 end
@@ -95,6 +103,7 @@ type AffineSets
     n::Int  # Size of primal variables
     p::Int  # Number of linear equalities
     m::Int  # Number of linear inequalities
+    extra::Int  # Number of adition linear equalities (for disjoint cones)
     A::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
     G::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
     b::Vector{Float64}
@@ -300,10 +309,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Diagonal scaling
         # @show affine_sets.A, affine_sets.G
         M = vcat(affine_sets.A, affine_sets.G)
+        # @show size(affine_sets.A), size(affine_sets.G), size(affine_sets.b), size(affine_sets.h), size(affine_sets.c), size(M) 
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
         mat = Matrices(M, Mt, affine_sets.c)
-        a.Mtrhs, mat.Mt, rhs
+        # @show a.Mtrhs, mat.Mt, rhs
         A_mul_B!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
@@ -328,14 +338,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p)
         # Print progress
-        if mod(k, p.window) == 0 && opt.log_verbose
+        if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
         end
 
         # Check convergence of inexact fixed-point
         p.rank_update += 1
         if primal_residual[k] < opt.tol_primal && dual_residual[k] < opt.tol_dual && k > opt.convergence_check
-            if convergedrank(p, conic_sets, opt)
+            if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
                 p.converged = true
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 if opt.log_verbose
@@ -427,6 +437,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     ctr_primal = Float64[]
     for soc in conic_sets.socone
+        # @show pair.x[soc.idx]
         append!(ctr_primal, pair.x[soc.idx])
     end
     for sdp in conic_sets.sdpcone
@@ -567,6 +578,10 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
     c_orig = zeros(1)
     if length(conic_sets.sdpcone) >= 1 || length(conic_sets.socone) >= 1
         all_cone_vars = Int[]
+        for (idx, soc) in enumerate(conic_sets.socone)
+            soc_vars = copy(soc.idx)
+            append!(all_cone_vars, soc_vars)
+        end
         for (idx, sdp) in enumerate(conic_sets.sdpcone)
             M = zeros(Int, sdp.sq_side, sdp.sq_side)
             iv = conic_sets.sdpcone[idx].vec_i
@@ -584,10 +599,6 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
                 cont += 1
             end
             append!(all_cone_vars, sdp_vars)
-        end
-        for (idx, soc) in enumerate(conic_sets.socone)
-            soc_vars = copy(soc.idx)
-            append!(all_cone_vars, soc_vars)
         end
 
         totvars = aff.n
@@ -628,11 +639,11 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 
     # Projection onto the psd cone
     if length(cones.sdpcone) >= 1
-        @timeit "sdp proj" sdp_cone_projection!(pair.x, a, cones, arc, pair, opt, p)
+        @timeit "sdp proj" sdp_cone_projection!(pair.x, a, cones, arc, opt, p)
     end
 
     if length(cones.socone) >= 1
-        @timeit "soc proj" so_cone_projection!(pair.x, a, cones, arc, pair, opt, p)
+        @timeit "soc proj" so_cone_projection!(pair.x, a, cones, opt, p)
     end
 
     @timeit "linesearch -1" A_mul_B!(a.Mx, mat.M, pair.x)
@@ -671,7 +682,7 @@ function print_progress(primal_res::Float64, dual_res::Float64, p::Params)
     return nothing
 end
 
-function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, arc::Vector{ARPACKAlloc{Float64}}, pair::PrimalDual, opt::Options, p::Params)
+function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
 
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.0)
     # Build symmetric matrix(es) X
@@ -690,7 +701,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
         if sdp.sq_side == 1
             a.m[idx][1] = max(0.0, a.m[idx][1])
             p.min_eig[idx] = a.m[idx][1]
-        elseif p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
+        elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
             @timeit "eigs" begin 
                 eig!(arc[idx], a.m[idx], p.target_rank[idx], p.iter)
                 if hasconverged(arc[idx])
@@ -706,21 +717,12 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
             end
             if hasconverged(arc[idx])
                 @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc[idx]))
-            end    
+            else
+                @timeit "eigfact" full_eig!(a, idx, opt)
+            end
         else
             p.min_eig[idx] = 0.0
-            @timeit "eigfact" begin
-                current_rank = 0
-                # fact = eigfact!(a.m[1], 1e-6, Inf)
-                fact = eigfact!(a.m[idx])
-                fill!(a.m[idx].data, 0.0)
-                for i in 1:length(fact[:values])
-                    if fact[:values][i] > 0.0
-                        current_rank += 1
-                        Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m[idx].data)
-                    end
-                end
-            end
+            @timeit "eigfact" full_eig!(a, idx, opt)
         end
     end
     @timeit "reshape2" begin
@@ -738,7 +740,22 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
     return nothing
 end
 
-function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, arc::Vector{ARPACKAlloc{Float64}}, pair::PrimalDual, opt::Options, p::Params)
+function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
+    current_rank = 0
+    # fact = eigfact!(a.m[1], 1e-6, Inf)
+    fact = eigfact!(a.m[idx])
+    fill!(a.m[idx].data, 0.0)
+    for i in 1:length(fact[:values])
+        if fact[:values][i] > 0.0
+            current_rank += 1
+            Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m[idx].data)
+        end
+    end
+    return nothing
+end
+
+
+function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
         # @show "a", pair.x
         soc_projection!(a.soc_v[idx], a.soc_s[idx])
@@ -760,5 +777,18 @@ function soc_projection!(v::ViewVector, s::ViewScalar)
         s[] = val * nv
     end
     return nothing
+end
+
+function soc_gap(v::ViewVector, s::ViewScalar)
+    return norm(v) - s[]
+end
+
+function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, opt::Options, p::Params)
+    for (idx, soc) in enumerate(cones.socone)
+        if soc_gap(a.soc_v[idx], a.soc_s[idx]) >= opt.tol_soc
+            return false
+        end
+    end
+    return true
 end
 end

@@ -385,14 +385,14 @@ function MOI.optimize!(optimizer::Optimizer)
     preA = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
     preb = optimizer.data.b
     objconstant = optimizer.data.objconstant
-    c = optimizer.data.c # TODO (@joaquim) - change sign?
-    optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded to SCS
+    c = optimizer.data.c
+    optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded
 
     TimerOutputs.reset_timer!()
 
-#     @show preA
-#     @show full(preA)
-# @show cone
+    # @show preA
+    # @show full(preA)
+    # @show cone
 
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
@@ -408,7 +408,7 @@ function MOI.optimize!(optimizer::Optimizer)
     n_variables = size(preA)[2] # primal
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
-    aff = AffineSets(n_variables, n_eqs, n_ineqs, A, G, b, h, c)
+    aff = AffineSets(n_variables, n_eqs, n_ineqs, 0, A, G, b, h, c)
 
     # Build SDP Sets
     con = ConicSets(
@@ -416,41 +416,31 @@ function MOI.optimize!(optimizer::Optimizer)
         SOCSet[]
         )
 
-        # Asdp = preA[cone.f+cone.l+1:end,:]
-        # indices_sdp = Asdp.rowval
-    
-        # aff = AffineSets(A, G, b, h, c)
-        # con = ConicSets(Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
     Asoc = preA[cone.f+cone.l+1:cone.f+cone.l+cone.q,:]
     # @show cone.qa
     # @show full(Asoc)
-    first_ind = 1
+    first_ind_local = 1
+    first_ind_global = 1
     inds = Asoc.rowval
     for d in cone.qa
         lines = d
 
-        indices_soc = inds[first_ind:first_ind+lines-1]
-        vec_inds = sortperm(indices_soc)+first_ind-1#sort(indices_sdp)
+        indices_soc = inds[first_ind_local:first_ind_local+lines-1]
+        vec_inds = sortperm(indices_soc)+first_ind_global-1#sort(indices_sdp)
 
         newsoc = SOCSet(vec_inds, lines)
         push!(con.socone, newsoc)
-        first_ind += lines
-    end
-
-    for i in 1:length(con.socone)
-        for j in i+1:length(con.socone)
-            # @show con.socone[i].vec_i
-            # @show con.socone[j].vec_i
-            if length(intersect(con.socone[i].idx,con.socone[j].idx)) > 0
-                error("SOC cones must be disjoint")
-            end
-        end
+        first_ind_local += lines
+        first_ind_global += lines
     end
 
     Asdp = preA[cone.f+cone.l+cone.q+1:end,:]
+    # @show full(preA)
+    # @show full(Asdp)
+    # @show full(Asoc)
     # @show cone.sa
     # @show full(Asdp)
-    first_ind = 1
+    first_ind_local = 1
     inds = Asdp.rowval
     for d in cone.sa
         lines = sympackedlen(d)
@@ -458,9 +448,8 @@ function MOI.optimize!(optimizer::Optimizer)
         # Ac = Asdp[first_ind:first_ind+lines-1, :]
         # Ic, Jc, Vc = findnz(Ac)
 
-
-        indices_sdp = inds[first_ind:first_ind+lines-1]
-        vec_inds = sortperm(indices_sdp)+first_ind-1#sort(indices_sdp)
+        indices_sdp = inds[first_ind_local:first_ind_local+lines-1]
+        vec_inds = sortperm(indices_sdp)+first_ind_global-1#sort(indices_sdp)
         # @show vec_inds2 = sortperm(indices_sdp)#sort(indices_sdp)
         # vec_inds = sortperm(indices_sdp)
         mat_inds = matindices(sympackeddim(length(indices_sdp)))
@@ -469,16 +458,39 @@ function MOI.optimize!(optimizer::Optimizer)
         sq_len = sq_side*sq_side
         newsdp = SDPSet(vec_inds, mat_inds, tri_len, sq_len, sq_side)
         push!(con.sdpcone, newsdp)
-        first_ind += lines
+        first_ind_local += lines
+        first_ind_global += lines
+    end
+
+    # @show full(preA)
+    # @show full(Asdp)
+    # @show full(Asoc)
+    # @show con
+
+    # create extra variables
+    n_tot_variables = n_variables
+    In, Jn, Vn = Int[], Int[], Float64[]
+    for i in 1:length(con.socone)
+        for j in i+1:length(con.socone)
+            # @show con.socone[i].vec_i
+            # @show con.socone[j].vec_i
+            vec1 = con.socone[i].idx
+            vec2 = con.socone[j].idx
+            n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
+
+        end
     end
 
     for i in 1:length(con.sdpcone)
         for j in i+1:length(con.sdpcone)
             # @show con.sdpcone[i].vec_i
             # @show con.sdpcone[j].vec_i
-            if length(intersect(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i)) > 0
-                error("SDP cones must be disjoint")
-            end
+            vec1 = con.sdpcone[i].vec_i
+            vec2 = con.sdpcone[j].vec_i
+            n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
+            # if length(intersect(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i)) > 0
+            #     error("SDP cones must be disjoint")
+            # end
         end
     end
 
@@ -486,11 +498,28 @@ function MOI.optimize!(optimizer::Optimizer)
         for j in 1:length(con.socone)
             # @show con.sdpcone[i].vec_i
             # @show con.sdpcone[j].vec_i
-            if length(intersect(con.sdpcone[i].vec_i,con.socone[j].idx)) > 0
-                error("SDP cones and SOC must be disjoint")
-            end
+            vec1 = con.sdpcone[i].vec_i
+            vec2 = con.socone[j].idx
+            n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
+            # if length(intersect(con.sdpcone[i].vec_i,con.socone[j].idx)) > 0
+            #     error("SDP cones and SOC must be disjoint")
+            # end
         end
     end
+
+    n_new_variables = n_tot_variables - n_variables
+
+    A2 = sparse(In .- n_variables, Jn, Vn, n_new_variables, n_tot_variables)
+    b2 = zeros(n_new_variables)
+
+    append!(aff.b, b2)
+    aff.A = vcat(hcat(aff.A, spzeros(size(aff.A)[1], n_new_variables)), A2)
+    aff.G = hcat(aff.G, spzeros(size(aff.G)[1], n_new_variables))
+    append!(aff.c, zeros(n_new_variables))
+    # @show aff.n, n_new_variables, n_new_variables, n_tot_variables
+    aff.n += n_new_variables
+    aff.p += n_new_variables
+    aff.extra = n_new_variables
 
     # @show con.sdpcone
 
@@ -498,9 +527,9 @@ function MOI.optimize!(optimizer::Optimizer)
     sol = @timeit "Main" chambolle_pock(aff, con, options)
 
     ret_val = sol.status
-    primal = sol.primal
-    dual = sol.dual
-    slack = sol.slack
+    primal = sol.primal[1:aff.n-aff.extra]
+    dual = vcat(sol.dual[1:aff.p-aff.extra], sol.dual[aff.p+1:end])
+    slack = vcat(sol.slack[1:aff.p-aff.extra], sol.slack[aff.p+1:end])
     objval = sol.objval
 
     if options.timer_verbose
@@ -517,6 +546,33 @@ function MOI.optimize!(optimizer::Optimizer)
     end
 
     optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval+objconstant, sol.dual_objval, sol.gap, sol.time)
+end
+
+function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
+
+    duplicates = intersect(vec2, vec1)
+    n_dups = length(duplicates)
+    if n_dups == 0
+        return 0
+    end
+    # if n_dups > 0
+    #     error("SOC cones must be disjoint")
+    # end
+    append!(Jn, duplicates)
+    append!(Jn, collect(1:n_dups) + n)
+    append!(In, collect(1:n_dups) + n)
+    append!(In, collect(1:n_dups) + n)
+    append!(Vn,  ones(n_dups))
+    append!(Vn, -ones(n_dups))
+    cont = 1
+    for i in eachindex(vec2)
+        if vec2[i] == duplicates[cont]
+            vec2[i] = n + cont
+            cont += 1
+        end
+    end
+    @assert cont-1 == n_dups
+    return n_dups
 end
 
 function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
