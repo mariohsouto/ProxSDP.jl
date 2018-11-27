@@ -10,8 +10,9 @@ const MOIU = MOI.Utilities
 MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
-const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000_000))
-const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000))
+const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_lin_hd = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-5, tol_dual = 1e-5))
+const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-4, tol_dual = 1e-4))
 
 const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
 const config_conic = MOIT.TestConfig(atol=1e-1, rtol=1e-1, duals = false)
@@ -31,9 +32,12 @@ end
         # infeasible/unbounded
         "linear8a", "linear8b", "linear8c", "linear12", 
         # linear10 is poorly conditioned
-        "linear10"
+        "linear10",
+        # linear9 is requires precision
+        "linear9"
         ]
     )
+    MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer_lin_hd), config)
 end
 
 @testset "MOI Continuous Conic" begin

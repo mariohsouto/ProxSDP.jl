@@ -47,10 +47,13 @@ mutable struct Options
 
     function Options()
         opt = new()
+
         opt.log_verbose = false
         opt.log_freq = 100
         opt.timer_verbose = false
+
         opt.max_iter = Int(1e+5)
+
         opt.tol_primal = 1e-3
         opt.tol_dual = 1e-3
         opt.tol_eig = 1e-3
