@@ -11,172 +11,29 @@ MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MO
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
 const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000_000))
-const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = true, tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000))
+const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000))
 
 const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
 const config_conic = MOIT.TestConfig(atol=1e-1, rtol=1e-1, duals = false)
 
-function _psd1test(model::MOI.ModelLike, vecofvars::Bool, psdcone, config)
-    atol = config.atol
-    rtol = config.rtol
-    square = psdcone == MOI.PositiveSemidefiniteConeSquare
-    # Problem SDP1 - sdo1 from MOSEK docs
-    # From Mosek.jl/test/mathprogtestextra.jl, under license:
-    #   Copyright (c) 2013 Ulf Worsoe, Mosek ApS
-    #   Permission is hereby granted, free of charge, to any person obtaining a copy of this
-    #   software and associated documentation files (the "Software"), to deal in the Software
-    #   without restriction, including without limitation the rights to use, copy, modify, merge,
-    #   publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons
-    #   to whom the Software is furnished to do so, subject to the following conditions:
-    #   The above copyright notice and this permission notice shall be included in all copies or
-    #   substantial portions of the Software.
-    #
-    #     | 2 1 0 |
-    # min | 1 2 1 | . X + x1
-    #     | 0 1 2 |
-    #
-    #
-    # s.t. | 1 0 0 |
-    #      | 0 1 0 | . X + x1 = 1
-    #      | 0 0 1 |
-    #
-    #      | 1 1 1 |
-    #      | 1 1 1 | . X + x2 + x3 = 1/2
-    #      | 1 1 1 |
-    #
-    #      (x1,x2,x3) in C^3_q
-    #      X in C_psd
-    #
-    # The dual is
-    # max y1 + y2/2
-    #
-    # s.t. | y1+y2    y2    y2 |
-    #      |    y2 y1+y2    y2 | in C_psd
-    #      |    y2    y2 y1+y2 |
-    #
-    #      (1-y1, -y2, -y2) in C^3_q
-    #
-    # The dual of the SDP constraint is rank two of the form
-    # [γ, 0, -γ] * [γ, 0, γ'] + [δ, ε, δ] * [δ, ε, δ]'
-    # and the dual of the SOC constraint is of the form (√2*y2, -y2, -y2)
-    #
-    # The feasible set of the constraint dual contains only four points.
-    # Eliminating, y1, y2 and γ from the dual constraints gives
-    # -ε^2 + -εδ + 2δ^2 + 1
-    # (√2-2)ε^2 + (-2√2+2)δ^2 + 1
-    # Eliminating ε from this set of equation give
-    # (-6√2+4)δ^4 + (3√2-2)δ^2 + (2√2-3)
-    # from which we find the solution
-    δ = √(1 + (3*√2+2)*√(-116*√2+166) / 14) / 2
-    # which is optimal
-    ε = √((1 - 2*(√2-1)*δ^2) / (2-√2))
-    y2 = 1 - ε*δ
-    y1 = 1 - √2*y2
-    obj = y1 + y2/2
-    # The primal solution is rank one of the form
-    # X = [α, β, α] * [α, β, α]'
-    # and by complementary slackness, x is of the form (√2*x2, x2, x2)
-    # The primal reduces to
-    #      4α^2+4αβ+2β^2+√2*x2= obj
-    #      2α^2    + β^2+√2*x2 = 1 (1)
-    #      8α^2+8αβ+2β^2+ 4 x2 = 1
-    # Eliminating β, we get
-    # 4α^2 + 4x2 = 3 - 2obj (2)
-    # By complementary slackness, we have β = kα where
-    k = -2*δ/ε
-    # Replacing β by kα in (1) allows to eliminate α^2 in (2) to get
-    x2 = ((3-2obj)*(2+k^2)-4) / (4*(2+k^2)-4*√2)
-    # With (2) we get
-    α = √(3-2obj-4x2)/2
-    β = k*α
-
-    MOI.empty!(model)
-    @test MOI.is_empty(model)
-
-    x = MOI.add_variables(model, 3)
-    X = MOI.add_variables(model, square ? 9 : 6)
-
-    vov = MOI.VectorOfVariables(X)
-    if vecofvars
-        cX = MOI.add_constraint(model, vov, psdcone(3))
-    else
-        cX = MOI.add_constraint(model, MOI.VectorAffineFunction{Float64}(vov), psdcone(3))
-    end
-    cx = MOI.add_constraint(model, MOI.VectorOfVariables(x), MOI.SecondOrderCone(3))
-
-    c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1., 1, 1, 1], [X[1], X[square ? 5 : 3], X[end], x[1]]), 0.), MOI.EqualTo(1.))
-    c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(square ? ones(11) : [1., 2, 1, 2, 2, 1, 1, 1], [X; x[2]; x[3]]), 0.), MOI.EqualTo(1/2))
-
-    # # fix socp
-    # xv = [√2*x2, x2, x2]
-    # for i in eachindex(xv)
-    #     MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x[i]]), 0.), MOI.EqualTo(xv[i]))
-    # end
-
-    # # fix sdp
-    # Xv = square ? [α^2, α*β, α^2, α*β, β^2, α*β, α^2, α*β, α^2] : [α^2, α*β, β^2, α^2, α*β, α^2]
-    # for i in eachindex(Xv)
-    #     MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [X[i]]), 0.), MOI.EqualTo(Xv[i]))
-    # end
-
-    objXidx = square ? [1:2; 4:6; 8:9] : [1:3; 5:6]
-    objXcoefs = square ? [2., 1., 1., 2., 1., 1., 2.] : 2*ones(5)
-    MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([objXcoefs; 1.0], [X[objXidx]; x[1]]), 0.0))
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MinSense)
-
-    if config.solve
-        MOI.optimize!(model)
-
-        @test MOI.get(model, MOI.TerminationStatus()) == MOI.Success
-
-        # @test MOI.get(model, MOI.PrimalStatus()) == MOI.FeasiblePoint
-        # if config.duals
-        #     @test MOI.get(model, MOI.DualStatus()) == MOI.FeasiblePoint
-        # end
-        @show MOI.get(model, MOI.ObjectiveValue()), obj
-        @test MOI.get(model, MOI.ObjectiveValue()) ≈ obj atol=atol rtol=rtol
-
-        Xv = square ? [α^2, α*β, α^2, α*β, β^2, α*β, α^2, α*β, α^2] : [α^2, α*β, β^2, α^2, α*β, α^2]
-        xv = [√2*x2, x2, x2]
-        @test MOI.get(model, MOI.VariablePrimal(), X) ≈ Xv atol=atol rtol=rtol
-        @test MOI.get(model, MOI.VariablePrimal(), x) ≈ xv atol=atol rtol=rtol
-        @show MOI.get(model, MOI.VariablePrimal(), x) , xv
-        @show MOI.get(model, MOI.VariablePrimal(), X) , Xv
-        # @show ProxSDP.ivec(MOI.get(model, MOI.VariablePrimal(), X)) , ProxSDP.ivec(Xv)
-        # @show eig(ProxSDP.ivec(MOI.get(model, MOI.VariablePrimal(), X))) , eig(ProxSDP.ivec(Xv))
-
-        @test MOI.get(model, MOI.ConstraintPrimal(), cX) ≈ Xv atol=atol rtol=rtol
-        @test MOI.get(model, MOI.ConstraintPrimal(), cx) ≈ xv atol=atol rtol=rtol
-        @test MOI.get(model, MOI.ConstraintPrimal(), c1) ≈ 1. atol=atol rtol=rtol
-        @test MOI.get(model, MOI.ConstraintPrimal(), c2) ≈ .5 atol=atol rtol=rtol
-        @show MOI.get(model, MOI.ConstraintPrimal(), c1) , 1.
-        @show MOI.get(model, MOI.ConstraintPrimal(), c2) , .5
-        @show MOI.get(model, MOI.ConstraintPrimal(), cx) , xv
-        @show MOI.get(model, MOI.ConstraintPrimal(), cX) , Xv
-
-    end
+@testset "MOI Continuous Linear" begin
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
+        # infeasible/unbounded
+        "linear8a", "linear8b", "linear8c", "linear12", 
+        # linear10 is poorly conditioned
+        "linear10"
+        ]
+    )
 end
 
-psdt1vtest(model::MOI.ModelLike, config) = _psd1test(model, true, MOI.PositiveSemidefiniteConeTriangle, config)
-
-@testset "Continuous Conic" begin
-    psdt1vtest(optimizer3, config_conic)
-end
-
-@testset "Continuous Linear" begin
-    # linear10 is poorly conditioned
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, ["linear8a", "linear8b", "linear8c", "linear12", "linear10"])
-end
-
-@testset "Continuous Conic" begin
+@testset "MOI Continuous Conic" begin
     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(optimizer3)), config_conic, [
-        "psdt1v",
+        # bridge
+        "rootdet","geomean",
         # affine in cone
         "psdt1f","psdt0f","soc2p", "soc2n", "rsoc",
         # square psd
         "psds", "rootdets",
-        # bridge
-        "rootdet","geomean",
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded

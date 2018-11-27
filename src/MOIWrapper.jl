@@ -416,64 +416,41 @@ function MOI.optimize!(optimizer::Optimizer)
         SOCSet[]
         )
 
-    Asoc = preA[cone.f+cone.l+1:cone.f+cone.l+cone.q,:]
-    # @show cone.qa
-    # @show full(Asoc)
+    preAt = preA'
+
+    # this way there is a single elements per column
+    # because we assume VOV in SET and NOT AFF in SET
+    Asoc = preAt[:,cone.f+cone.l+1:cone.f+cone.l+cone.q]
+    A = Asoc
+    rows = rowvals(A)
     first_ind_local = 1
-    first_ind_global = 1
-    inds = Asoc.rowval
     for d in cone.qa
-        lines = d
-
-        indices_soc = inds[first_ind_local:first_ind_local+lines-1]
-        vec_inds = sortperm(indices_soc)+first_ind_global-1#sort(indices_sdp)
-
-        newsoc = SOCSet(vec_inds, lines)
-        push!(con.socone, newsoc)
-        first_ind_local += lines
-        first_ind_global += lines
+        n_vars = d
+        vec_inds = get_indices_cone(A, rows, n_vars, first_ind_local)
+        push!(con.socone, SOCSet(vec_inds, n_vars))
+        first_ind_local += n_vars
     end
 
-    Asdp = preA[cone.f+cone.l+cone.q+1:end,:]
-    # @show full(preA)
-    # @show full(Asdp)
-    # @show full(Asoc)
-    # @show cone.sa
-    # @show full(Asdp)
+    Asdp = preAt[:,cone.f+cone.l+cone.q+1:end]
+    A = Asdp
+    rows = rowvals(A)
     first_ind_local = 1
-    inds = Asdp.rowval
     for d in cone.sa
-        lines = sympackedlen(d)
-
-        # Ac = Asdp[first_ind:first_ind+lines-1, :]
-        # Ic, Jc, Vc = findnz(Ac)
-
-        indices_sdp = inds[first_ind_local:first_ind_local+lines-1]
-        vec_inds = sortperm(indices_sdp)+first_ind_global-1#sort(indices_sdp)
-        # @show vec_inds2 = sortperm(indices_sdp)#sort(indices_sdp)
-        # vec_inds = sortperm(indices_sdp)
-        mat_inds = matindices(sympackeddim(length(indices_sdp)))
-        tri_len = length(vec_inds)
-        sq_side = sympackeddim(tri_len)
+        n_vars = sympackedlen(d)
+        vec_inds = get_indices_cone(A, rows, n_vars, first_ind_local)
+        mat_inds = matindices(d)
+        tri_len = n_vars
+        sq_side = d
         sq_len = sq_side*sq_side
-        newsdp = SDPSet(vec_inds, mat_inds, tri_len, sq_len, sq_side)
-        push!(con.sdpcone, newsdp)
-        first_ind_local += lines
-        first_ind_global += lines
+        push!(con.sdpcone, SDPSet(vec_inds, mat_inds, tri_len, sq_len, sq_side))
+        first_ind_local += n_vars
     end
-
-    # @show full(preA)
-    # @show full(Asdp)
-    # @show full(Asoc)
-    # @show con
 
     # create extra variables
     n_tot_variables = n_variables
     In, Jn, Vn = Int[], Int[], Float64[]
     for i in 1:length(con.socone)
         for j in i+1:length(con.socone)
-            # @show con.socone[i].vec_i
-            # @show con.socone[j].vec_i
             vec1 = con.socone[i].idx
             vec2 = con.socone[j].idx
             n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
@@ -483,8 +460,6 @@ function MOI.optimize!(optimizer::Optimizer)
 
     for i in 1:length(con.sdpcone)
         for j in i+1:length(con.sdpcone)
-            # @show con.sdpcone[i].vec_i
-            # @show con.sdpcone[j].vec_i
             vec1 = con.sdpcone[i].vec_i
             vec2 = con.sdpcone[j].vec_i
             n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
@@ -496,8 +471,6 @@ function MOI.optimize!(optimizer::Optimizer)
 
     for i in 1:length(con.sdpcone)
         for j in 1:length(con.socone)
-            # @show con.sdpcone[i].vec_i
-            # @show con.sdpcone[j].vec_i
             vec1 = con.sdpcone[i].vec_i
             vec2 = con.socone[j].idx
             n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
@@ -546,6 +519,20 @@ function MOI.optimize!(optimizer::Optimizer)
     end
 
     optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval+objconstant, sol.dual_objval, sol.gap, sol.time)
+end
+
+function get_indices_cone(A, rows, n_vars, first_ind_local)
+    vec_inds = zeros(Int, n_vars)
+    for (idx, col) in enumerate(first_ind_local:first_ind_local+n_vars-1)
+        # columns -> pos in cone (because is tranposed)
+        for j in nzrange(A, col)
+            row = rows[j]
+            position = idx
+            var_idx = row # global
+            vec_inds[position] = var_idx
+        end
+    end
+    return vec_inds
 end
 
 function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
