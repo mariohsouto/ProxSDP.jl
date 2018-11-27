@@ -10,19 +10,11 @@ const MOIU = MOI.Utilities
 MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
-const optimizer2 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000_000))
-const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000))
+const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000_000))
+const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = true, tol_primal = 1e-6, tol_dual = 1e-6, max_iter = 100_000))
 
-# const optimizer = MOIU.CachingOptimizer(SDModelData{Float64}(), CSDP.Optimizer(printlevel=0))
 const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
-@testset "Continuous Linear" begin
-# linear10 is poorly conditioned
-MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer2), config, ["linear8a", "linear8b", "linear8c", "linear12", "linear10"])
-end
 const config_conic = MOIT.TestConfig(atol=1e-1, rtol=1e-1, duals = false)
-# @testset "Continuous Conic" begin
-#     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(MOIB.RSOCtoPSD{Float64}(MOIB.SOCtoPSD{Float64}(optimizer)))), config_conic, ["psds", "rootdets", "logdet", "exp", "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"])
-# end
 
 function _psd1test(model::MOI.ModelLike, vecofvars::Bool, psdcone, config)
     atol = config.atol
@@ -98,27 +90,15 @@ function _psd1test(model::MOI.ModelLike, vecofvars::Bool, psdcone, config)
     α = √(3-2obj-4x2)/2
     β = k*α
 
-    @test MOI.supports(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-    @test MOI.supports(model, MOI.ObjectiveSense())
-    @test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
-    if vecofvars
-        @test MOI.supports_constraint(model, MOI.VectorOfVariables, psdcone)
-    else
-        @test MOI.supports_constraint(model, MOI.VectorAffineFunction{Float64}, psdcone)
-    end
-    @test MOI.supports_constraint(model, MOI.VectorOfVariables, MOI.SecondOrderCone)
-
     MOI.empty!(model)
     @test MOI.is_empty(model)
 
-    X = MOI.add_variables(model, square ? 9 : 6)
-    @test MOI.get(model, MOI.NumberOfVariables()) == (square ? 9 : 6)
     x = MOI.add_variables(model, 3)
-    @test MOI.get(model, MOI.NumberOfVariables()) == (square ? 12 : 9)
+    X = MOI.add_variables(model, square ? 9 : 6)
 
     vov = MOI.VectorOfVariables(X)
     if vecofvars
-        # cX = MOI.add_constraint(model, vov, psdcone(3))
+        cX = MOI.add_constraint(model, vov, psdcone(3))
     else
         cX = MOI.add_constraint(model, MOI.VectorAffineFunction{Float64}(vov), psdcone(3))
     end
@@ -127,72 +107,68 @@ function _psd1test(model::MOI.ModelLike, vecofvars::Bool, psdcone, config)
     c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1., 1, 1, 1], [X[1], X[square ? 5 : 3], X[end], x[1]]), 0.), MOI.EqualTo(1.))
     c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(square ? ones(11) : [1., 2, 1, 2, 2, 1, 1, 1], [X; x[2]; x[3]]), 0.), MOI.EqualTo(1/2))
 
-    MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x[1]]), 0.), MOI.EqualTo(√2*x2))
-    MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x[2]]), 0.), MOI.EqualTo(x2))
-    MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x[3]]), 0.), MOI.EqualTo(x2))
+    # # fix socp
+    # xv = [√2*x2, x2, x2]
+    # for i in eachindex(xv)
+    #     MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x[i]]), 0.), MOI.EqualTo(xv[i]))
+    # end
 
-    fff = [α^2, α*β, β^2, α^2, α*β, α^2]
-    for i in 1:6
-    MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [X[i]]), 0.), MOI.EqualTo(fff[i]))
-    end
+    # # fix sdp
+    # Xv = square ? [α^2, α*β, α^2, α*β, β^2, α*β, α^2, α*β, α^2] : [α^2, α*β, β^2, α^2, α*β, α^2]
+    # for i in eachindex(Xv)
+    #     MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [X[i]]), 0.), MOI.EqualTo(Xv[i]))
+    # end
 
     objXidx = square ? [1:2; 4:6; 8:9] : [1:3; 5:6]
     objXcoefs = square ? [2., 1., 1., 2., 1., 1., 2.] : 2*ones(5)
     MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([objXcoefs; 1.0], [X[objXidx]; x[1]]), 0.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MinSense)
 
-    # @test MOI.get(model, MOI.NumberOfConstraints{vecofvars ? MOI.VectorOfVariables : MOI.VectorAffineFunction{Float64}, psdcone}()) == 1
-    # @test MOI.get(model, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}()) == 2
-    # @test MOI.get(model, MOI.NumberOfConstraints{MOI.VectorOfVariables, MOI.SecondOrderCone}()) == 1
-
     if config.solve
         MOI.optimize!(model)
 
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.Success
 
-        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FeasiblePoint
-        if config.duals
-            @test MOI.get(model, MOI.DualStatus()) == MOI.FeasiblePoint
-        end
+        # @test MOI.get(model, MOI.PrimalStatus()) == MOI.FeasiblePoint
+        # if config.duals
+        #     @test MOI.get(model, MOI.DualStatus()) == MOI.FeasiblePoint
+        # end
         @show MOI.get(model, MOI.ObjectiveValue()), obj
         @test MOI.get(model, MOI.ObjectiveValue()) ≈ obj atol=atol rtol=rtol
 
         Xv = square ? [α^2, α*β, α^2, α*β, β^2, α*β, α^2, α*β, α^2] : [α^2, α*β, β^2, α^2, α*β, α^2]
         xv = [√2*x2, x2, x2]
-        # @test MOI.get(model, MOI.VariablePrimal(), X) ≈ Xv atol=atol rtol=rtol
-        @show MOI.get(model, MOI.VariablePrimal(), X) , Xv
-        # @test MOI.get(model, MOI.VariablePrimal(), x) ≈ xv atol=atol rtol=rtol
+        @test MOI.get(model, MOI.VariablePrimal(), X) ≈ Xv atol=atol rtol=rtol
+        @test MOI.get(model, MOI.VariablePrimal(), x) ≈ xv atol=atol rtol=rtol
         @show MOI.get(model, MOI.VariablePrimal(), x) , xv
+        @show MOI.get(model, MOI.VariablePrimal(), X) , Xv
+        # @show ProxSDP.ivec(MOI.get(model, MOI.VariablePrimal(), X)) , ProxSDP.ivec(Xv)
+        # @show eig(ProxSDP.ivec(MOI.get(model, MOI.VariablePrimal(), X))) , eig(ProxSDP.ivec(Xv))
 
-        # @test MOI.get(model, MOI.ConstraintPrimal(), cX) ≈ Xv atol=atol rtol=rtol
-        # @test MOI.get(model, MOI.ConstraintPrimal(), cx) ≈ xv atol=atol rtol=rtol
-        # @test MOI.get(model, MOI.ConstraintPrimal(), c1) ≈ 1. atol=atol rtol=rtol
-        # @test MOI.get(model, MOI.ConstraintPrimal(), c2) ≈ .5 atol=atol rtol=rtol
-        # @show MOI.get(model, MOI.ConstraintPrimal(), cX) , Xv
-        # @show MOI.get(model, MOI.ConstraintPrimal(), cx) , xv
+        @test MOI.get(model, MOI.ConstraintPrimal(), cX) ≈ Xv atol=atol rtol=rtol
+        @test MOI.get(model, MOI.ConstraintPrimal(), cx) ≈ xv atol=atol rtol=rtol
+        @test MOI.get(model, MOI.ConstraintPrimal(), c1) ≈ 1. atol=atol rtol=rtol
+        @test MOI.get(model, MOI.ConstraintPrimal(), c2) ≈ .5 atol=atol rtol=rtol
         @show MOI.get(model, MOI.ConstraintPrimal(), c1) , 1.
         @show MOI.get(model, MOI.ConstraintPrimal(), c2) , .5
+        @show MOI.get(model, MOI.ConstraintPrimal(), cx) , xv
+        @show MOI.get(model, MOI.ConstraintPrimal(), cX) , Xv
 
-        # if config.duals
-        #     cX0 = 1+(√2-1)*y2
-        #     cX1 = 1-y2
-        #     cX2 = -y2
-        #     cXv = square ? [cX0, cX1, cX2, cX1, cX0, cX1, cX2, cX1, cX0] : [cX0, cX1, cX0, cX2, cX1, cX0]
-        #     @test MOI.get(model, MOI.ConstraintDual(), cX) ≈ cXv atol=atol rtol=rtol
-        #     @test MOI.get(model, MOI.ConstraintDual(), cx) ≈ [1-y1, -y2, -y2] atol=atol rtol=rtol
-        #     @test MOI.get(model, MOI.ConstraintDual(), c1) ≈ y1 atol=atol rtol=rtol
-        #     @test MOI.get(model, MOI.ConstraintDual(), c2) ≈ y2 atol=atol rtol=rtol
-        # end
     end
 end
 
 psdt1vtest(model::MOI.ModelLike, config) = _psd1test(model, true, MOI.PositiveSemidefiniteConeTriangle, config)
-psdt1ftest(model::MOI.ModelLike, config) = _psd1test(model, false, MOI.PositiveSemidefiniteConeTriangle, config)
-psds1vtest(model::MOI.ModelLike, config) = _psd1test(model, true, MOI.PositiveSemidefiniteConeSquare, config)
-psds1ftest(model::MOI.ModelLike, config) = _psd1test(model, false, MOI.PositiveSemidefiniteConeSquare, config)
 
 @testset "Continuous Conic" begin
-    # psdt1vtest(optimizer3, config_conic)
+    psdt1vtest(optimizer3, config_conic)
+end
+
+@testset "Continuous Linear" begin
+    # linear10 is poorly conditioned
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, ["linear8a", "linear8b", "linear8c", "linear12", "linear10"])
+end
+
+@testset "Continuous Conic" begin
     MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(optimizer3)), config_conic, [
         "psdt1v",
         # affine in cone

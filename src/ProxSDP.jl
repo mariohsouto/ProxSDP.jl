@@ -578,10 +578,6 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
     c_orig = zeros(1)
     if length(conic_sets.sdpcone) >= 1 || length(conic_sets.socone) >= 1
         all_cone_vars = Int[]
-        for (idx, soc) in enumerate(conic_sets.socone)
-            soc_vars = copy(soc.idx)
-            append!(all_cone_vars, soc_vars)
-        end
         for (idx, sdp) in enumerate(conic_sets.sdpcone)
             M = zeros(Int, sdp.sq_side, sdp.sq_side)
             iv = conic_sets.sdpcone[idx].vec_i
@@ -599,6 +595,10 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
                 cont += 1
             end
             append!(all_cone_vars, sdp_vars)
+        end
+        for (idx, soc) in enumerate(conic_sets.socone)
+            soc_vars = copy(soc.idx)
+            append!(all_cone_vars, soc_vars)
         end
 
         totvars = aff.n

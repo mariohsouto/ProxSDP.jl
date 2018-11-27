@@ -587,11 +587,13 @@ function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
     return out
 end
 function ivech(v::AbstractVector{T}) where T
-    n = sympackeddim(v)
+    n = sympackeddim(length(v))
     out = zeros(n, n)
-    vech!(out, v)
+    ivech!(out, v)
     return out
 end
+
+ivec(X) = full(Symmetric(ivech(X),:U))
 
 #=
     Status
@@ -612,18 +614,10 @@ end
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
     @assert -7 <= s <= 2
-    @assert s != 0
-    if s in (-7, -6, 2)
-        MOI.AlmostSuccess
-    elseif s == -5
-        MOI.Interrupted
-    elseif s == -4
-        MOI.NumericalError
-    elseif s == -3
-        MOI.SlowProgress
+    if s == 1
+        return MOI.Success
     else
-        @assert -2 <= s <= 1
-        MOI.Success
+        return MOI.IterationLimit
     end
 end
 
@@ -631,10 +625,8 @@ MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue) = optimizer.sol.objval
 
 function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
     s = optimizer.sol.ret_val
-    if s in (-3, 1, 2)
+    if s == 1
         MOI.FeasiblePoint
-    elseif s in (-6, -1)
-        MOI.InfeasibilityCertificate
     else
         MOI.InfeasiblePoint
     end
@@ -657,10 +649,8 @@ end
 
 function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
     s = optimizer.sol.ret_val
-    if s in (-3, 1, 2)
+    if s == 1
         MOI.FeasiblePoint
-    elseif s in (-7, -2)
-        MOI.InfeasibilityCertificate
     else
         MOI.InfeasiblePoint
     end
