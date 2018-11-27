@@ -16,6 +16,16 @@ const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Op
 const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
 const config_conic = MOIT.TestConfig(atol=1e-1, rtol=1e-1, duals = false)
 
+@testset "Unit" begin
+    MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer_lin), config,[
+        # Quadratic functions are not supported
+        "solve_qcp_edge_cases", "solve_qp_edge_cases",
+        # Integer and ZeroOne sets are not supported
+        "solve_integer_edge_cases", "solve_objbound_edge_cases"
+        ]
+    )
+end
+
 @testset "MOI Continuous Linear" begin
     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
         # infeasible/unbounded
