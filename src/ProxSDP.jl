@@ -16,6 +16,18 @@ function get_solution(opt::MOIU.CachingOptimizer{Optimizer,T}) where T
     return opt.optimizer.sol
 end
 
+struct CircularVector{T}
+    v::Vector{T}
+    l::Int
+    CircularVector{T}(l::Integer) where T = new(zeros(T, l), l)
+end
+function Base.getindex(V::CircularVector{T}, i::Int) where T
+    return V.v[mod1(i, V.l)]
+end
+function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
+    V.v[mod1(i, V.l)] = val
+end
+
 # --------------------------------
 mutable struct Options
     log_verbose::Bool
@@ -307,7 +319,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         arc = [ARPACKAlloc(Float64, 1) for i in conic_sets.sdpcone]
         map_socs!(pair.x, conic_sets, a)
 
-        primal_residual, dual_residual, comb_residual = zeros(opt.max_iter), zeros(opt.max_iter), zeros(opt.max_iter)
+        primal_residual, dual_residual, comb_residual = CircularVector{Float64}(2*p.window), CircularVector{Float64}(2*p.window), CircularVector{Float64}(2*p.window)
+        # primal_residual, dual_residual, comb_residual = CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter)
 
         # Diagonal scaling
         # @show affine_sets.A, affine_sets.G
@@ -486,7 +499,7 @@ function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
     return nothing
 end
 
-function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::Array{Float64,1}, dual_residual::Array{Float64,1}, comb_residual::Array{Float64,1}, mat::Matrices, p::Params)
+function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params)
     # Compute primal residual
     a.Mty_old .+= .- a.Mty .+ (1.0 / (1.0 + p.primal_step)).*(pair.x_old .- pair.x)
 
@@ -558,21 +571,6 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
 
     copy!(pair.y, a.y_temp)
     p.primal_step_old = p.primal_step
-
-    return nothing
-end
-
-function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, p::Params)
-    # Compute intermediate dual variable (y_{k + 1/2})
-    # pair.y = pair.y + dual_step * mat.M * (2.0 * pair.x - pair.x_old)
-    a.y_half .= p.theta .* a.Mx_old .- (1.0 + p.theta) .* a.Mx
-    pair.y .-= p.dual_step .* a.y_half
-
-    copy!(a.y_half, pair.y)
-    @timeit "box" box_projection!(a.y_half, affine_sets, p.dual_step)
-    pair.y .-= p.dual_step .* a.y_half
-
-    A_mul_B!(a.Mty, mat.Mt, pair.y)
 
     return nothing
 end

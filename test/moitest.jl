@@ -13,9 +13,10 @@ const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Opt
 const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_lin_hd = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-5, tol_dual = 1e-5))
 const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
 
-const config = MOIT.TestConfig(atol=1e-1, rtol=1e-1)
-const config_conic = MOIT.TestConfig(atol=1e-1, rtol=1e-1, duals = false)
+const config = MOIT.TestConfig(atol=1e-4, rtol=1e-3)
+const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
 
 @testset "Unit" begin
     MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer_lin), config,[
@@ -55,9 +56,6 @@ end
         ]
     )
 end
-# psdt2 is VAFF in cone
-# psdt1v is soc interc sdp "psdt1v",
-# need to creat dummy vars and ctrs
 
 @testset "Simple LP" begin
 
@@ -473,7 +471,10 @@ end
     include("base_sensorloc.jl")
     include("moi_sensorloc.jl")
     for n in 20:5:30
-        # @show n
         moi_sensorloc(optimizer, 0, n, test = true)
     end
+end
+
+@testset "Print" begin
+    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-4, rtol=1e-3))
 end

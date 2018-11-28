@@ -59,32 +59,6 @@ end
 
 hasconverged(arc::ARPACKAlloc) = arc.converged
 
-function Base.getindex(arc::ARPACKAlloc, s::Symbol)
-    if s == :Values
-        return arc.d
-    elseif s == :Vector
-        return arc.v
-    else
-        error("Not a field")
-    end
-end
-
-function Base.getindex(arc::ARPACKAlloc{T}, s::Symbol, i::Integer)::T where T
-    if s == :Values && i <= arc.nev
-        return arc.d[i]
-    else
-        error("Not allowed")
-    end
-end
-
-function getvector(arc::ARPACKAlloc{T}, s::Symbol, i::Integer)::Vector{T} where T
-    if i <= arc.nev
-        return arc.v[:,i]
-    else
-        error("Bounds out of range")
-    end
-end
-
 function unsafe_getvalues(arc::ARPACKAlloc)
     return arc.d
 end
@@ -99,24 +73,13 @@ function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1, iter::Int64=1)
     return arc
 end
 
-function ARPACKAlloc(A, nev::Integer, iter::Int64)
-    arc = ARPACKAlloc{T}()
-    ARPACKAlloc_reset!(arc::ARPACKAlloc, A, nev, 1)
-    return arc
-end
-
 function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer, iter::Int64) where T
 
     tol = 0.0
     v0=zeros(eltype(A),(0,))
     #, v0::Vector{T} = zeros(T,(0,))
 
-    newT = eltype(A)
     n = Base.LinAlg.checksquare(A)
-
-    if newT != T
-        error("Element type change is not allowed")
-    end
 
     # eigs
     arc.n = n
