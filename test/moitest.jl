@@ -7,9 +7,151 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
+MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer())
+const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_lin_hd = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-5, tol_dual = 1e-5))
+const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
+
+const config = MOIT.TestConfig(atol=1e-4, rtol=1e-3)
+const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
+
+@testset "Unit" begin
+    MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer_lin), config,[
+        # Quadratic functions are not supported
+        "solve_qcp_edge_cases", "solve_qp_edge_cases",
+        # Integer and ZeroOne sets are not supported
+        "solve_integer_edge_cases", "solve_objbound_edge_cases"
+        ]
+    )
+end
+
+@testset "MOI Continuous Linear" begin
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
+        # infeasible/unbounded
+        "linear8a", "linear8b", "linear8c", "linear12", 
+        # linear10 is poorly conditioned
+        "linear10",
+        # linear9 is requires precision
+        "linear9"
+        ]
+    )
+    MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer_lin_hd), config)
+end
+
+@testset "MOI Continuous Conic" begin
+    MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(optimizer3)), config_conic, [
+        # bridge
+        "rootdet","geomean",
+        # affine in cone
+        "psdt1f","psdt0f","soc2p", "soc2n", "rsoc",
+        # square psd
+        "psds", "rootdets",
+        # exp cone
+        "logdet", "exp",
+        # infeasible/unbounded
+        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        ]
+    )
+end
+
+@testset "Simple LP" begin
+
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    # add 10 variables - only diagonal is relevant
+    X = MOI.add_variables(optimizer, 2)
+
+    # add sdp constraints - only ensuring positivenesse of the diagonal
+    vov = MOI.VectorOfVariables(X)
+
+    c1 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(2.0, X[1]),
+            MOI.ScalarAffineTerm(1.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    c2 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1]),
+            MOI.ScalarAffineTerm(2.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    b1 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1])
+        ], 0.0), MOI.GreaterThan(0.0))
+
+    b2 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[2])
+        ], 0.0), MOI.GreaterThan(0.0))
+
+    MOI.set(optimizer, 
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[2]]), 0.0)
+        )
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
+
+    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    @test obj ≈ -9.33333 atol = 1e-2
+
+    Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
+
+    @test Xr ≈ [1.3333, 1.3333] atol = 1e-2
+
+end
+
+@testset "Simple LP with 2 1D SDP" begin
+
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    # add 10 variables - only diagonal is relevant
+    X = MOI.add_variables(optimizer, 2)
+
+    # add sdp constraints - only ensuring positivenesse of the diagonal
+    vov = MOI.VectorOfVariables(X)
+
+    c1 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(2.0, X[1]),
+            MOI.ScalarAffineTerm(1.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    c2 = MOI.add_constraint(optimizer, 
+        MOI.ScalarAffineFunction([
+            MOI.ScalarAffineTerm(1.0, X[1]),
+            MOI.ScalarAffineTerm(2.0, X[2])
+        ], 0.0), MOI.EqualTo(4.0))
+
+    b1 = MOI.add_constraint(optimizer, 
+        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[1]])), MOI.PositiveSemidefiniteConeTriangle(1))
+
+    b2 = MOI.add_constraint(optimizer, 
+        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[2]])), MOI.PositiveSemidefiniteConeTriangle(1))
+
+    MOI.set(optimizer, 
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[2]]), 0.0)
+        )
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
+
+    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    @test obj ≈ -9.33333 atol = 1e-2
+
+    Xr = MOI.get(optimizer, MOI.VariablePrimal(), X)
+
+    @test Xr ≈ [1.3333, 1.3333] atol = 1e-2
+
+end
 
 @testset "LP in SDP EQ form" begin
 
@@ -135,6 +277,54 @@ end
 
     Xv = ones(3)
     @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
+    # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
+
+    # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
+    # @show MOI.get(optimizer, MOI.ConstraintDual(), c)
+
+end
+
+@testset "Double SDP from MOI" begin
+    # solve simultaneously two of these:
+    # min X[1,1] + X[2,2]    max y
+    #     X[2,1] = 1         [0   y/2     [ 1  0
+    #                         y/2 0    <=   0  1]
+    #     X >= 0              y free
+    # Optimal solution:
+    #
+    #     ⎛ 1   1 ⎞
+    # X = ⎜       ⎟           y = 2
+    #     ⎝ 1   1 ⎠
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    X = MOI.add_variables(optimizer, 3)
+    Y = MOI.add_variables(optimizer, 3)
+
+    vov = MOI.VectorOfVariables(X)
+    vov2 = MOI.VectorOfVariables(Y)
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
+    cY = MOI.add_constraint(optimizer, vov2, MOI.PositiveSemidefiniteConeTriangle(2))
+
+    c = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, X[2])], 0.0), MOI.EqualTo(1.0))
+    c2 = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Y[2])], 0.0), MOI.EqualTo(1.0))
+
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end], Y[1], Y[end]]), 0.0))
+
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.optimize!(optimizer)
+
+    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.Success
+
+    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FeasiblePoint
+    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FeasiblePoint
+
+    @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2*2 atol=1e-2
+
+    Xv = ones(3)
+    @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
+    Yv = ones(3)
+    @test MOI.get(optimizer, MOI.VariablePrimal(), Y) ≈ Yv atol=1e-2
     # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
 
     # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
@@ -281,7 +471,14 @@ end
     include("base_sensorloc.jl")
     include("moi_sensorloc.jl")
     for n in 20:5:30
-        # @show n
         moi_sensorloc(optimizer, 0, n, test = true)
     end
+end
+
+@testset "Full eig" begin
+    MOIT.psdt0vtest(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false))
+end
+
+@testset "Print" begin
+    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-4, rtol=1e-3))
 end

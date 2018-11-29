@@ -7,7 +7,7 @@ const VI = MOI.VariableIndex
 const MOIU = MOI.Utilities
 
 const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle}
+const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle}
 
 mutable struct MOISolution
     ret_val::Int
@@ -68,9 +68,12 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     sol::MOISolution
 
     params::Vector{Any}
-    function Optimizer(args=Any[])
+    function Optimizer(args::Vector)
         new(ConeData(), false, nothing, MOISolution(), args)
     end
+end
+function Optimizer(;args...)
+    return Optimizer(args)
 end
 
 function MOI.is_empty(optimizer::Optimizer)
@@ -85,12 +88,16 @@ MOIU.needs_allocate_load(instance::Optimizer) = true
 
 function MOI.supports(::Optimizer,
                       ::Union{MOI.ObjectiveSense,
-                              MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
-                              MOI.VariablePrimalStart})
+                              MOI.ObjectiveFunction{MOI.SingleVariable},
+                              MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}
+                              })
     return true
 end
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SF}, ::Type{<:SS}) = true
+MOI.supports_constraint(::Optimizer, ::Type{MOI.VectorAffineFunction{Float64}}, ::Type{MOI.PositiveSemidefiniteConeTriangle}) = false
+MOI.supports_constraint(::Optimizer, ::Type{MOI.VectorAffineFunction{Float64}}, ::Type{MOI.SecondOrderCone}) = false
+# MOI.supports_constraint(::Optimizer, ::Type{MOI.VectorOfVariables}, ::Type{MOI.PositiveSemidefiniteConeTriangle}) = false
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; copy_names = true)
     return MOIU.allocate_load(dest, src, copy_names)
@@ -295,7 +302,10 @@ end
 function MOIU.allocate(optimizer::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense)
     optimizer.maxsense = sense == MOI.MaxSense
 end
-function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction, ::MOI.ScalarAffineFunction) end
+function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction,
+    ::MOI.Union{MOI.SingleVariable,
+                MOI.ScalarAffineFunction{Float64}})
+end
 
 function MOIU.load(optimizer::Optimizer, ::MOI.VariablePrimalStart,
                    vi::MOI.VariableIndex, value::Float64)
@@ -313,11 +323,21 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ConstraintDualStart,
     rows = constrrows(optimizer, ci)
     optimizer.sol.primal[offset .+ rows] .= value
 end
-function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense) end
-function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction, f::MOI.ScalarAffineFunction)
-    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms), optimizer.data.n))
+function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense)
+end
+function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
+               f::MOI.SingleVariable)
+MOIU.load(optimizer,
+          MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+          MOI.ScalarAffineFunction{Float64}(f))
+end
+function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
+               f::MOI.ScalarAffineFunction)
+    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
+                        optimizer.data.n))
     optimizer.data.objconstant = f.constant
     optimizer.data.c = optimizer.maxsense ? -c0 : c0
+    return nothing
 end
 
 #=
@@ -333,12 +353,12 @@ function MOI.optimize!(optimizer::Optimizer)
 
     cone = optimizer.cone
 
-    if cone.q > 0
-        error("SOC constraints not supported")
-    end
-    if length(cone.qa) > 0
-        error("SOC constraints not supported")
-    end
+    # if cone.q > 0
+    #     error("SOC constraints not supported")
+    # end
+    # if length(cone.qa) > 0
+    #     error("SOC constraints not supported")
+    # end
     if cone.ep > 0
         error("Primal Exponential Cone constraints not supported")
     end
@@ -348,9 +368,9 @@ function MOI.optimize!(optimizer::Optimizer)
     if length(cone.p) > 0
         error("Power Cone constraints not supported")
     end
-    if length(cone.sa) != 1
-        error("There must be exactely one SDP constraint")
-    end
+    # if length(cone.sa) >= 0
+    #     error("There must be exactely one SDP constraint")
+    # end
 
     # @show cone.s
     # @show cone.sa
@@ -358,17 +378,21 @@ function MOI.optimize!(optimizer::Optimizer)
     m = optimizer.data.m #rows
     n = optimizer.data.n #cols
 
-    if cone.s != n
-        error("The number of columns must be equal to the number of entries in the PSD matrix")
-    end
+    # if cone.s != n
+    #     error("The number of columns must be equal to the number of entries in the PSD matrix")
+    # end
 
     preA = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
     preb = optimizer.data.b
     objconstant = optimizer.data.objconstant
-    c = optimizer.data.c # TODO (@joaquim) - change sign?
-    optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded to SCS
+    c = optimizer.data.c
+    optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded
 
     TimerOutputs.reset_timer!()
+
+    # @show preA
+    # @show full(preA)
+    # @show cone
 
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
@@ -380,56 +404,106 @@ function MOI.optimize!(optimizer::Optimizer)
 
     b = preb[1:cone.f]
     h = preb[cone.f+1:cone.f+cone.l]
-    aff = AffineSets(A, G, b, h, c)
-
     # Dimensions (of affine sets)
-    n_variables = size(A)[2] # primal
+    n_variables = size(preA)[2] # primal
     n_eqs = size(A)[1]
     n_ineqs = size(G)[1]
-    dims = Dims(sympackeddim(n_variables), n_eqs, n_ineqs, copy(cone.sa))
+    aff = AffineSets(n_variables, n_eqs, n_ineqs, 0, A, G, b, h, c)
+
     # Build SDP Sets
     con = ConicSets(
-        SDPSet[]
+        SDPSet[],
+        SOCSet[]
         )
 
-        # Asdp = preA[cone.f+cone.l+1:end,:]
-        # indices_sdp = Asdp.rowval
-    
-        # aff = AffineSets(A, G, b, h, c)
-        # con = ConicSets(Tuple{Vector{Int},Vector{Int}}[(sortperm(indices_sdp), matindices(sympackeddim(length(indices_sdp))) )])
+    preAt = preA'
 
-    Asdp = preA[cone.f+cone.l+1:end,:]
-    first_ind = 1
-    inds = Asdp.rowval
+    # this way there is a single elements per column
+    # because we assume VOV in SET and NOT AFF in SET
+    Asoc = preAt[:,cone.f+cone.l+1:cone.f+cone.l+cone.q]
+    A = Asoc
+    rows = rowvals(A)
+    first_ind_local = 1
+    for d in cone.qa
+        n_vars = d
+        vec_inds = get_indices_cone(A, rows, n_vars, first_ind_local)
+        push!(con.socone, SOCSet(vec_inds, n_vars))
+        first_ind_local += n_vars
+    end
+
+    Asdp = preAt[:,cone.f+cone.l+cone.q+1:end]
+    A = Asdp
+    rows = rowvals(A)
+    first_ind_local = 1
     for d in cone.sa
-        lines = sympackedlen(d)
-        indices_sdp = inds[first_ind:first_ind+lines-1]
-        vec_inds = sortperm(indices_sdp)#sort(indices_sdp)
-        # vec_inds = sortperm(indices_sdp)
-        mat_inds = matindices(sympackeddim(length(indices_sdp)))
-        newsdp = SDPSet(vec_inds, mat_inds)
-        push!(con.sdpcone, newsdp)
-        first_ind += lines
+        n_vars = sympackedlen(d)
+        vec_inds = get_indices_cone(A, rows, n_vars, first_ind_local)
+        mat_inds = matindices(d)
+        tri_len = n_vars
+        sq_side = d
+        sq_len = sq_side*sq_side
+        push!(con.sdpcone, SDPSet(vec_inds, mat_inds, tri_len, sq_len, sq_side))
+        first_ind_local += n_vars
+    end
+
+    # create extra variables
+    n_tot_variables = n_variables
+    In, Jn, Vn = Int[], Int[], Float64[]
+    for i in 1:length(con.socone)
+        for j in i+1:length(con.socone)
+            vec1 = con.socone[i].idx
+            vec2 = con.socone[j].idx
+            n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
+
+        end
     end
 
     for i in 1:length(con.sdpcone)
         for j in i+1:length(con.sdpcone)
-            if !is_empty(setdiff(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i))
-                error("SDP cones must be disjoint")
-            end
+            vec1 = con.sdpcone[i].vec_i
+            vec2 = con.sdpcone[j].vec_i
+            n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
+            # if length(intersect(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i)) > 0
+            #     error("SDP cones must be disjoint")
+            # end
         end
     end
+
+    for i in 1:length(con.sdpcone)
+        for j in 1:length(con.socone)
+            vec1 = con.sdpcone[i].vec_i
+            vec2 = con.socone[j].idx
+            n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
+            # if length(intersect(con.sdpcone[i].vec_i,con.socone[j].idx)) > 0
+            #     error("SDP cones and SOC must be disjoint")
+            # end
+        end
+    end
+
+    n_new_variables = n_tot_variables - n_variables
+
+    A2 = sparse(In .- n_variables, Jn, Vn, n_new_variables, n_tot_variables)
+    b2 = zeros(n_new_variables)
+
+    append!(aff.b, b2)
+    aff.A = vcat(hcat(aff.A, spzeros(size(aff.A)[1], n_new_variables)), A2)
+    aff.G = hcat(aff.G, spzeros(size(aff.G)[1], n_new_variables))
+    append!(aff.c, zeros(n_new_variables))
+    # @show aff.n, n_new_variables, n_new_variables, n_tot_variables
+    aff.n += n_new_variables
+    aff.p += n_new_variables
+    aff.extra = n_new_variables
 
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = @timeit "Main" chambolle_pock(aff, con, dims, options)
+    sol = @timeit "Main" chambolle_pock(aff, con, options)
 
     ret_val = sol.status
-    primal = sol.primal
-    dual = sol.dual
-    slack = sol.slack
-    objval = sol.objval + objconstant
+    primal = sol.primal[1:aff.n-aff.extra]
+    dual = vcat(sol.dual[1:aff.p-aff.extra], sol.dual[aff.p+1:end])
+    slack = vcat(sol.slack[1:aff.p-aff.extra], sol.slack[aff.p+1:end])
+    objval = sol.objval
 
     if options.timer_verbose
         TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
@@ -444,7 +518,48 @@ function MOI.optimize!(optimizer::Optimizer)
         close(f)
     end
 
-    optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval, sol.dual_objval, sol.gap, sol.time)
+    optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval+objconstant, sol.dual_objval, sol.gap, sol.time)
+end
+
+function get_indices_cone(A, rows, n_vars, first_ind_local)
+    vec_inds = zeros(Int, n_vars)
+    for (idx, col) in enumerate(first_ind_local:first_ind_local+n_vars-1)
+        # columns -> pos in cone (because is tranposed)
+        for j in nzrange(A, col)
+            row = rows[j]
+            position = idx
+            var_idx = row # global
+            vec_inds[position] = var_idx
+        end
+    end
+    return vec_inds
+end
+
+function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
+
+    duplicates = intersect(vec2, vec1)
+    n_dups = length(duplicates)
+    if n_dups == 0
+        return 0
+    end
+    # if n_dups > 0
+    #     error("SOC cones must be disjoint")
+    # end
+    append!(Jn, duplicates)
+    append!(Jn, collect(1:n_dups) + n)
+    append!(In, collect(1:n_dups) + n)
+    append!(In, collect(1:n_dups) + n)
+    append!(Vn,  ones(n_dups))
+    append!(Vn, -ones(n_dups))
+    cont = 1
+    for i in eachindex(vec2)
+        if vec2[i] == duplicates[cont]
+            vec2[i] = n + cont
+            cont += 1
+        end
+    end
+    @assert cont-1 == n_dups
+    return n_dups
 end
 
 function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
@@ -459,11 +574,13 @@ function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
     return out
 end
 function ivech(v::AbstractVector{T}) where T
-    n = sympackeddim(v)
+    n = sympackeddim(length(v))
     out = zeros(n, n)
-    vech!(out, v)
+    ivech!(out, v)
     return out
 end
+
+ivec(X) = full(Symmetric(ivech(X),:U))
 
 #=
     Status
@@ -484,18 +601,10 @@ end
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
     @assert -7 <= s <= 2
-    @assert s != 0
-    if s in (-7, -6, 2)
-        MOI.AlmostSuccess
-    elseif s == -5
-        MOI.Interrupted
-    elseif s == -4
-        MOI.NumericalError
-    elseif s == -3
-        MOI.SlowProgress
+    if s == 1
+        return MOI.Success
     else
-        @assert -2 <= s <= 1
-        MOI.Success
+        return MOI.IterationLimit
     end
 end
 
@@ -503,10 +612,8 @@ MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue) = optimizer.sol.objval
 
 function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
     s = optimizer.sol.ret_val
-    if s in (-3, 1, 2)
+    if s == 1
         MOI.FeasiblePoint
-    elseif s in (-6, -1)
-        MOI.InfeasibilityCertificate
     else
         MOI.InfeasiblePoint
     end
@@ -529,10 +636,8 @@ end
 
 function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
     s = optimizer.sol.ret_val
-    if s in (-3, 1, 2)
+    if s == 1
         MOI.FeasiblePoint
-    elseif s in (-7, -2)
-        MOI.InfeasibilityCertificate
     else
         MOI.InfeasiblePoint
     end
