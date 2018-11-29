@@ -98,6 +98,4 @@ The first version of the paper can be found [here](https://arxiv.org/abs/1810.05
 
 ### TODO
 
-- Add support for multiple SDP Variables
-- Add support for scalar Variables
 - Add support for other cones
