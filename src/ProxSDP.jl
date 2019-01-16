@@ -5,7 +5,7 @@ using MathOptInterface, TimerOutputs
 using Compat
 using Printf
 
-include("MOIWrapper.jl")
+include("MOI_wrapper.jl")
 include("eigsolver.jl")
 
 
@@ -342,7 +342,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         if minimum(size(M)) >= 2
             p.primal_step = 1.0 / Arpack.svds(M, nsv = 1)[1].S #TODO review efficiency
         else
-            p.primal_step = 1.0 / maximum(LinearAlgebra.svd(full(M)).S) #TODO review efficiency
+            p.primal_step = 1.0 / maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
         end
         # dual_step = primal_step
         p.primal_step_old = p.primal_step
@@ -523,11 +523,11 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     comb_residual[p.iter] = primal_residual[p.iter] + dual_residual[p.iter]
 
     # Keep track of previous iterates
-    copy!(pair.x_old, pair.x)
-    copy!(pair.y_old, pair.y)
-    copy!(a.Mty_old, a.Mty)
-    copy!(a.Mx_old, a.Mx)
-    copy!(a.MtMx_old, a.MtMx)
+    copyto!(pair.x_old, pair.x)
+    copyto!(pair.y_old, pair.y)
+    copyto!(a.Mty_old, a.Mty)
+    copyto!(a.Mx_old, a.Mx)
+    copyto!(a.MtMx_old, a.MtMx)
 
     return nothing
 end
@@ -545,7 +545,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         end
         @timeit "linesearch 2" begin
             # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
-            copy!(a.y_temp, a.y_half)
+            copyto!(a.y_temp, a.y_half)
             box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
         end
@@ -578,7 +578,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     a.Mty .+= a.Mty_old
     a.y_temp .+= pair.y_old
 
-    copy!(pair.y, a.y_temp)
+    copyto!(pair.y, a.y_temp)
     p.primal_step_old = p.primal_step
 
     return nothing
