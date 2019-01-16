@@ -94,7 +94,7 @@ end
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[2]]), 0.0)
         )
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
@@ -140,7 +140,7 @@ end
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[2]]), 0.0)
         )
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
@@ -183,7 +183,7 @@ end
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-4.0, -3.0], [X[1], X[3]]), 0.0)
         )
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
@@ -224,7 +224,7 @@ end
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([4.0, 3.0], [X[1], X[3]]), 0.0)
         )
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
@@ -265,13 +265,13 @@ end
 
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end]]), 0.0))
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     MOI.optimize!(optimizer)
 
-    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.Success
+    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
 
-    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FeasiblePoint
-    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FeasiblePoint
+    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FEASIBLE_POINT
 
     @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2 atol=1e-2
 
@@ -311,13 +311,13 @@ end
 
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end], Y[1], Y[end]]), 0.0))
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     MOI.optimize!(optimizer)
 
-    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.Success
+    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
 
-    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FeasiblePoint
-    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FeasiblePoint
+    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FEASIBLE_POINT
 
     @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2*2 atol=1e-2
 
@@ -354,14 +354,14 @@ end
 
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[4]]), 0.0))
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
     MOI.optimize!(optimizer)
 
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
     @test obj ≈ -0.978 atol=1e-2
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MaxSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MAX_SENSE)
 
     MOI.optimize!(optimizer)
 
@@ -415,7 +415,7 @@ end
     objf_t = vec([MOI.ScalarAffineTerm(L[i,j], Xsq[i,j]) for i in 1:n+1, j in 1:n+1])
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
     MOI.optimize!(optimizer)
 

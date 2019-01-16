@@ -31,7 +31,7 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false)
     objf_t = vec([MOI.ScalarAffineTerm(L[i,j], Xsq[i,j]) for i in 1:n+1, j in 1:n+1])
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
     MOI.optimize!(optimizer)
 

@@ -26,7 +26,7 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
     objf_t = vec([MOI.ScalarAffineTerm(C[i,j], Xsq[i,j]) for j in 1:n, i in 1:n])
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
 
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
     MOI.optimize!(optimizer)
 

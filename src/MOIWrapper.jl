@@ -82,6 +82,7 @@ end
 function MOI.empty!(optimizer::Optimizer)
     optimizer.maxsense = false
     optimizer.data = nothing # It should already be nothing except if an error is thrown inside copy_to
+    optimizer.sol.ret_val = 0
 end
 
 MOIU.needs_allocate_load(instance::Optimizer) = true
@@ -300,7 +301,7 @@ function MOIU.allocate(::Optimizer, ::MOI.ConstraintDualStart,
                        ::MOI.ConstraintIndex, ::Float64)
 end
 function MOIU.allocate(optimizer::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense)
-    optimizer.maxsense = sense == MOI.MaxSense
+    optimizer.maxsense = sense == MOI.MAX_SENSE
 end
 function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction,
     ::MOI.Union{MOI.SingleVariable,
@@ -602,7 +603,9 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
     @assert -7 <= s <= 2
     if s == 1
-        return MOI.Success
+        return MOI.OPTIMAL
+    elseif s == 0
+        return MOI.OPTIMIZE_NOT_CALLED
     else
         return MOI.IterationLimit
     end
@@ -613,9 +616,9 @@ MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue) = optimizer.sol.objval
 function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
     s = optimizer.sol.ret_val
     if s == 1
-        MOI.FeasiblePoint
+        MOI.FEASIBLE_POINT
     else
-        MOI.InfeasiblePoint
+        MOI.INFEASIBLE_POINT
     end
 end
 function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, vi::VI)
@@ -637,9 +640,9 @@ end
 function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
     s = optimizer.sol.ret_val
     if s == 1
-        MOI.FeasiblePoint
+        MOI.FEASIBLE_POINT
     else
-        MOI.InfeasiblePoint
+        MOI.INFEASIBLE_POINT
     end
 end
 function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet

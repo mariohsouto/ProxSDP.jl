@@ -29,7 +29,7 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
     I,J,V=findnz(F[0])
     objf_t = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MinSense)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
     # for i in 1:nvars
     #     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[i]), MOI.LessThan(1.0))
