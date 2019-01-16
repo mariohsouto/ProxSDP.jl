@@ -4,7 +4,7 @@ module ProxSDP
 using MathOptInterface, TimerOutputs
 using Compat
 
-include("MOIWrapper.jl")
+include("MOI_wrapper.jl")
 include("eigsolver.jl")
 
 
