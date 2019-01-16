@@ -1,6 +1,6 @@
 push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
 
-using ProxSDP, MathOptInterface, Base.Test
+using ProxSDP, MathOptInterface, Test, LinearAlgebra
 
 const MOI = MathOptInterface
 const MOIT = MOI.Test

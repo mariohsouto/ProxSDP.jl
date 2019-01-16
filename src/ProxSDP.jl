@@ -3,6 +3,7 @@ module ProxSDP
 
 using MathOptInterface, TimerOutputs
 using Compat
+using Printf
 
 include("MOIWrapper.jl")
 include("eigsolver.jl")
@@ -114,7 +115,7 @@ function parse_arg!(options::Options, arg)
     return nothing
 end
 
-type AffineSets
+mutable struct AffineSets
     n::Int  # Size of primal variables
     p::Int  # Number of linear equalities
     m::Int  # Number of linear inequalities
@@ -126,7 +127,7 @@ type AffineSets
     c::Vector{Float64}
 end
 
-type SDPSet
+mutable struct SDPSet
     vec_i::Vector{Int}
     mat_i::Vector{Int}
     tri_len::Int
@@ -134,12 +135,12 @@ type SDPSet
     sq_side::Int
 end
 
-type SOCSet
+mutable struct SOCSet
     idx::Vector{Int}
     len::Int
 end
 
-type ConicSets
+mutable struct ConicSets
     sdpcone::Vector{SDPSet}
     socone::Vector{SOCSet}
 end
@@ -157,7 +158,7 @@ struct CPResult
     time::Float64
 end
 
-type PrimalDual
+mutable struct PrimalDual
     x::Vector{Float64}
     x_old::Vector{Float64}
 
@@ -173,7 +174,7 @@ end
 const ViewVector = SubArray#{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int}}, true}
 const ViewScalar = SubArray#{Float64, 1, Vector{Float64}, Tuple{Int}, true}
 
-type AuxiliaryData
+mutable struct AuxiliaryData
     m::Vector{Symmetric{Float64,Matrix{Float64}}}
     Mty::Vector{Float64}
     Mty_old::Vector{Float64}
@@ -196,7 +197,7 @@ type AuxiliaryData
     end
 end
 
-type Matrices
+mutable struct Matrices
     M::SparseMatrixCSC{Float64,Int64}
     Mt::SparseMatrixCSC{Float64,Int64}
     c::Vector{Float64}
@@ -305,8 +306,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         printheader()
     end
 
-    tic()
-    @timeit "Init" begin
+    # @timeit "Init" begin
         # Scale objective function
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
@@ -319,7 +319,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         arc = [ARPACKAlloc(Float64, 1) for i in conic_sets.sdpcone]
         map_socs!(pair.x, conic_sets, a)
 
-        primal_residual, dual_residual, comb_residual = CircularVector{Float64}(2*p.window), CircularVector{Float64}(2*p.window), CircularVector{Float64}(2*p.window)
+        println("oi1")
+        primal_residual = CircularVector{Float64}(2*p.window)
+        dual_residual = CircularVector{Float64}(2*p.window)
+        comb_residual = CircularVector{Float64}(2*p.window)
+        println("oi2")
         # primal_residual, dual_residual, comb_residual = CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter)
 
         # Diagonal scaling
@@ -330,17 +334,22 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         rhs = vcat(affine_sets.b, affine_sets.h)
         mat = Matrices(M, Mt, affine_sets.c)
         # @show a.Mtrhs, mat.Mt, rhs
-        A_mul_B!(a.Mtrhs, mat.Mt, rhs)
+        mul!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
         # primal_step = sqrt(min(aff.n^2, aff.m + aff.p)) / vecnorm(M)
-        p.primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
+        # p.primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
+        if minimum(size(M)) >= 2
+            p.primal_step = 1.0 / Arpack.svds(M, nsv = 1)[1].S #TODO review efficiency
+        else
+            p.primal_step = 1.0 / maximum(LinearAlgebra.svd(full(M)).S) #TODO review efficiency
+        end
         # dual_step = primal_step
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
         pair.x[1] = 1.0
 
-    end
+    # end
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
@@ -547,7 +556,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         @timeit "linesearch 4" if affine_sets.m == 0
             a.Mty .-= (p.beta * p.primal_step) .* a.Mtrhs
         else
-            A_mul_B!(a.Mty_aux, mat.Mt, a.y_half)
+            mul!(a.Mty_aux, mat.Mt, a.y_half)
             a.Mty .-= (p.beta * p.primal_step) .* a.Mty_aux
         end
         
@@ -647,8 +656,8 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
         @timeit "soc proj" so_cone_projection!(pair.x, a, cones, opt, p)
     end
 
-    @timeit "linesearch -1" A_mul_B!(a.Mx, mat.M, pair.x)
-    @timeit "linesearch 0" A_mul_B!(a.MtMx, mat.Mt, a.Mx)
+    @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
+    @timeit "linesearch 0" mul!(a.MtMx, mat.Mt, a.Mx)
 
     return nothing
 end
@@ -711,7 +720,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                         if unsafe_getvalues(arc[idx])[i] > 0.0
                             current_rank += 1
                             vec = unsafe_getvectors(arc[idx])[:, i]
-                            Base.LinAlg.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
+                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
                         end
                     end
                 end
@@ -749,7 +758,7 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
     for i in 1:length(fact[:values])
         if fact[:values][i] > 0.0
             current_rank += 1
-            Base.LinAlg.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m[idx].data)
+            LinearAlgebra.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m[idx].data)
         end
     end
     return nothing

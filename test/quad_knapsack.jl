@@ -56,9 +56,9 @@ function quad_knapsack(solver, seed)
     if Base.libblas_name == "libmkl_rt"
         JuMP.attach(model, solver)
     end
-    tic()
-    teste = JuMP.solve(model)
-    toc()
+    
+    @time teste = JuMP.solve(model)
+    
     if Base.libblas_name == "libmkl_rt"
         XX = getvalue2.(X)
     else

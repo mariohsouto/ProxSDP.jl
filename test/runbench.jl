@@ -34,7 +34,7 @@ function println2(FILE, class::String, ref::String, sol::ProxSDP.MOISolution)
     println(FILE, "$class, $ref, $(sol.time), $(sol.objval), $(sol.dual_objval), $(sol.primal_residual), $(sol.dual_residual)")
     flush(FILE)
 end
-println2(FILE, class::String, ref::String, sol::Void) = nothing
+println2(FILE, class::String, ref::String, sol::Nothing) = nothing
 
 RANDSDP_TEST_SET = 1:1
 SENSORLOC_TEST_SET = 50:50:300

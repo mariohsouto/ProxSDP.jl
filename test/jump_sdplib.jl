@@ -30,9 +30,8 @@ function jump_sdplib(solver, path, verbose = false)
     if Base.libblas_name == "libmkl_rt"
         JuMP.attach(model, solver)
     end
-    tic()
-    teste = JuMP.solve(model)
-    toc()
+    
+    @time teste = JuMP.solve(model)
 
     if Base.libblas_name == "libmkl_rt"
         XX = getvalue2.(X)

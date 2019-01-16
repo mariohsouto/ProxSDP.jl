@@ -1,9 +1,11 @@
 
-import Base.LinAlg: BlasInt, ARPACKException
-
+# import Base.LinAlg: BlasInt, ARPACKException
+import LinearAlgebra: BlasInt, ARPACKException
+using LinearAlgebra
 using TimerOutputs
 
-Base.LinAlg.ARPACK
+# Base.LinAlg.ARPACK
+using Arpack
 
 mutable struct ARPACKAlloc{T}
 
@@ -79,7 +81,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     v0=zeros(eltype(A),(0,))
     #, v0::Vector{T} = zeros(T,(0,))
 
-    n = Base.LinAlg.checksquare(A)
+    n = LinearAlgebra.checksquare(A)
 
     # eigs
     arc.n = n
@@ -93,7 +95,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.mode = 1
     # arc.solveSI = x->x
     # arc.B = x->x
-    matvecA!(y, x) = A_mul_B!(y, A, x)
+    matvecA!(y, x) = mul!(y, A, x)
     arc.A = matvecA!
     arc.Amat = A
     arc.x = Vector{T}(arc.n)
@@ -144,7 +146,7 @@ function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
     arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
     
     while true
-        Base.LinAlg.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
+        LinearAlgebra.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
         # x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
@@ -156,7 +158,7 @@ function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
                 arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
             end
             # arc.A(arc.y, arc.x)
-            A_mul_B!(arc.y, arc.Amat, arc.x)
+            mul!(arc.y, arc.Amat, arc.x)
             @inbounds @simd for i in 1:arc.n
                  arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
             end
@@ -175,14 +177,14 @@ end
 
 function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64) where T1
 
-    n = Base.LinAlg.checksquare(A)
+    n = LinearAlgebra.checksquare(A)
     T = eltype(A)
 
     if eltype(arc.v) != T || n != arc.n || nev != arc.nev
         return ARPACKAlloc_reset!(arc, A, nev, iter)
     end
 
-    matvecA!(y, x) = A_mul_B!(y, A, x)
+    matvecA!(y, x) = mul!(y, A, x)
     arc.A = matvecA!
     arc.Amat = A
 
@@ -216,7 +218,7 @@ function _EUPD!(arc)
 
     # d = Vector{T}(nev)
     # sigmar = Ref{T}(sigma)
-    Base.LinAlg.ARPACK.seupd(true, arc.howmny, arc.select, arc.d, arc.v, arc.n, arc.sigmar,
+    Arpack.seupd(true, arc.howmny, arc.select, arc.d, arc.v, arc.n, arc.sigmar,
     arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
     arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info_e)
     if arc.info_e[] != 0
@@ -241,11 +243,11 @@ function _EUPD!(arc)
 end
 
 
-function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64)::Void where T1
+function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64)::Nothing where T1
 
-    @timeit "_INIT!" _INIT!(arc, A, nev, iter)::Void
-    @timeit "_AUPD!" _AUPD!(arc, iter)::Void
-    @timeit "_EUPD!" _EUPD!(arc)::Void
+    @timeit "_INIT!" _INIT!(arc, A, nev, iter)::Nothing
+    @timeit "_AUPD!" _AUPD!(arc, iter)::Nothing
+    @timeit "_EUPD!" _EUPD!(arc)::Nothing
 
     return nothing
 end
