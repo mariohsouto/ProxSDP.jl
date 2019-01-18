@@ -146,8 +146,6 @@ function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
     arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
     
     while true
-        # Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
-        # arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
         Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 

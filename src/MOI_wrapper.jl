@@ -498,7 +498,7 @@ function MOI.optimize!(optimizer::Optimizer)
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = chambolle_pock(aff, con, options)
+    sol = @timeit "Main" chambolle_pock(aff, con, options)
 
     ret_val = sol.status
     primal = sol.primal[1:aff.n-aff.extra]
@@ -506,18 +506,18 @@ function MOI.optimize!(optimizer::Optimizer)
     slack = vcat(sol.slack[1:aff.p-aff.extra], sol.slack[aff.p+1:end])
     objval = sol.objval
 
-    # if options.timer_verbose
-    #     TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
-    #     print("\n")
-    #     TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
-    #     print("\n")
-    #     f = open("time.log","w")
-    #     TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
-    #     print(f,"\n")
-    #     TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
-    #     print(f,"\n")
-    #     close(f)
-    # end
+    if options.timer_verbose
+        TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
+        print("\n")
+        TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+        print("\n")
+        f = open("time.log","w")
+        TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
+        print(f,"\n")
+        TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+        print(f,"\n")
+        close(f)
+    end
 
     optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval+objconstant, sol.dual_objval, sol.gap, sol.time)
 end
