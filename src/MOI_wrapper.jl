@@ -345,7 +345,7 @@ end
     Different rom SCS
 =#
 
-matindices(n::Integer) = find(tril(trues(n,n)))
+matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,n)))]
 
 function MOI.optimize!(optimizer::Optimizer)
 
@@ -392,16 +392,16 @@ function MOI.optimize!(optimizer::Optimizer)
     TimerOutputs.reset_timer!()
 
     # @show preA
-    # @show full(preA)
+    # @show Matrix(preA)
     # @show cone
 
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
 
     A = preA[1:cone.f,:]
-    # @show full(A)
+    # @show Matrix(A)
     G = preA[cone.f+1:cone.f+cone.l,:]
-    # @show full(G)
+    # @show Matrix(G)
 
     b = preb[1:cone.f]
     h = preb[cone.f+1:cone.f+cone.l]
@@ -498,7 +498,7 @@ function MOI.optimize!(optimizer::Optimizer)
     # @show con.sdpcone
 
     # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
-    sol = @timeit "Main" chambolle_pock(aff, con, options)
+    sol = chambolle_pock(aff, con, options)
 
     ret_val = sol.status
     primal = sol.primal[1:aff.n-aff.extra]
@@ -506,18 +506,18 @@ function MOI.optimize!(optimizer::Optimizer)
     slack = vcat(sol.slack[1:aff.p-aff.extra], sol.slack[aff.p+1:end])
     objval = sol.objval
 
-    if options.timer_verbose
-        TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
-        print("\n")
-        TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
-        print("\n")
-        f = open("time.log","w")
-        TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
-        print(f,"\n")
-        TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
-        print(f,"\n")
-        close(f)
-    end
+    # if options.timer_verbose
+    #     TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
+    #     print("\n")
+    #     TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+    #     print("\n")
+    #     f = open("time.log","w")
+    #     TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
+    #     print(f,"\n")
+    #     TimerOutputs.print_timer(f,TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
+    #     print(f,"\n")
+    #     close(f)
+    # end
 
     optimizer.sol = MOISolution(ret_val, primal, dual, slack, sol.primal_residual, sol.dual_residual, (optimizer.maxsense ? -1 : 1) * objval+objconstant, sol.dual_objval, sol.gap, sol.time)
 end
@@ -581,7 +581,7 @@ function ivech(v::AbstractVector{T}) where T
     return out
 end
 
-ivec(X) = full(Symmetric(ivech(X),:U))
+ivec(X) = Matrix(Symmetric(ivech(X),:U))
 
 #=
     Status

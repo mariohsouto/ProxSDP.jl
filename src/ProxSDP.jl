@@ -1,7 +1,7 @@
 
 module ProxSDP
 
-using MathOptInterface, TimerOutputs
+using MathOptInterface, Arpack
 using Compat
 using Printf
 
@@ -306,24 +306,22 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         printheader()
     end
 
-    # @timeit "Init" begin
+    @timeit "Init" begin
         # Scale objective function
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
         rhs_orig = vcat(affine_sets.b, affine_sets.h)
-        @timeit "Norm Scaling" norm_scaling(affine_sets, conic_sets)
+        norm_scaling(affine_sets, conic_sets)
         # Initialization
         pair = PrimalDual(affine_sets)
         a = AuxiliaryData(affine_sets, conic_sets)
         arc = [ARPACKAlloc(Float64, 1) for i in conic_sets.sdpcone]
         map_socs!(pair.x, conic_sets, a)
 
-        println("oi1")
         primal_residual = CircularVector{Float64}(2*p.window)
         dual_residual = CircularVector{Float64}(2*p.window)
         comb_residual = CircularVector{Float64}(2*p.window)
-        println("oi2")
         # primal_residual, dual_residual, comb_residual = CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter)
 
         # Diagonal scaling
@@ -340,7 +338,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # primal_step = sqrt(min(aff.n^2, aff.m + aff.p)) / vecnorm(M)
         # p.primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
         if minimum(size(M)) >= 2
-            p.primal_step = 1.0 / Arpack.svds(M, nsv = 1)[1].S #TODO review efficiency
+            p.primal_step = 1.0 / Arpack.svds(M, nsv = 1)[1].S[1] #TODO review efficiency
         else
             p.primal_step = 1.0 / maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
         end
@@ -349,19 +347,19 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.dual_step = p.primal_step
         pair.x[1] = 1.0
 
-    # end
+    end
 
     # Fixed-point loop
-    @timeit "CP loop" for k in 1:opt.max_iter
+    for k in 1:opt.max_iter
 
         p.iter = k
 
         # Primal update
-        @timeit "primal" primal_step!(pair, a, conic_sets, mat, arc, opt, p)
+        primal_step!(pair, a, conic_sets, mat, arc, opt, p)
         # Linesearch
         linesearch!(pair, a, affine_sets, mat, opt, p)
         # Compute residuals and update old iterates
-        @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p)
+        compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p)
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
@@ -476,12 +474,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             println(" Solution metrics [failed to converge]:")
         end
-        println(" Primal objective = $(round(prim_obj, 5))")
-        println(" Dual objective = $(round(dual_obj, 5))")
-        println(" Duality gap (%) = $(round(gap, 2)) %")
-        println(" Duality residual = $(round(res_dual, 5))")
-        println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq, 6))")
-        println(" time elapsed = $(round(time_, 6))")
+        println(" Primal objective = $(round(prim_obj; digits = 5))")
+        println(" Dual objective = $(round(dual_obj; digits = 5))")
+        println(" Duality gap (%) = $(round(gap; digits = 2)) %")
+        println(" Duality residual = $(round(res_dual; digits = 5))")
+        println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq; digits = 6))")
+        println(" time elapsed = $(round(time_; digits = 6))")
         println("======================================================================")
     end
     return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack, slack2, -ctr_primal), res_eq, res_dual, prim_obj, dual_obj, gap, time_)
@@ -540,20 +538,15 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         cont += 1
         p.theta = p.primal_step / p.primal_step_old
 
-        @timeit "linesearch 1" begin
-            a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
-        end
-        @timeit "linesearch 2" begin
-            # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
-            copyto!(a.y_temp, a.y_half)
-            box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
-            a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
-        end
+        a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
 
-        @timeit "linesearch 3" begin
-            a.Mty .= a.Mty_old .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.MtMx .- p.theta .* a.MtMx_old)
-        end
-        @timeit "linesearch 4" if affine_sets.m == 0
+        # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
+        copyto!(a.y_temp, a.y_half)
+        box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
+        a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
+
+        a.Mty .= a.Mty_old .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.MtMx .- p.theta .* a.MtMx_old)
+        if affine_sets.m == 0
             a.Mty .-= (p.beta * p.primal_step) .* a.Mtrhs
         else
             mul!(a.Mty_aux, mat.Mt, a.y_half)
@@ -561,12 +554,10 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         end
         
         # In-place norm
-        @timeit "linesearch 5" begin
-            a.Mty .-= a.Mty_old
-            a.y_temp .-= pair.y_old
-            y_norm = norm(a.y_temp)
-            Mty_norm = norm(a.Mty)
-        end
+        a.Mty .-= a.Mty_old
+        a.y_temp .-= pair.y_old
+        y_norm = norm(a.y_temp)
+        Mty_norm = norm(a.Mty)
         if sqrt(p.beta) * p.primal_step * Mty_norm <= (1.0 - 1e-3) * y_norm
             break
         else
@@ -649,15 +640,15 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 
     # Projection onto the psd cone
     if length(cones.sdpcone) >= 1
-        @timeit "sdp proj" sdp_cone_projection!(pair.x, a, cones, arc, opt, p)
+        sdp_cone_projection!(pair.x, a, cones, arc, opt, p)
     end
 
     if length(cones.socone) >= 1
-        @timeit "soc proj" so_cone_projection!(pair.x, a, cones, opt, p)
+        so_cone_projection!(pair.x, a, cones, opt, p)
     end
 
-    @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
-    @timeit "linesearch 0" mul!(a.MtMx, mat.Mt, a.Mx)
+    mul!(a.Mx, mat.M, pair.x)
+    mul!(a.MtMx, mat.Mt, a.Mx)
 
     return nothing
 end
@@ -696,16 +687,14 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
 
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.0)
     # Build symmetric matrix(es) X
-    @timeit "reshape1" begin
-        cont = 1
-        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
-            if i != j
-                a.m[idx].data[i,j] = v[cont] / sqrt_2
-            else
-                a.m[idx].data[i,j] = v[cont]
-            end
-            cont += 1
+    cont = 1
+    @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
+        if i != j
+            a.m[idx].data[i,j] = v[cont] / sqrt_2
+        else
+            a.m[idx].data[i,j] = v[cont]
         end
+        cont += 1
     end
     for (idx, sdp) in enumerate(cones.sdpcone)
         if sdp.sq_side == 1
@@ -728,14 +717,13 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
             if hasconverged(arc[idx])
                 @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc[idx]))
             else
-                @timeit "eigfact" full_eig!(a, idx, opt)
+                @timeit "eigen" full_eig!(a, idx, opt)
             end
         else
             p.min_eig[idx] = 0.0
-            @timeit "eigfact" full_eig!(a, idx, opt)
+            @timeit "eigen" full_eig!(a, idx, opt)
         end
     end
-    @timeit "reshape2" begin
         cont = 1
         @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
             if i != j
@@ -744,7 +732,6 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                 v[cont] = a.m[idx].data[i, j]
             end
             cont += 1
-        end
     end
 
     return nothing
@@ -752,13 +739,13 @@ end
 
 function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
     current_rank = 0
-    # fact = eigfact!(a.m[1], 1e-6, Inf)
-    fact = eigfact!(a.m[idx])
+    # fact = eigen!(a.m[1], 1e-6, Inf)
+    fact = eigen!(a.m[idx])
     fill!(a.m[idx].data, 0.0)
-    for i in 1:length(fact[:values])
-        if fact[:values][i] > 0.0
+    for i in 1:length(fact.values)
+        if fact.values[i] > 0.0
             current_rank += 1
-            LinearAlgebra.BLAS.gemm!('N', 'T', fact[:values][i], fact[:vectors][:, i], fact[:vectors][:, i], 1.0, a.m[idx].data)
+            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1.0, a.m[idx].data)
         end
     end
     return nothing

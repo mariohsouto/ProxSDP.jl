@@ -17,9 +17,9 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false)
         MOI.add_constraint(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
     end
 
-    Xsq = Matrix{MOI.VariableIndex}(n+1,n+1)
+    Xsq = Matrix{MOI.VariableIndex}(undef, n+1,n+1)
     ProxSDP.ivech!(Xsq, X)
-    Xsq = full(Symmetric(Xsq,:U))
+    Xsq = Matrix(Symmetric(Xsq,:U))
 
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n+1))

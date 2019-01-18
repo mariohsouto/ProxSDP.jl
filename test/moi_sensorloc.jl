@@ -1,7 +1,7 @@
 
 function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
 
-    srand(seed)
+    Random.seed!(seed)
     MOI.empty!(optimizer)
     if test
         @test MOI.is_empty(optimizer)
@@ -12,9 +12,9 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
     # Decision variable
     nvars = ProxSDP.sympackedlen(n + 2) 
     X = MOI.add_variables(optimizer, nvars)
-    Xsq = Matrix{MOI.VariableIndex}(n + 2, n + 2)
+    Xsq = Matrix{MOI.VariableIndex}(undef, n + 2, n + 2)
     ProxSDP.ivech!(Xsq, X)
-    Xsq = full(Symmetric(Xsq, :U))
+    Xsq = Matrix(Symmetric(Xsq, :U))
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n + 2))
 

@@ -1,6 +1,6 @@
 push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
 
-using ProxSDP, MathOptInterface, Test, LinearAlgebra
+using ProxSDP, MathOptInterface, Test, LinearAlgebra, Random, SparseArrays, DelimitedFiles
 
 const MOI = MathOptInterface
 const MOIT = MOI.Test
@@ -372,7 +372,7 @@ end
 
 @testset "MIMO" begin
 
-    srand(23)
+    Random.seed!(23)
 
     # Instance size
     n = 3
@@ -400,9 +400,12 @@ end
         MOI.add_constraint(optimizer, MOI.SingleVariable(X[i]), MOI.GreaterThan(-1.0))
     end
 
-    Xsq = Matrix{MOI.VariableIndex}(n+1,n+1)
+    LinearAlgebra.symmetric_type(::Type{MOI.VariableIndex}) = MOI.VariableIndex
+    LinearAlgebra.symmetric(v::MOI.VariableIndex, ::Symbol) = v
+    LinearAlgebra.transpose(v::MOI.VariableIndex) = v
+    Xsq = Matrix{MOI.VariableIndex}(undef, n+1,n+1)
     ProxSDP.ivech!(Xsq, X)
-    Xsq = full(Symmetric(Xsq,:U))
+    Xsq = Symmetric(Xsq,:U)
 
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n+1))

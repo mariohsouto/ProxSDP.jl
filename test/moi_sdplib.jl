@@ -13,9 +13,9 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
     nvars = ProxSDP.sympackedlen(n)
 
     X = MOI.add_variables(optimizer, nvars)
-    Xsq = Matrix{MOI.VariableIndex}(n,n)
+    Xsq = Matrix{MOI.VariableIndex}(undef, n,n)
     ProxSDP.ivech!(Xsq, X)
-    Xsq = full(Symmetric(Xsq,:U))
+    Xsq = Matrix(Symmetric(Xsq,:U))
 
     for k in 1:m
         I,J,V=findnz(F[k])
@@ -39,13 +39,13 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
     MOI.optimize!(optimizer)
     obj = MOI.get(optimizer, MOI.ObjectiveValue())
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
-    minus_rank = length([eig for eig in eigfact(Xsq_s)[:values] if eig < -1e-4])
+    minus_rank = length([eig for eig in eigen(Xsq_s).values if eig < -1e-4])
     if test
         @test minus_rank == 0
     end
-    # @test trace(F[0] * Xsq_s) - obj < 1e-1
+    # @test tr(F[0] * Xsq_s) - obj < 1e-1
     # for i in 1:m
-    #     @test abs(trace(F[i] * Xsq_s)-c[i]) < 1e-1
+    #     @test abs(tr(F[i] * Xsq_s)-c[i]) < 1e-1
     # end
 
     verbose && sdplib_eval(F,c,n,m,Xsq_s)

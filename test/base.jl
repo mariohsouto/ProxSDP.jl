@@ -1,6 +1,6 @@
 function base_sdp(solver, seed)
 
-    srand(seed)
+    Random.seed!(seed)
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else
@@ -32,7 +32,7 @@ function base_sdp(solver, seed)
 end
 function base_sdp2(solver, seed)
 
-    srand(seed)
+    Random.seed!(seed)
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else

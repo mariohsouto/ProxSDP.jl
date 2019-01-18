@@ -71,7 +71,7 @@ end
 
 function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1, iter::Int64=1)
     arc = ARPACKAlloc{T}()
-    ARPACKAlloc_reset!(arc::ARPACKAlloc, Symmetric(eye(T,n,n)), 1, 1)
+    ARPACKAlloc_reset!(arc::ARPACKAlloc, Symmetric(Matrix{T}(I, n, n)), 1, 1)
     return arc
 end
 
@@ -98,20 +98,20 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     matvecA!(y, x) = mul!(y, A, x)
     arc.A = matvecA!
     arc.Amat = A
-    arc.x = Vector{T}(arc.n)
-    arc.y = Vector{T}(arc.n)
+    arc.x = Vector{T}(undef, arc.n)
+    arc.y = Vector{T}(undef, arc.n)
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)
 
     # arc.TOL = 1e-15 * ones(T, 1)
 
-    arc.v = Matrix{T}(arc.n, arc.ncv)
-    arc.workd = Vector{T}(3*arc.n)
-    arc.workl = Vector{T}(arc.lworkl)
+    arc.v = Matrix{T}(undef, arc.n, arc.ncv)
+    arc.workd = Vector{T}(undef, 3*arc.n)
+    arc.workl = Vector{T}(undef, arc.lworkl)
     arc.rwork = Vector{T}() # cmplx ? Vector{TR}(ncv) : Vector{TR}()
 
     if isempty(v0)
-        arc.resid = Vector{T}(arc.n)
+        arc.resid = Vector{T}(undef, arc.n)
         arc.info  = zeros(BlasInt, 1)#Ref{BlasInt}(0)
     else
         # arc.resid = v0#deepcopy(v0)
@@ -129,10 +129,10 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.zernm1 = 0:(arc.n-1)
 
     arc.howmny = "A"
-    arc.select = Vector{BlasInt}(arc.ncv)
+    arc.select = Vector{BlasInt}(undef, arc.ncv)
     arc.info_e = zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
-    arc.d = Vector{T}(arc.nev)
+    arc.d = Vector{T}(undef, arc.nev)
     arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
 
     arc.converged = false
@@ -146,7 +146,9 @@ function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
     arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
     
     while true
-        LinearAlgebra.ARPACK.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
+        # Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
+        # arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
+        Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
         # x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
@@ -219,7 +221,7 @@ function _EUPD!(arc)
     # d = Vector{T}(nev)
     # sigmar = Ref{T}(sigma)
     Arpack.seupd(true, arc.howmny, arc.select, arc.d, arc.v, arc.n, arc.sigmar,
-    arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
+    arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
     arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info_e)
     if arc.info_e[] != 0
         arc.converged = false

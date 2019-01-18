@@ -11,9 +11,9 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
     X = MOI.add_variables(optimizer, nvars)
 
-    Xsq = Matrix{MOI.VariableIndex}(n,n)
+    Xsq = Matrix{MOI.VariableIndex}(undef,n,n)
     ProxSDP.ivech!(Xsq, X)
-    Xsq = full(Symmetric(Xsq,:U))
+    Xsq = Matrix(Symmetric(Xsq,:U))
 
     for k in 1:m
         ctr_k = vec([MOI.ScalarAffineTerm(A[k][i,j], Xsq[i,j]) for j in 1:n, i in 1:n])
@@ -34,16 +34,16 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
-    minus_rank = length([eig for eig in eigfact(Xsq_s)[:values] if eig < -1e-4])
+    minus_rank = length([eig for eig in eigen(Xsq_s).values if eig < -1e-4])
     if test
         @test minus_rank == 0
     end
-    # rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
+    # rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
     # @show rank
     if test
-        @test trace(C * Xsq_s) - obj < atol
+        @test tr(C * Xsq_s) - obj < atol
         for i in 1:m
-            @test abs(trace(A[i] * Xsq_s)-b[i])/(1+abs(b[i])) < atol
+            @test abs(tr(A[i] * Xsq_s)-b[i])/(1+abs(b[i])) < atol
         end
     end
     verbose && randsdp_eval(A,b,C,n,m,Xsq_s)
