@@ -3,9 +3,10 @@ os:
     - linux
 julia:
     - 0.7
-matrix:
-    allow_failures:
-        - julia: nightly
+# This is left as an example for the next big version switch.
+# matrix:
+#     allow_failures:
+#         - julia: nightly
 notifications:
     email: false
 sudo: false
@@ -16,7 +17,7 @@ addons:
         - libgmp-dev
         - libglpk-dev
 after_success:
-- julia -e 'cd(Pkg.dir("ProxSDP")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+- julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("ProxSDP")); using Coverage; Codecov.submit(process_folder())'
 - echo $TRAVIS_JULIA_VERSION
 env:
 - CODECOV_TOKEN="257536e4-7c71-4d18-b459-443db91d2870"
