@@ -1,3 +1,4 @@
-julia 0.6 0.7
-MathOptInterface 0.8 0.9
-TimerOutputs 0.3
+julia 0.7
+MathOptInterface 0.8.1
+TimerOutputs 0.4.0
+Arpack 0.3.0
