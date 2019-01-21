@@ -66,7 +66,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     maxsense::Bool
     data::Union{Nothing, ModelData} # only non-Void between MOI.copy_to and MOI.optimize!
     sol::MOISolution
-
     params
     function Optimizer(args)
         new(ConeData(), false, nothing, MOISolution(), args)
