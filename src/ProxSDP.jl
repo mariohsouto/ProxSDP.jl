@@ -543,10 +543,10 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
         end
         @timeit "linesearch 2" begin
-        # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
-        copyto!(a.y_temp, a.y_half)
-        box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
-        a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
+            # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
+            copyto!(a.y_temp, a.y_half)
+            box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
+            a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
         end
 
         @timeit "linesearch 3" begin
