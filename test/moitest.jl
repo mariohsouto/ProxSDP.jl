@@ -35,18 +35,36 @@ end
         # linear10 is poorly conditioned
         "linear10",
         # linear9 is requires precision
-        "linear9"
+        "linear9",
+        # primalstart not accepted
+        "partial_start"
         ]
     )
     MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer_lin_hd), config)
 end
 
 @testset "MOI Continuous Conic" begin
-    MOIT.contconictest(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(optimizer3)), config_conic, [
+    MOIT.contconictest(optimizer_lin, config_conic, [
         # bridge
         "rootdet","geomean",
         # affine in cone
         "psdt1f","psdt0f","soc2p", "soc2n", "rsoc",
+        # square psd
+        "psds", "rootdets",
+        # exp cone
+        "logdet", "exp",
+        # infeasible/unbounded
+        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        ]
+    )
+end
+
+@testset "MOI Continuous Conic" begin
+    MOIT.contconictest(MOIB.VectorSlack{Float64}(optimizer_lin_hd), config_conic, [
+        # bridge
+        "rootdet","geomean",
+        # affine in cone
+        "rsoc",
         # square psd
         "psds", "rootdets",
         # exp cone
