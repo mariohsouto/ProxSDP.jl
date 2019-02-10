@@ -419,6 +419,10 @@ function MOI.optimize!(optimizer::Optimizer)
 
     preAt = preA'
 
+    # create extra variables
+    n_tot_variables = n_variables
+    In, Jn, Vn = Int[], Int[], Float64[]
+
     # this way there is a single elements per column
     # because we assume VOV in SET and NOT AFF in SET
     Asoc = preAt[:,cone.f+cone.l+1:cone.f+cone.l+cone.q]
@@ -428,6 +432,7 @@ function MOI.optimize!(optimizer::Optimizer)
     for d in cone.qa
         n_vars = d
         vec_inds = get_indices_cone(A, rows, n_vars, first_ind_local)
+        n_tot_variables += fix_duplicates!(vec_inds, n_tot_variables, In, Jn, Vn)
         push!(con.socone, SOCSet(vec_inds, n_vars))
         first_ind_local += n_vars
     end
@@ -439,6 +444,7 @@ function MOI.optimize!(optimizer::Optimizer)
     for d in cone.sa
         n_vars = sympackedlen(d)
         vec_inds = get_indices_cone(A, rows, n_vars, first_ind_local)
+        n_tot_variables += fix_duplicates!(vec_inds, n_tot_variables, In, Jn, Vn)
         mat_inds = matindices(d)
         tri_len = n_vars
         sq_side = d
@@ -447,15 +453,11 @@ function MOI.optimize!(optimizer::Optimizer)
         first_ind_local += n_vars
     end
 
-    # create extra variables
-    n_tot_variables = n_variables
-    In, Jn, Vn = Int[], Int[], Float64[]
     for i in 1:length(con.socone)
         for j in i+1:length(con.socone)
             vec1 = con.socone[i].idx
             vec2 = con.socone[j].idx
             n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
-
         end
     end
 
@@ -464,9 +466,6 @@ function MOI.optimize!(optimizer::Optimizer)
             vec1 = con.sdpcone[i].vec_i
             vec2 = con.sdpcone[j].vec_i
             n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
-            # if length(intersect(con.sdpcone[i].vec_i,con.sdpcone[j].vec_i)) > 0
-            #     error("SDP cones must be disjoint")
-            # end
         end
     end
 
@@ -475,9 +474,6 @@ function MOI.optimize!(optimizer::Optimizer)
             vec1 = con.sdpcone[i].vec_i
             vec2 = con.socone[j].idx
             n_tot_variables += fix_duplicates!(vec1, vec2, n_tot_variables, In, Jn, Vn)
-            # if length(intersect(con.sdpcone[i].vec_i,con.socone[j].idx)) > 0
-            #     error("SDP cones and SOC must be disjoint")
-            # end
         end
     end
 
@@ -547,9 +543,9 @@ function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vecto
     #     error("SOC cones must be disjoint")
     # end
     append!(Jn, duplicates)
-    append!(Jn, collect(1:n_dups) + n)
-    append!(In, collect(1:n_dups) + n)
-    append!(In, collect(1:n_dups) + n)
+    append!(Jn, collect(1:n_dups) .+ n)
+    append!(In, collect(1:n_dups) .+ n)
+    append!(In, collect(1:n_dups) .+ n)
     append!(Vn,  ones(n_dups))
     append!(Vn, -ones(n_dups))
     cont = 1
@@ -560,6 +556,41 @@ function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vecto
         end
     end
     @assert cont-1 == n_dups
+    return n_dups
+end
+
+function fix_duplicates!(vec::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
+
+    len = length(vec)
+
+    new_vars = 0
+    duplicates = Int[]
+
+    for i in 1:len
+        for j in i+1:len
+            if vec[i] == vec[j]
+                new_vars += 1
+                vec[j] = n + new_vars
+                push!(duplicates, vec[i])
+            end
+        end
+    end
+
+    n_dups = length(duplicates)
+    if n_dups == 0
+        return 0
+    end
+    # if n_dups > 0
+    #     error("SOC cones must be disjoint")
+    # end
+    append!(Jn, duplicates)
+    append!(Jn, collect(1:n_dups) .+ n)
+    append!(In, collect(1:n_dups) .+ n)
+    append!(In, collect(1:n_dups) .+ n)
+    append!(Vn,  ones(n_dups))
+    append!(Vn, -ones(n_dups))
+
+    @assert new_vars == n_dups
     return n_dups
 end
 
