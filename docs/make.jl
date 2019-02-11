@@ -6,7 +6,7 @@ makedocs(
     clean    = true,
     format   = Documenter.HTML(),
     sitename = "ProxSDP.jl",
-    authors = "Mario Souto, Joaquim Garcia and contributors.",
+    authors = "Mario Souto, Joaquim D. Garcia and contributors.",
     pages = [
         "Home" => "index.md",
         "manual.md"
