@@ -392,6 +392,7 @@ function MOI.optimize!(optimizer::Optimizer)
     TimerOutputs.reset_timer!()
 
     # @show preA
+
     # @show Matrix(preA)
     # @show cone
 
@@ -654,5 +655,6 @@ end
 function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.PositiveSemidefiniteConeTriangle
     error("ProxSDP does not return duals for SDP constraints. Only linear constraints (equalities and inequalities) can be queried.")
 end
+
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
