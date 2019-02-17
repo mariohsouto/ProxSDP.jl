@@ -31,7 +31,7 @@ push!(sets_to_test, :SENSORLOC)
     end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
-    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = false)
+    optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
 else
     using JuMP
     # using CSDP
