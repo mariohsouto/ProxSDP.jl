@@ -417,7 +417,7 @@ function MOI.optimize!(optimizer::Optimizer)
         SOCSet[]
         )
 
-    preAt = preA'
+    preAt = sparse(preA')
 
     # create extra variables
     n_tot_variables = n_variables
@@ -533,7 +533,6 @@ function get_indices_cone(A, rows, n_vars, first_ind_local)
 end
 
 function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
-
     duplicates = intersect(vec2, vec1)
     n_dups = length(duplicates)
     if n_dups == 0
