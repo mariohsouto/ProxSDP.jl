@@ -8,9 +8,8 @@ if is_julia1
     using Dates
     using Random
     using LinearAlgebra
-    LinearAlgebra.symmetric_type(::Type{MOI.VariableIndex}) = MOI.VariableIndex
-    LinearAlgebra.symmetric(v::MOI.VariableIndex, ::Symbol) = v
-    LinearAlgebra.transpose(v::MOI.VariableIndex) = v
+    using DelimitedFiles
+    using SparseArrays
 else
     using Base.Test
 end
@@ -25,6 +24,11 @@ push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
+    if is_julia1
+        LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
+        LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
+        LinearAlgebra.transpose(v::MathOptInterface.VariableIndex) = v
+    end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
     optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = false)
