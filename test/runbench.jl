@@ -2,7 +2,17 @@ path = joinpath(dirname(@__FILE__), "..", "..")
 push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
 # using JuMP
-using Base.Test
+is_julia1 = VERSION >= v"1.0"
+if is_julia1
+    using Test
+    using Dates
+    using Random
+    using LinearAlgebra
+    using DelimitedFiles
+    using SparseArrays
+else
+    using Base.Test
+end
 # import Base.is_empty
 
 use_MOI = true
@@ -14,6 +24,11 @@ push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
+    if is_julia1
+        LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
+        LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
+        LinearAlgebra.transpose(v::MathOptInterface.VariableIndex) = v
+    end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
     optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
@@ -27,14 +42,14 @@ else
     # optimizer = MosekSolver()
 end
 
-NOW = replace("$(now())",":","_")
+NOW = is_julia1 ? replace("$(now())",":"=>"_") : replace("$(now())",":","_")
 FILE = open(joinpath(dirname(@__FILE__),"proxsdp_bench_$(NOW).log"),"w")
 println(FILE, "class, prob_ref, time, p_obj, d_obj, p_res, d_res")
 function println2(FILE, class::String, ref::String, sol::ProxSDP.MOISolution)
     println(FILE, "$class, $ref, $(sol.time), $(sol.objval), $(sol.dual_objval), $(sol.primal_residual), $(sol.dual_residual)")
     flush(FILE)
 end
-println2(FILE, class::String, ref::String, sol::Void) = nothing
+println2(FILE, class::String, ref::String, sol::Nothing) = nothing
 
 RANDSDP_TEST_SET = 1:1
 SENSORLOC_TEST_SET = 50:50:300

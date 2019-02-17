@@ -1,7 +1,7 @@
 using StatsBase
 
 function quad_knapsack(solver, seed)
-    srand(seed)
+    Random.seed!(seed)
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else
@@ -56,15 +56,15 @@ function quad_knapsack(solver, seed)
     if Base.libblas_name == "libmkl_rt"
         JuMP.attach(model, solver)
     end
-    tic()
-    teste = JuMP.solve(model)
-    toc()
+    
+    @time teste = JuMP.solve(model)
+    
     if Base.libblas_name == "libmkl_rt"
         XX = getvalue2.(X)
     else
         XX = getvalue.(X)
     end
-    rank = length([eig for eig in eigfact(XX)[:values] if eig > 1e-10])
+    rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
     @show rank
     @show diag(XX)
 end

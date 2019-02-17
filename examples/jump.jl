@@ -1,7 +1,7 @@
 using ProxSDP, JuMP
 
 # Create a JuMP model using ProxSDP as the solver
-model = Model(with_optimizer(ProxSDP.Solver, log_verbose=true))
+model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true))
 
 # Create a Positive Semidefinite variable
 # Currently ProxSDP is only able to hold one PSD

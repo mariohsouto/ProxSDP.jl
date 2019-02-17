@@ -67,8 +67,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     data::Union{Nothing, ModelData} # only non-Void between MOI.copy_to and MOI.optimize!
     sol::MOISolution
 
-    params::Vector{Any}
-    function Optimizer(args::Vector)
+    params
+    function Optimizer(args)
         new(ConeData(), false, nothing, MOISolution(), args)
     end
 end
@@ -345,7 +345,7 @@ end
     Different rom SCS
 =#
 
-matindices(n::Integer) = find(tril(trues(n,n)))
+matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,n)))]
 
 function MOI.optimize!(optimizer::Optimizer)
 
@@ -392,16 +392,16 @@ function MOI.optimize!(optimizer::Optimizer)
     TimerOutputs.reset_timer!()
 
     # @show preA
-    # @show full(preA)
+    # @show Matrix(preA)
     # @show cone
 
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
 
     A = preA[1:cone.f,:]
-    # @show full(A)
+    # @show Matrix(A)
     G = preA[cone.f+1:cone.f+cone.l,:]
-    # @show full(G)
+    # @show Matrix(G)
 
     b = preb[1:cone.f]
     h = preb[cone.f+1:cone.f+cone.l]
@@ -417,8 +417,7 @@ function MOI.optimize!(optimizer::Optimizer)
         SOCSet[]
         )
 
-    preAt = preA'
-
+    preAt = sparse(preA')
     # this way there is a single elements per column
     # because we assume VOV in SET and NOT AFF in SET
     Asoc = preAt[:,cone.f+cone.l+1:cone.f+cone.l+cone.q]
@@ -537,7 +536,6 @@ function get_indices_cone(A, rows, n_vars, first_ind_local)
 end
 
 function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
-
     duplicates = intersect(vec2, vec1)
     n_dups = length(duplicates)
     if n_dups == 0
@@ -581,7 +579,7 @@ function ivech(v::AbstractVector{T}) where T
     return out
 end
 
-ivec(X) = full(Symmetric(ivech(X),:U))
+ivec(X) = Matrix(Symmetric(ivech(X),:U))
 
 #=
     Status
