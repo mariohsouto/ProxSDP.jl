@@ -2,19 +2,20 @@
 
 ## Building problems with JuMP.jl
 
-Currently the easiest ways to pass problems to ProxSDP is through [JuMP](https://github.com/JuliaOpt/JuMP.jl) ([v0.19-alpha](https://discourse.julialang.org/t/first-alpha-release-of-jump-0-19-jump-mathoptinterface/16099)) or MathOptInterface (v0.8).
+Currently the easiest ways to pass problems to ProxSDP is through [JuMP](https://github.com/JuliaOpt/JuMP.jl) or MathOptInterface (v0.8).
 
 The main caveat is that currently ProxSDP must have one and only one PSD variable, no other variables are allowed.
 
 In the test folder one can find MOI implementations of some problems: MIMO, Sensor Localization, Random SDPs and sdplib problems.
 
+## Solver arguments
+
+Argument | Description | Values (default)
+--- | --- | ---
+log_verbose | print evolution of the process | `true`
+...
+
 ## JuMP example
-
-ProxSDP uses the new implementation of JuMP, currently in alpha version.
-
-Therefore one needs to checkout in JuMP on the tag [v0.19-alpha](https://discourse.julialang.org/t/first-alpha-release-of-jump-0-19-jump-mathoptinterface/16099)
-
-For more example on how to use the latest version of JuMP please refer to the [manual](http://www.juliaopt.org/JuMP.jl/latest/).
 
 A quick JuMP example:
 
@@ -22,7 +23,7 @@ A quick JuMP example:
 using ProxSDP, JuMP
 
 # Create a JuMP model using ProxSDP as the solver
-model = Model(with_optimizer(ProxSDP.Solver, log_verbose=true))
+model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true))
 
 # Create a Positive Semidefinite variable
 # Currently ProxSDP is only able to hold one PSD
@@ -53,9 +54,9 @@ JuMP.optimize!(model)
 # And ask for results!
 JuMP.objective_value(model)
 
-JuMP.result_value(x)
+JuMP.value(x)
 
-JuMP.result_value(y)
+JuMP.value(y)
 ```
 
 ### Referencing
