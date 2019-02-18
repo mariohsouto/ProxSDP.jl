@@ -50,22 +50,15 @@ using ProxSDP, JuMP
 model = Model(with_optimizer(ProxSDP.Solver, log_verbose=true))
 
 # Create a Positive Semidefinite variable
-# Currently ProxSDP is only able to hold one PSD
-# variable and no other variable
+# Its possible to use common variables as well
 @variable(model, X[1:2,1:2], PSD)
 
-# but you can define pieces of the one PSD
-# variable to hold other variable as in the
-# Canonical SDP format
 x = X[1,1]
 y = X[2,2]
 
-# There is no limits on linear constraints
-# one can define as many as wanted
+# Add constraints
 @constraint(model, ub_x, x <= 2)
-
 @constraint(model, ub_y, y <= 30)
-
 @constraint(model, con, 1x + 5y <= 3)
 
 # ProxSDP supports maximization or minimization
@@ -98,4 +91,4 @@ The first version of the paper can be found [here](https://arxiv.org/abs/1810.05
 
 ### TODO
 
-- Add support for other cones
+- Add support for exponential and power cones
