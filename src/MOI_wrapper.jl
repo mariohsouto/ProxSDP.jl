@@ -559,37 +559,29 @@ function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vecto
 end
 
 function fix_duplicates!(vec::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{Int}, Vn::Vector{Float64})
-
-    len = length(vec)
-
+    seen = Set{eltype(vec)}()
+    dups = Vector{eltype(vec)}()
     new_vars = 0
-    duplicates = Int[]
-
-    for i in 1:len
-        for j in i+1:len
-            if vec[i] == vec[j]
-                new_vars += 1
-                vec[j] = n + new_vars
-                push!(duplicates, vec[i])
-            end
+    for i in eachindex(vec)
+        x = vec[i]
+        if in(x, seen)
+            push!(dups, x)
+            new_vars += 1
+            vec[i] = new_vars + n
+        else
+            push!(seen, x)
         end
     end
-
-    n_dups = length(duplicates)
+    n_dups = length(dups)
     if n_dups == 0
         return 0
     end
-    # if n_dups > 0
-    #     error("SOC cones must be disjoint")
-    # end
-    append!(Jn, duplicates)
+    append!(Jn, dups)
     append!(Jn, collect(1:n_dups) .+ n)
     append!(In, collect(1:n_dups) .+ n)
     append!(In, collect(1:n_dups) .+ n)
     append!(Vn,  ones(n_dups))
     append!(Vn, -ones(n_dups))
-
-    @assert new_vars == n_dups
     return n_dups
 end
 

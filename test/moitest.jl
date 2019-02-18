@@ -28,49 +28,6 @@ const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
     )
 end
 
-
-@testset "SDP with duplicates from MOI" begin
-    # min X[1,1] + X[2,2]    max y
-    #     X[2,1] = 1         [0   y/2     [ 1  0
-    #                         y/2 0    <=   0  1]
-    #     X >= 0              y free
-    # Optimal solution:
-    #
-    #     ⎛ 1   1 ⎞
-    # X = ⎜       ⎟           y = 2
-    #     ⎝ 1   1 ⎠
-    MOI.empty!(optimizer)
-    @test MOI.is_empty(optimizer)
-
-    x = MOI.add_variable(optimizer)
-    X = [x, x, x]
-
-    vov = MOI.VectorOfVariables(X)
-    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
-
-    c = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, X[2])], 0.0), MOI.EqualTo(1.0))
-
-    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end]]), 0.0))
-
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(optimizer)
-
-    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
-
-    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
-    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FEASIBLE_POINT
-
-    @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2 atol=1e-2
-
-    Xv = ones(3)
-    @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
-    # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
-
-    # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
-    # @show MOI.get(optimizer, MOI.ConstraintDual(), c)
-
-end
-
 @testset "MOI Continuous Linear" begin
     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
         # infeasible/unbounded
@@ -102,14 +59,27 @@ end
     )
 end
 
-@testset "MOI Continuous Conic" begin
+@testset "MOI Continuous Conic with VectorSlack" begin
     MOIT.contconictest(MOIB.VectorSlack{Float64}(optimizer_lin_hd), config_conic, [
         # bridge
-        "rootdet","geomean",
+        "rootdet",
+        "geomean",
         # affine in cone
         "rsoc",
         # square psd
         "psds", "rootdets",
+        # exp cone
+        "logdet", "exp",
+        # infeasible/unbounded
+        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        ]
+    )
+end
+
+@testset "MOI Continuous Conic with FullBridge" begin
+    MOIT.contconictest(MOIB.full_bridge_optimizer(optimizer_lin_hd, Float64), config_conic, [
+        # bridge: needs to add set in VectorSlack bridge MOI
+        "rootdet",
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
@@ -386,6 +356,40 @@ end
     @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
     Yv = ones(3)
     @test MOI.get(optimizer, MOI.VariablePrimal(), Y) ≈ Yv atol=1e-2
+    # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
+
+    # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
+    # @show MOI.get(optimizer, MOI.ConstraintDual(), c)
+
+end
+
+@testset "SDP with duplicates from MOI" begin
+
+    MOI.empty!(optimizer)
+    @test MOI.is_empty(optimizer)
+
+    x = MOI.add_variable(optimizer)
+    X = [x, x, x]
+
+    vov = MOI.VectorOfVariables(X)
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
+
+    c = MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, X[2])], 0.0), MOI.EqualTo(1.0))
+
+    MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, [X[1], X[end]]), 0.0))
+
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.optimize!(optimizer)
+
+    @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
+
+    @test MOI.get(optimizer, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    @test MOI.get(optimizer, MOI.DualStatus()) == MOI.FEASIBLE_POINT
+
+    @test MOI.get(optimizer, MOI.ObjectiveValue()) ≈ 2 atol=1e-2
+
+    Xv = ones(3)
+    @test MOI.get(optimizer, MOI.VariablePrimal(), X) ≈ Xv atol=1e-2
     # @test MOI.get(optimizer, MOI.ConstraintPrimal(), cX) ≈ Xv atol=1e-2
 
     # @test MOI.get(optimizer, MOI.ConstraintDual(), c) ≈ 2 atol=1e-2
