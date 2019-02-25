@@ -556,7 +556,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             y_norm = norm(a.y_temp)
             Mty_norm = norm(a.Mty)
         end
-        if sqrt(p.beta) * p.primal_step * Mty_norm <= (1.0 - 1e-3) * y_norm
+        if sqrt(p.beta) * p.primal_step * Mty_norm <= (1.0 - 1e-6) * y_norm
             break
         else
             p.primal_step *= 0.9
@@ -633,7 +633,6 @@ end
 
 function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
 
-    # x = x - p_step * (Mty + c)
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
     # Projection onto the psd cone
@@ -752,7 +751,6 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
     end
     return nothing
 end
-
 
 function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
