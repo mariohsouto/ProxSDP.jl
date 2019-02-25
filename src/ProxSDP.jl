@@ -68,10 +68,10 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-3
-        opt.tol_dual = 1e-3
-        opt.tol_eig = 1e-3
-        opt.tol_soc = 1e-3
+        opt.tol_primal = 1e-4
+        opt.tol_dual = 1e-4
+        opt.tol_eig = 1e-15
+        opt.tol_soc = 1e-15
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
@@ -323,21 +323,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         primal_residual = CircularVector{Float64}(2*p.window)
         dual_residual = CircularVector{Float64}(2*p.window)
         comb_residual = CircularVector{Float64}(2*p.window)
-        # primal_residual, dual_residual, comb_residual = CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter), CircularVector{Float64}(opt.max_iter)
 
         # Diagonal scaling
-        # @show affine_sets.A, affine_sets.G
         M = vcat(affine_sets.A, affine_sets.G)
-        # @show size(affine_sets.A), size(affine_sets.G), size(affine_sets.b), size(affine_sets.h), size(affine_sets.c), size(M) 
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
         mat = Matrices(M, Mt, affine_sets.c)
-        # @show a.Mtrhs, mat.Mt, rhs
         mul!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
-        # primal_step = sqrt(min(aff.n^2, aff.m + aff.p)) / vecnorm(M)
-        # p.primal_step = 1.0 / svds(M; nsv=1)[1][:S][1]
         if minimum(size(M)) >= 2
             p.primal_step = 1.0 / Arpack.svds(M, nsv = 1)[1].S[1] #TODO review efficiency
         else
@@ -347,7 +341,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
         pair.x[1] = 1.0
-
     end
 
     # Fixed-point loop
@@ -461,7 +454,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     ctr_primal = Float64[]
     for soc in conic_sets.socone
-        # @show pair.x[soc.idx]
         append!(ctr_primal, pair.x[soc.idx])
     end
     for sdp in conic_sets.sdpcone
