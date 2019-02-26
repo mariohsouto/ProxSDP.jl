@@ -70,15 +70,15 @@ mutable struct Options
 
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-15
-        opt.tol_soc = 1e-15
+        opt.tol_eig = 1e-6
+        opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
         opt.min_beta = 1e-3
         opt.max_beta = 1e+3
         opt.initial_adapt_level = 0.9
-        opt.adapt_decay = 0.5
+        opt.adapt_decay = 0.9
         opt.convergence_window = 100
 
         opt.convergence_check = 50
@@ -336,7 +336,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             p.primal_step = 1.0 / maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
         end
-        p.primal_step *= 0.9999
+        p.primal_step *= 0.99
         # dual_step = primal_step
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
@@ -392,7 +392,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Adaptive stepsizes
         elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
             p.beta *= (1 - p.adapt_level)
-            p.primal_step /= (1 - p.adapt_level)
+            # p.primal_step /= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
                 p.beta = opt.min_beta
             else
@@ -403,7 +403,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
-            p.primal_step *= (1 - p.adapt_level)
+            # p.primal_step *= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
             else
@@ -414,7 +414,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
             p.beta *= (1 - p.adapt_level)
-            p.primal_step /= (1 - p.adapt_level)
+            # p.primal_step /= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
                 p.beta = opt.min_beta
             else
@@ -425,7 +425,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         elseif opt.residual_relative_diff * primal_residual[k] < dual_residual[k] && k > p.window
             p.beta /= (1 - p.adapt_level)
-            p.primal_step *= (1 - p.adapt_level)
+            # p.primal_step *= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
             else
