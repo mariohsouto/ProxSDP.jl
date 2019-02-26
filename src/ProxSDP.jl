@@ -75,15 +75,15 @@ mutable struct Options
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-3
-        opt.max_beta = 1e+3
+        opt.min_beta = 1e-4
+        opt.max_beta = 1e+4
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
         opt.convergence_window = 100
 
         opt.convergence_check = 50
 
-        opt.residual_relative_diff = 100.0
+        opt.residual_relative_diff = 50.0
 
         opt.max_linsearch_steps = 10000
 
@@ -301,6 +301,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     if analysis
         p.window = 1
     end
+    analysis = true
 
     if opt.log_verbose
         printheader()
@@ -336,8 +337,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             p.primal_step = 1.0 / maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
         end
-        p.primal_step *= 0.99
-        # dual_step = primal_step
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
         pair.x[1] = 1.0
@@ -390,7 +389,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
+        elseif primal_residual[k] > 10 * opt.tol_primal && dual_residual[k] < 10 * opt.tol_dual && k > p.window
             p.beta *= (1 - p.adapt_level)
             # p.primal_step /= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
@@ -401,7 +400,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
-        elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
+        elseif primal_residual[k] < 10 * opt.tol_primal && dual_residual[k] > 10 * opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
             # p.primal_step *= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
@@ -565,7 +564,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.9
+            p.primal_step *= 0.95
         end
     end
 
