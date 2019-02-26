@@ -68,8 +68,8 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-4
-        opt.tol_dual = 1e-4
+        opt.tol_primal = 1e-3
+        opt.tol_dual = 1e-3
         opt.tol_eig = 1e-15
         opt.tol_soc = 1e-15
 
@@ -78,7 +78,7 @@ mutable struct Options
         opt.min_beta = 1e-3
         opt.max_beta = 1e+3
         opt.initial_adapt_level = 0.9
-        opt.adapt_decay = 0.9
+        opt.adapt_decay = 0.5
         opt.convergence_window = 100
 
         opt.convergence_check = 50
