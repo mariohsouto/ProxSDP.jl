@@ -75,8 +75,8 @@ mutable struct Options
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-4
-        opt.max_beta = 1e+4
+        opt.min_beta = 1e-5
+        opt.max_beta = 1e+5
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
         opt.convergence_window = 100
@@ -85,7 +85,7 @@ mutable struct Options
 
         opt.residual_relative_diff = 50.0
 
-        opt.max_linsearch_steps = 10000
+        opt.max_linsearch_steps = 1000
 
         opt.full_eig_decomp = false
 
@@ -528,7 +528,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
-    for i in 1:10000#opt.max_linsearch_steps
+    for i in 1:opt.max_linsearch_steps
         cont += 1
         p.theta = p.primal_step / p.primal_step_old
 
