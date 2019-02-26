@@ -79,9 +79,9 @@ mutable struct Options
         opt.max_beta = 1e+8
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.95
-        opt.convergence_window = 100
+        opt.convergence_window = 200
 
-        opt.convergence_check = 50
+        opt.convergence_check = 100
 
         opt.residual_relative_diff = 50.0
 
@@ -378,7 +378,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 30
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
