@@ -1,58 +1,58 @@
  ──────────────────────────────────────────────────────────────────────────────
                                        Time                   Allocations      
                                ──────────────────────   ───────────────────────
-       Tot / % measured:            9.45s / 37.5%            410MiB / 97.4%    
+       Tot / % measured:            2.93s / 87.1%            128MiB / 97.8%    
 
  Section               ncalls     time   %tot     avg     alloc   %tot      avg
  ──────────────────────────────────────────────────────────────────────────────
- Main                       1    3.54s   100%   3.54s    399MiB  100%    399MiB
-   CP loop                  1    3.49s  98.6%   3.49s    383MiB  96.0%   383MiB
-     primal             1.08k    2.90s  82.0%  2.69ms    121MiB  30.2%   115KiB
-       sdp proj         1.08k    2.75s  77.5%  2.55ms    121MiB  30.2%   114KiB
-         eigs             980    1.48s  41.9%  1.51ms   13.5MiB  3.39%  14.2KiB
-           _AUPD!         980    1.21s  34.1%  1.23ms   1.07MiB  0.27%  1.12KiB
-           _EUPD!         980   88.8ms  2.51%  90.6μs   15.3KiB  0.00%        -
-           _INIT!         980    183μs  0.01%   187ns    277KiB  0.07%        -
-         eigfact           98    1.07s  30.3%  10.9ms    107MiB  26.7%  1.09MiB
-         reshape1       1.08k    140ms  3.95%   130μs         -  0.00%        -
-         reshape2       1.08k   47.2ms  1.33%  43.8μs         -  0.00%        -
-         get min eig      980    222μs  0.01%   226ns         -  0.00%        -
-       linesearch -1    1.08k   92.0ms  2.60%  85.3μs         -  0.00%        -
-       linesearch 0     1.08k   41.9ms  1.18%  38.8μs         -  0.00%        -
-     residual           1.08k    228ms  6.43%   211μs    262MiB  65.7%   249KiB
-     linesearch 5       4.59k    133ms  3.75%  28.9μs         -  0.00%        -
-     linesearch 3       4.59k    130ms  3.66%  28.3μs         -  0.00%        -
-     linesearch 4       4.59k   72.7ms  2.05%  15.8μs         -  0.00%        -
-     linesearch 1       4.59k   1.48ms  0.04%   323ns         -  0.00%        -
-     linesearch 2       4.59k   1.45ms  0.04%   316ns         -  0.00%        -
-   Init                     1   50.4ms  1.42%  50.4ms   14.5MiB  3.63%  14.5MiB
+ Main                       1    2.55s   100%   2.55s    125MiB  100%    125MiB
+   CP loop                  1    2.54s   100%   2.54s    121MiB  96.8%   121MiB
+     primal             1.19k    2.26s  88.4%  1.90ms   47.6MiB  38.2%  41.1KiB
+       sdp proj         1.19k    2.20s  86.4%  1.86ms   47.6MiB  38.1%  41.1KiB
+         eigs           1.05k    1.69s  66.3%  1.61ms   7.45MiB  5.97%  7.25KiB
+           _AUPD!       1.05k    1.52s  59.8%  1.45ms   1.37MiB  1.10%  1.34KiB
+           _EUPD!       1.05k    107ms  4.20%   102μs   16.4KiB  0.01%        -
+           _INIT!       1.05k    214μs  0.01%   203ns    162KiB  0.13%        -
+         eigfact          134    449ms  17.6%  3.35ms   40.0MiB  32.0%   305KiB
+         reshape1       1.19k   38.4ms  1.51%  32.4μs         -  0.00%        -
+         reshape2       1.19k   22.4ms  0.88%  18.9μs         -  0.00%        -
+         get min eig    1.05k    271μs  0.01%   258ns         -  0.00%        -
+       linesearch -1    1.19k   31.0ms  1.22%  26.1μs         -  0.00%        -
+       linesearch 0     1.19k   14.3ms  0.56%  12.1μs         -  0.00%        -
+     residual           1.19k    195ms  7.63%   164μs   72.6MiB  58.2%  62.7KiB
+     linesearch 5       5.07k   34.7ms  1.36%  6.84μs         -  0.00%        -
+     linesearch 3       5.07k   28.2ms  1.11%  5.57μs         -  0.00%        -
+     linesearch 4       5.07k   15.7ms  0.61%  3.09μs         -  0.00%        -
+     linesearch 2       5.07k   1.61ms  0.06%   318ns         -  0.00%        -
+     linesearch 1       5.07k   1.50ms  0.06%   295ns         -  0.00%        -
+   Init                     1   8.30ms  0.33%  8.30ms   3.67MiB  2.94%  3.67MiB
  ──────────────────────────────────────────────────────────────────────────────
  ────────────────────────────────────────────────────────────────────────
                                  Time                   Allocations      
                          ──────────────────────   ───────────────────────
-    Tot / % measured:         9.45s / 37.5%            410MiB / 97.4%    
+    Tot / % measured:         2.93s / 87.1%            128MiB / 97.7%    
 
  Section         ncalls     time   %tot     avg     alloc   %tot      avg
  ────────────────────────────────────────────────────────────────────────
- Main                 1    3.54s   100%   3.54s    399MiB  100%    399MiB
- CP loop              1    3.49s  98.6%   3.49s    383MiB  96.0%   383MiB
- primal           1.08k    2.90s  82.0%  2.69ms    121MiB  30.2%   115KiB
- sdp proj         1.08k    2.75s  77.5%  2.55ms    121MiB  30.2%   114KiB
- eigs               980    1.48s  41.9%  1.51ms   13.5MiB  3.39%  14.2KiB
- _AUPD!             980    1.21s  34.1%  1.23ms   1.07MiB  0.27%  1.12KiB
- eigfact             98    1.07s  30.3%  10.9ms    107MiB  26.7%  1.09MiB
- residual         1.08k    228ms  6.43%   211μs    262MiB  65.7%   249KiB
- reshape1         1.08k    140ms  3.95%   130μs         -  0.00%        -
- linesearch 5     4.59k    133ms  3.75%  28.9μs         -  0.00%        -
- linesearch 3     4.59k    130ms  3.66%  28.3μs         -  0.00%        -
- linesearch -1    1.08k   92.0ms  2.60%  85.3μs         -  0.00%        -
- _EUPD!             980   88.8ms  2.51%  90.6μs   15.3KiB  0.00%        -
- linesearch 4     4.59k   72.7ms  2.05%  15.8μs         -  0.00%        -
- Init                 1   50.4ms  1.42%  50.4ms   14.5MiB  3.63%  14.5MiB
- reshape2         1.08k   47.2ms  1.33%  43.8μs         -  0.00%        -
- linesearch 0     1.08k   41.9ms  1.18%  38.8μs         -  0.00%        -
- linesearch 1     4.59k   1.48ms  0.04%   323ns         -  0.00%        -
- linesearch 2     4.59k   1.45ms  0.04%   316ns         -  0.00%        -
- get min eig        980    222μs  0.01%   226ns         -  0.00%        -
- _INIT!             980    183μs  0.01%   187ns    277KiB  0.07%        -
+ Main                 1    2.55s   100%   2.55s    125MiB  100%    125MiB
+ CP loop              1    2.54s   100%   2.54s    121MiB  96.8%   121MiB
+ primal           1.19k    2.26s  88.4%  1.90ms   47.6MiB  38.2%  41.1KiB
+ sdp proj         1.19k    2.20s  86.4%  1.86ms   47.6MiB  38.1%  41.1KiB
+ eigs             1.05k    1.69s  66.3%  1.61ms   7.45MiB  5.97%  7.25KiB
+ _AUPD!           1.05k    1.52s  59.8%  1.45ms   1.37MiB  1.10%  1.34KiB
+ eigfact            134    449ms  17.6%  3.35ms   40.0MiB  32.0%   305KiB
+ residual         1.19k    195ms  7.63%   164μs   72.6MiB  58.2%  62.7KiB
+ _EUPD!           1.05k    107ms  4.20%   102μs   16.4KiB  0.01%        -
+ reshape1         1.19k   38.4ms  1.51%  32.4μs         -  0.00%        -
+ linesearch 5     5.07k   34.7ms  1.36%  6.84μs         -  0.00%        -
+ linesearch -1    1.19k   31.0ms  1.22%  26.1μs         -  0.00%        -
+ linesearch 3     5.07k   28.2ms  1.11%  5.57μs         -  0.00%        -
+ reshape2         1.19k   22.4ms  0.88%  18.9μs         -  0.00%        -
+ linesearch 4     5.07k   15.7ms  0.61%  3.09μs         -  0.00%        -
+ linesearch 0     1.19k   14.3ms  0.56%  12.1μs         -  0.00%        -
+ Init                 1   8.30ms  0.33%  8.30ms   3.67MiB  2.94%  3.67MiB
+ linesearch 2     5.07k   1.61ms  0.06%   318ns         -  0.00%        -
+ linesearch 1     5.07k   1.50ms  0.06%   295ns         -  0.00%        -
+ get min eig      1.05k    271μs  0.01%   258ns         -  0.00%        -
+ _INIT!           1.05k    214μs  0.01%   203ns    162KiB  0.13%        -
  ────────────────────────────────────────────────────────────────────────
