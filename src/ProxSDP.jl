@@ -75,10 +75,10 @@ mutable struct Options
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-4
-        opt.max_beta = 1e+4
+        opt.min_beta = 1e-9
+        opt.max_beta = 1e+9
         opt.initial_adapt_level = 0.9
-        opt.adapt_decay = 0.5
+        opt.adapt_decay = 0.9
         opt.convergence_window = 100
 
         opt.convergence_check = 50
@@ -338,13 +338,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
-        # pair.x[1] = 1.0
     end
-
-    opt.tol_primal = 1e-5
-    opt.tol_dual = 1e-5
-
-    @show "OK"
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
@@ -527,7 +521,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .99
+    delta = .999
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
@@ -566,7 +560,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.7
+            p.primal_step *= 0.9
         end
     end
 
