@@ -529,7 +529,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
-    for i in 1:opt.max_linsearch_steps
+    for i in 1:10000#opt.max_linsearch_steps
         cont += 1
         p.theta = p.primal_step / p.primal_step_old
 
@@ -565,7 +565,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.7
+            p.primal_step *= 0.9
         end
     end
 
