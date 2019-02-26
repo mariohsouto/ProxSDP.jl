@@ -68,20 +68,20 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-3
-        opt.tol_dual = 1e-3
-        opt.tol_eig = 1e-6
-        opt.tol_soc = 1e-6
+        opt.tol_primal = 1e-4
+        opt.tol_dual = 1e-4
+        opt.tol_eig = 1e-10
+        opt.tol_soc = 1e-10
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-8
-        opt.max_beta = 1e+8
+        opt.min_beta = 1e-4
+        opt.max_beta = 1e+4
         opt.initial_adapt_level = 0.9
-        opt.adapt_decay = 0.95
-        opt.convergence_window = 200
+        opt.adapt_decay = 0.5
+        opt.convergence_window = 100
 
-        opt.convergence_check = 100
+        opt.convergence_check = 50
 
         opt.residual_relative_diff = 50.0
 
@@ -338,8 +338,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
-        pair.x[1] = 1.0
+        # pair.x[1] = 1.0
     end
+
+    opt.tol_primal = 1e-5
+    opt.tol_dual = 1e-5
+
+    @show "OK"
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
@@ -378,9 +383,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < 0.9 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
-            if p.update_cont > 30
+            if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
                     p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
                 end
@@ -388,7 +393,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > 10 * opt.tol_primal && dual_residual[k] < 10 * opt.tol_dual && k > p.window
+        elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
             p.beta *= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
                 p.beta = opt.min_beta
@@ -398,7 +403,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
-        elseif primal_residual[k] < 10 * opt.tol_primal && dual_residual[k] > 10 * opt.tol_dual && k > p.window
+        elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
@@ -501,10 +506,12 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     # Compute primal residual
     a.Mty_old .+= .- a.Mty .+ (1.0 / (1.0 + p.primal_step)) .* (pair.x_old .- pair.x)
     primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + max(p.norm_c, maximum(abs.(a.Mty))))
+    # primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + p.norm_c)
 
     # Compute dual residual
     a.Mx_old .+= .- a.Mx .+ (1.0 / (1.0 + p.dual_step)) .* (pair.y_old .- pair.y)
     dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + max(p.norm_rhs, maximum(abs.(a.Mx))))
+    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + p.norm_rhs)
 
     # Compute combined residual
     comb_residual[p.iter] = primal_residual[p.iter] + dual_residual[p.iter]
@@ -559,7 +566,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.9
+            p.primal_step *= 0.7
         end
     end
 
