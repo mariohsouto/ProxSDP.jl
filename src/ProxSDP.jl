@@ -68,10 +68,10 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-4
-        opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-10
-        opt.tol_soc = 1e-10
+        opt.tol_primal = 1e-3
+        opt.tol_dual = 1e-3
+        opt.tol_eig = 1e-6
+        opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
@@ -377,7 +377,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < 0.9 * comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
@@ -500,12 +500,10 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     # Compute primal residual
     a.Mty_old .+= .- a.Mty .+ (1.0 / (1.0 + p.primal_step)) .* (pair.x_old .- pair.x)
     primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + max(p.norm_c, maximum(abs.(a.Mty))))
-    # primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + p.norm_c)
 
     # Compute dual residual
     a.Mx_old .+= .- a.Mx .+ (1.0 / (1.0 + p.dual_step)) .* (pair.y_old .- pair.y)
     dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + max(p.norm_rhs, maximum(abs.(a.Mx))))
-    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + p.norm_rhs)
 
     # Compute combined residual
     comb_residual[p.iter] = primal_residual[p.iter] + dual_residual[p.iter]
@@ -515,13 +513,12 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     copyto!(pair.y_old, pair.y)
     copyto!(a.Mty_old, a.Mty)
     copyto!(a.Mx_old, a.Mx)
-    copyto!(a.MtMx_old, a.MtMx)
 
     return nothing
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .999
+    delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
@@ -538,25 +535,16 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
         end
 
-        # @timeit "linesearch 3" begin
-        #     a.Mty .= a.Mty_old .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.MtMx .- p.theta .* a.MtMx_old)
-        # end
-        # @timeit "linesearch 4" if affine_sets.m == 0
-        #     a.Mty .-= (p.beta * p.primal_step) .* a.Mtrhs
-        # else
-        #     mul!(a.Mty_aux, mat.Mt, a.y_half)
-        #     a.Mty .-= (p.beta * p.primal_step) .* a.Mty_aux
-        # end
-
-        a.Mty = mat.Mt * a.y_temp
+        @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
         
         # In-place norm
-        @timeit "linesearch 5" begin
+        @timeit "linesearch 4" begin
             a.Mty .-= a.Mty_old
             a.y_temp .-= pair.y_old
             y_norm = norm(a.y_temp)
             Mty_norm = norm(a.Mty)
         end
+
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
@@ -646,7 +634,6 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
     end
 
     @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
-    @timeit "linesearch 0" mul!(a.MtMx, mat.Mt, a.Mx)
 
     return nothing
 end
