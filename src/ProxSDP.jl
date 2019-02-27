@@ -68,15 +68,15 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-3
-        opt.tol_dual = 1e-3
-        opt.tol_eig = 1e-6
-        opt.tol_soc = 1e-6
+        opt.tol_primal = 1e-4
+        opt.tol_dual = 1e-4
+        opt.tol_eig = 1e-15
+        opt.tol_soc = 1e-15
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-9
-        opt.max_beta = 1e+9
+        opt.min_beta = 1e-3
+        opt.max_beta = 1e+6
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
         opt.convergence_window = 100
@@ -500,10 +500,13 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     # Compute primal residual
     a.Mty_old .+= .- a.Mty .+ (1.0 / (1.0 + p.primal_step)) .* (pair.x_old .- pair.x)
     primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + max(p.norm_c, maximum(abs.(a.Mty))))
+    # primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + p.norm_c)
+
 
     # Compute dual residual
     a.Mx_old .+= .- a.Mx .+ (1.0 / (1.0 + p.dual_step)) .* (pair.y_old .- pair.y)
     dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + max(p.norm_rhs, maximum(abs.(a.Mx))))
+    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + p.norm_rhs)
 
     # Compute combined residual
     comb_residual[p.iter] = primal_residual[p.iter] + dual_residual[p.iter]
@@ -518,7 +521,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .99
+    delta = .9
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
@@ -548,7 +551,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.9
+            p.primal_step *= 0.95
         end
     end
 
