@@ -70,8 +70,8 @@ mutable struct Options
 
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-9
-        opt.tol_soc = 1e-9
+        opt.tol_eig = 1e-4
+        opt.tol_soc = 1e-4
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
@@ -85,7 +85,7 @@ mutable struct Options
 
         opt.residual_relative_diff = 100.0
 
-        opt.max_linsearch_steps = 1000
+        opt.max_linsearch_steps = 100
 
         opt.full_eig_decomp = false
 
