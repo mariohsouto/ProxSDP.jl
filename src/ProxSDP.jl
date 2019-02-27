@@ -68,14 +68,14 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-3
-        opt.tol_dual = 1e-3
+        opt.tol_primal = 1e-4
+        opt.tol_dual = 1e-4
         opt.tol_eig = 1e-6
         opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-9
+        opt.min_beta = 1e-2
         opt.max_beta = 1e+9
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
@@ -548,7 +548,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.9
+            p.primal_step *= 0.95
         end
     end
 
