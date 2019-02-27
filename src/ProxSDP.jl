@@ -68,22 +68,22 @@ mutable struct Options
 
         opt.max_iter = Int(1e+5)
 
-        opt.tol_primal = 1e-4
-        opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-15
-        opt.tol_soc = 1e-15
+        opt.tol_primal = 1e-3
+        opt.tol_dual = 1e-3
+        opt.tol_eig = 1e-6
+        opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-3
-        opt.max_beta = 1e+3
+        opt.min_beta = 1e-9
+        opt.max_beta = 1e+9
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
         opt.convergence_window = 100
 
         opt.convergence_check = 50
 
-        opt.residual_relative_diff = 100.0
+        opt.residual_relative_diff = 50.0
 
         opt.max_linsearch_steps = 1000
 
@@ -283,8 +283,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     p = Params()
 
-    p.theta = opt.initial_theta           # Overrelaxation parameter
-    p.adapt_level = opt.initial_adapt_level     # Factor by which the stepsizes will be balanced 
+    p.theta = opt.initial_theta             # Overrelaxation parameter
+    p.adapt_level = opt.initial_adapt_level # Factor by which the stepsizes will be balanced 
     p.window = opt.convergence_window       # Convergence check window
     p.beta = opt.initial_beta
 
@@ -296,7 +296,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.rank_update, p.converged, p.update_cont = 0, false, 0
     p.target_rank = 2*ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
-
 
     analysis = false
     if analysis
@@ -337,10 +336,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             p.primal_step = 1.0 / maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
         end
-        # dual_step = primal_step
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
-        pair.x[1] = 1.0
     end
 
     # Fixed-point loop
@@ -380,9 +377,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
-            if p.update_cont > 30
+            if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
                     p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
                 end
@@ -516,13 +513,12 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     copyto!(pair.y_old, pair.y)
     copyto!(a.Mty_old, a.Mty)
     copyto!(a.Mx_old, a.Mx)
-    copyto!(a.MtMx_old, a.MtMx)
 
     return nothing
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    # theta = 1.0
+    delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
@@ -539,24 +535,17 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
         end
 
-        @timeit "linesearch 3" begin
-            a.Mty .= a.Mty_old .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.MtMx .- p.theta .* a.MtMx_old)
-        end
-        @timeit "linesearch 4" if affine_sets.m == 0
-            a.Mty .-= (p.beta * p.primal_step) .* a.Mtrhs
-        else
-            mul!(a.Mty_aux, mat.Mt, a.y_half)
-            a.Mty .-= (p.beta * p.primal_step) .* a.Mty_aux
-        end
+        @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
         
         # In-place norm
-        @timeit "linesearch 5" begin
+        @timeit "linesearch 4" begin
             a.Mty .-= a.Mty_old
             a.y_temp .-= pair.y_old
             y_norm = norm(a.y_temp)
             Mty_norm = norm(a.Mty)
         end
-        if sqrt(p.beta) * p.primal_step * Mty_norm <= (1.0 - 1e-6) * y_norm
+
+        if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
             p.primal_step *= 0.9
@@ -645,7 +634,6 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
     end
 
     @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
-    @timeit "linesearch 0" mul!(a.MtMx, mat.Mt, a.Mx)
 
     return nothing
 end
