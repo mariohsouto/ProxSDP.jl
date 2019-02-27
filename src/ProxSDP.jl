@@ -70,8 +70,8 @@ mutable struct Options
 
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-10
-        opt.tol_soc = 1e-10
+        opt.tol_eig = 1e-6
+        opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
@@ -387,7 +387,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > 10.0 * opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
+        elseif primal_residual[k] > 10. * opt.tol_primal && dual_residual[k] < 10. * opt.tol_dual && k > p.window
             p.beta *= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
                 p.beta = opt.min_beta
@@ -397,7 +397,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
-        elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > 10.0 * opt.tol_dual && k > p.window
+        elseif primal_residual[k] < 10. * opt.tol_primal && dual_residual[k] > 10. * opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
