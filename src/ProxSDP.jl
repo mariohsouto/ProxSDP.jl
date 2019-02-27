@@ -387,7 +387,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
+        elseif primal_residual[k] > 10. * opt.tol_primal && dual_residual[k] < 10. * opt.tol_dual && k > p.window
             p.beta *= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
                 p.beta = opt.min_beta
@@ -397,7 +397,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
-        elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
+        elseif primal_residual[k] < 10. * opt.tol_primal && dual_residual[k] > 10. * opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
@@ -518,7 +518,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .9
+    delta = .999
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
