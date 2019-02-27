@@ -85,7 +85,7 @@ mutable struct Options
 
         opt.residual_relative_diff = 100.0
 
-        opt.max_linsearch_steps = 100
+        opt.max_linsearch_steps = 1000
 
         opt.full_eig_decomp = false
 
@@ -518,7 +518,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .999
+    delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
@@ -548,7 +548,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.95
+            p.primal_step *= 0.9
         end
     end
 
