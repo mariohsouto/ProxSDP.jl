@@ -76,9 +76,9 @@ mutable struct Options
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
         opt.min_beta = 1e-3
-        opt.max_beta = 1e+7
+        opt.max_beta = 1e+8
         opt.initial_adapt_level = 0.9
-        opt.adapt_decay = 0.9
+        opt.adapt_decay = 0.95
         opt.convergence_window = 100
 
         opt.convergence_check = 50
@@ -548,7 +548,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.9
+            p.primal_step *= 0.95
         end
     end
 
