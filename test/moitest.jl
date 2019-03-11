@@ -18,6 +18,10 @@ const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP
 const config = MOIT.TestConfig(atol=1e-4, rtol=1e-3)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
 
+@testset "SolverName" begin
+    @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
+end
+
 @testset "Unit" begin
     MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer_lin), config,[
         # Quadratic functions are not supported

@@ -76,6 +76,8 @@ function Optimizer(;args...)
     return Optimizer(args)
 end
 
+MOI.get(::Optimizer, ::MOI.SolverName) = "ProxSDP"
+
 function MOI.is_empty(optimizer::Optimizer)
     !optimizer.maxsense && optimizer.data === nothing
 end
