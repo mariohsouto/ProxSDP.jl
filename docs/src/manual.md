@@ -10,10 +10,29 @@ In the test folder one can find MOI implementations of some problems: MIMO, Sens
 
 ## Solver arguments
 
-Argument | Description | Values (default)
---- | --- | ---
-log_verbose | print evolution of the process | `true`
-...
+Argument | Description | Type | Values (default)
+--- | --- | --- |  ---
+log_verbose | print evolution of the process | `Bool` |  `false`
+log_freq | print evoluition of the process every n iterations | `Int` |  `100`
+timer_verbose | #TODO | `Bool` |  `false`
+max_iter | #TODO | `Int` |  `100000`
+tol_primal | #TODO | `Float64` |  `1e-3`
+tol_dual | #TODO | `Float64` |  `1e-3`
+tol_eig | #TODO | `Float64` |  `1e-3`
+tol_soc | #TODO | `Float64` |  `1e-3`
+initial_theta | #TODO | `Float64` |  `1.0`
+initial_beta | #TODO | `Float64` |  `1.0`
+min_beta | #TODO | `Float64` |  `1e-3`
+max_beta | #TODO | `Float64` |  `1e+3`
+initial_adapt_level | #TODO | `Float64` |  `0.9`
+adapt_decay | #TODO | `Float64` |  `0.9`
+convergence_window | #TODO | `Int` |  `100`
+convergence_check | #TODO | `Int` |  `50`
+residual_relative_diff | #TODO | `Float64` |  `100.0`
+max_linsearch_steps | #TODO | `Int` |  `1000`
+full_eig_decomp | #TODO | `Bool` |  `false`
+max_target_rank_krylov_eigs | #TODO | `Int` |  `100`
+min_size_krylov_eigs | #TODO | `Int` |  `16`
 
 ## JuMP example
 
