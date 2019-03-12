@@ -32,6 +32,6 @@ JuMP.optimize!(model)
 # And ask for results!
 JuMP.objective_value(model)
 
-JuMP.result_value(x)
+JuMP.value(x)
 
-JuMP.result_value(y)
+JuMP.value(y)
