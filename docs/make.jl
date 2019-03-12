@@ -5,6 +5,7 @@ makedocs(
     doctest  = false,
     clean    = true,
     format   = Documenter.HTML(),
+    assets = ["assets/proj.ico"],
     sitename = "ProxSDP.jl",
     authors = "Mario Souto, Joaquim D. Garcia and contributors.",
     pages = [
