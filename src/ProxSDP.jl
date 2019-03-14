@@ -38,7 +38,7 @@ mutable struct Options
     max_iter::Int
     tol_primal::Float64
     tol_dual::Float64
-    tol_eig::Float64
+    tol_psd::Float64
     tol_soc::Float64
 
     initial_theta::Float64
@@ -70,7 +70,7 @@ mutable struct Options
 
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-6
+        opt.tol_psd = 1e-6
         opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
@@ -477,7 +477,7 @@ end
 
 function convergedrank(p::Params, cones::ConicSets, opt::Options)
     for (idx, sdp) in enumerate(cones.sdpcone)
-        if !(p.min_eig[idx] < opt.tol_eig || p.target_rank[idx] > opt.max_target_rank_krylov_eigs || sdp.sq_side < opt.min_size_krylov_eigs)
+        if !(p.min_eig[idx] < opt.tol_psd || p.target_rank[idx] > opt.max_target_rank_krylov_eigs || sdp.sq_side < opt.min_size_krylov_eigs)
             return false
         end
     end
