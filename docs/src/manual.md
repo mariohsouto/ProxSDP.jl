@@ -18,7 +18,7 @@ timer_verbose | Outputs a time logger | `Bool` |  `false`
 max_iter | Maximum number of iterations | `Int` |  `100000`
 tol_primal | Primal error tolerance | `Float64` |  `1e-4`
 tol_dual | Dual error tolerance | `Float64` |  `1e-4`
-tol_eig | Tolerance associated with PSD cone | `Float64` |  `1e-6`
+tol_psd | Tolerance associated with PSD cone | `Float64` |  `1e-6`
 tol_soc | Tolerance associated with SOC cone | `Float64` |  `1e-6`
 initial_theta | Initial over relaxation parameter | `Float64` |  `1.0`
 initial_beta | Initial primal/dual step ratio | `Float64` |  `1.0`
