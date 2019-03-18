@@ -16,7 +16,7 @@ addons:
         - libgmp-dev
         - libglpk-dev
 after_success:
-- julia -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+- julia -e 'import Pkg; Pkg.add("Coverage"); cd(Pkg.dir("ProxSDP")); using Coverage; Codecov.submit(process_folder())'
 
 - echo $TRAVIS_JULIA_VERSION
 env:
