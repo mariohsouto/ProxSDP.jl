@@ -95,6 +95,8 @@ function parse_arg!(options::Options, arg)
     value = arg[2]
     if name in fields
         setfield!(options, name, value)
+    else
+        error("$name is not supported parameter of ProxSDP")
     end
     return nothing
 end
