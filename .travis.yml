@@ -17,11 +17,7 @@ addons:
         - libglpk-dev
 after_success:
 - julia -e 'Pkg.add("Documenter")'
-<<<<<<< HEAD
 - julia -e 'cd(Pkg.dir("ProxSDP")); include(joinpath("docs", "make.jl"))'
-=======
-- julia -e 'cd(Pkg.dir("StateSpaceModels")); include(joinpath("docs", "make.jl"))'
->>>>>>> 2a4f63d6d0538d876fe72373647cd28e38a10e27
 # push coverage results to Codecov
 - julia --inline=no -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
 - echo $TRAVIS_JULIA_VERSION
