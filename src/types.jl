@@ -13,7 +13,6 @@ function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
     V.v[mod1(i, V.l)] = val
 end
 
-# --------------------------------
 mutable struct Options
     log_verbose::Bool
     log_freq::Int

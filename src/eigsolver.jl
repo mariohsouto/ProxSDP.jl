@@ -242,7 +242,6 @@ function _EUPD!(arc)
     return nothing
 end
 
-
 function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64)::Nothing where T1
 
     @timeit "_INIT!" _INIT!(arc, A, nev, iter)::Nothing
@@ -251,3 +250,4 @@ function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter:
 
     return nothing
 end
+

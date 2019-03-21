@@ -206,3 +206,66 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
     return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack, slack2, -ctr_primal), res_eq, res_dual, prim_obj, dual_obj, gap, time_)
 end
+
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
+
+    pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
+
+    # Projection onto the psd cone
+    if length(cones.sdpcone) >= 1
+        @timeit "sdp proj" sdp_cone_projection!(pair.x, a, cones, arc, opt, p)
+    end
+
+    if length(cones.socone) >= 1
+        @timeit "soc proj" so_cone_projection!(pair.x, a, cones, opt, p)
+    end
+
+    @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
+
+    return nothing
+end
+
+function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
+    delta = .999
+    cont = 0
+    p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
+    for i in 1:opt.max_linsearch_steps
+        cont += 1
+        p.theta = p.primal_step / p.primal_step_old
+
+        @timeit "linesearch 1" begin
+            a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
+        end
+        @timeit "linesearch 2" begin
+            # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
+            copyto!(a.y_temp, a.y_half)
+            box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
+            a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
+        end
+
+        @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
+        
+        # In-place norm
+        @timeit "linesearch 4" begin
+            a.Mty .-= a.Mty_old
+            a.y_temp .-= pair.y_old
+            y_norm = norm(a.y_temp)
+            Mty_norm = norm(a.Mty)
+        end
+
+        if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
+            break
+        else
+            p.primal_step *= 0.95
+        end
+    end
+
+    # Reverte in-place norm
+    a.Mty .+= a.Mty_old
+    a.y_temp .+= pair.y_old
+
+    copyto!(pair.y, a.y_temp)
+    p.primal_step_old = p.primal_step
+
+    return nothing
+end
