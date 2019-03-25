@@ -36,7 +36,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                 if hasconverged(arc[idx])
                     fill!(a.m[idx].data, 0.0)
                     for i in 1:p.target_rank[idx]
-                        if unsafe_getvalues(arc[idx])[i] > 0.0
+                        if unsafe_getvalues(arc[idx])[i] > opt.tol_psd
                             current_rank += 1
                             vec = unsafe_getvectors(arc[idx])[:, i]
                             LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
@@ -71,11 +71,10 @@ end
 
 function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
     current_rank = 0
-    # fact = eigen!(a.m[1], 1e-6, Inf)
     fact = eigen!(a.m[idx])
     fill!(a.m[idx].data, 0.0)
     for i in 1:length(fact.values)
-        if fact.values[i] > 0.0
+        if fact.values[i] > opt.tol_psd
             current_rank += 1
             LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1.0, a.m[idx].data)
         end
@@ -85,9 +84,7 @@ end
 
 function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
-        # @show "a", pair.x
         soc_projection!(a.soc_v[idx], a.soc_s[idx])
-        # @show "b", pair.x
     end
     return nothing
 end
