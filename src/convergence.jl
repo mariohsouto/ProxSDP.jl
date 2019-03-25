@@ -8,17 +8,13 @@ function convergedrank(p::Params, cones::ConicSets, opt::Options)
     return true
 end
 
-function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params)
-    # Compute primal residual
-    a.Mty_old .+= .- a.Mty .+ (1.0 / (1.0 + p.primal_step)) .* (pair.x_old .- pair.x)
-    primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + max(p.norm_c, maximum(abs.(a.Mty))))
-    # primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + p.norm_c)
+function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params, aff::AffineSets)
 
+    diff = (1. / p.primal_step) * (pair.x - pair.x_old) + (a.Mty - a.Mty_old)
+    primal_residual[p.iter] = norm(diff, Inf) / max(1. + p.norm_c, 1e-4)
 
-    # Compute dual residual
-    a.Mx_old .+= .- a.Mx .+ (1.0 / (1.0 + p.dual_step)) .* (pair.y_old .- pair.y)
-    dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + max(p.norm_rhs, maximum(abs.(a.Mx))))
-    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + p.norm_rhs)
+    diff = (1. / p.dual_step) * (pair.y - pair.y_old) + (a.Mx - a.Mx_old)
+    dual_residual[p.iter] = norm(diff, Inf) / max(1. + p.norm_rhs, 1e-4)
 
     # Compute combined residual
     comb_residual[p.iter] = primal_residual[p.iter] + dual_residual[p.iter]

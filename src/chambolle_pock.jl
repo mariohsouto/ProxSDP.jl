@@ -59,7 +59,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
-        mat = Matrices(M, Mt, affine_sets.c)
+        mat = Matrices(M, Mt, rhs, affine_sets.c)
         mul!(a.Mtrhs, mat.Mt, rhs)
         
         # Stepsize parameters and linesearch parameters
@@ -82,7 +82,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Linesearch
         linesearch!(pair, a, affine_sets, mat, opt, p)
         # Compute residuals and update old iterates
-        @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p)
+        @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
@@ -109,7 +109,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
@@ -119,26 +119,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > 10. * opt.tol_primal && dual_residual[k] < 10. * opt.tol_dual && k > p.window
-            p.beta *= (1 - p.adapt_level)
-            if p.beta <= opt.min_beta
-                p.beta = opt.min_beta
-            else
-                p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
-        elseif primal_residual[k] < 10. * opt.tol_primal && dual_residual[k] > 10. * opt.tol_dual && k > p.window
-            p.beta /= (1 - p.adapt_level)
-            if p.beta >= opt.max_beta
-                p.beta = opt.max_beta
-            else
-                p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
         elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
             p.beta *= (1 - p.adapt_level)
             if p.beta <= opt.min_beta
@@ -226,7 +206,7 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .999
+    delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
@@ -237,7 +217,6 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
         end
         @timeit "linesearch 2" begin
-            # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
             copyto!(a.y_temp, a.y_half)
             box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
@@ -256,7 +235,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
             break
         else
-            p.primal_step *= 0.95
+            p.primal_step *= 0.9
         end
     end
 
@@ -266,6 +245,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
 
     copyto!(pair.y, a.y_temp)
     p.primal_step_old = p.primal_step
+    p.dual_step = p.beta * p.primal_step
 
     return nothing
 end

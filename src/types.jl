@@ -48,20 +48,20 @@ mutable struct Options
         opt.log_freq = 100
         opt.timer_verbose = false
 
-        opt.max_iter = Int(1e+5)
+        opt.max_iter = Int(1e+6)
 
-        opt.tol_primal = 1e-4
-        opt.tol_dual = 1e-4
-        opt.tol_psd = 1e-6
-        opt.tol_soc = 1e-6
+        opt.tol_primal = 1e-3
+        opt.tol_dual = 1e-3
+        opt.tol_psd = 1e-10
+        opt.tol_soc = 1e-10
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
         opt.min_beta = 1e-2
-        opt.max_beta = 1e+8
+        opt.max_beta = 1e+2
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
-        opt.convergence_window = 100
+        opt.convergence_window = 200
 
         opt.convergence_check = 50
 
@@ -139,8 +139,9 @@ end
 mutable struct Matrices
     M::SparseMatrixCSC{Float64,Int64}
     Mt::SparseMatrixCSC{Float64,Int64}
+    rhs::Vector{Float64}
     c::Vector{Float64}
-    Matrices(M, Mt, c) = new(M, Mt, c)
+    Matrices(M, Mt, rhs, c) = new(M, Mt, rhs, c)
 end
 
 mutable struct Params

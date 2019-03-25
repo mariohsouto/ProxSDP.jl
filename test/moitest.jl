@@ -16,7 +16,7 @@ const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Op
 const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_unsupportedarg = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(unsupportedarg = 10))
 
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-3)
+const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
 
 @testset "SolverName" begin
@@ -553,7 +553,7 @@ end
 end
 
 @testset "Print" begin
-    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-4, rtol=1e-3))
+    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-3, rtol=1e-3))
 end
 
 @testset "Unsupported argument" begin
