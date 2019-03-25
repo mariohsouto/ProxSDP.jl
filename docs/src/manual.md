@@ -15,16 +15,16 @@ Argument | Description | Type | Values (default)
 log_verbose | print evolution of the process | `Bool` |  `false`
 log_freq | print evoluition of the process every n iterations | `Int` |  `100`
 timer_verbose | Outputs a time logger | `Bool` |  `false`
-max_iter | Maximum number of iterations | `Int` |  `100000`
-tol_primal | Primal error tolerance | `Float64` |  `1e-4`
-tol_dual | Dual error tolerance | `Float64` |  `1e-4`
-tol_psd | Tolerance associated with PSD cone | `Float64` |  `1e-6`
-tol_soc | Tolerance associated with SOC cone | `Float64` |  `1e-6`
+max_iter | Maximum number of iterations | `Int` |  `1000000`
+tol_primal | Primal error tolerance | `Float64` |  `1e-3`
+tol_dual | Dual error tolerance | `Float64` |  `1e-3`
+tol_psd | Tolerance associated with PSD cone | `Float64` |  `1e-15`
+tol_soc | Tolerance associated with SOC cone | `Float64` |  `1e-15`
 initial_theta | Initial over relaxation parameter | `Float64` |  `1.0`
 initial_beta | Initial primal/dual step ratio | `Float64` |  `1.0`
-min_beta | Minimum primal/dual step ratio | `Float64` |  `1e-2`
-max_beta | Maximum primal/dual step ratio | `Float64` |  `1e+8`
-convergence_window | Minimum number of iterations to update target rank | `Int` |  `100`
+min_beta | Minimum primal/dual step ratio | `Float64` |  `1e-4`
+max_beta | Maximum primal/dual step ratio | `Float64` |  `1e+4`
+convergence_window | Minimum number of iterations to update target rank | `Int` |  `200`
 max_linsearch_steps | Maximum number of iterations for linesearch | `Int` |  `1000`
 full_eig_decomp | Flag for using full eigenvalue decomposition | `Bool` |  `false`
 
