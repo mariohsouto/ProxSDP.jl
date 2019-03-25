@@ -52,13 +52,13 @@ mutable struct Options
 
         opt.tol_primal = 1e-3
         opt.tol_dual = 1e-3
-        opt.tol_psd = 1e-10
-        opt.tol_soc = 1e-10
+        opt.tol_psd = 1e-15
+        opt.tol_soc = 1e-15
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-2
-        opt.max_beta = 1e+2
+        opt.min_beta = 1e-4
+        opt.max_beta = 1e+4
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
         opt.convergence_window = 200

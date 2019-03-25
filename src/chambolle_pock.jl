@@ -109,7 +109,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < 0.9 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
@@ -206,7 +206,7 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .99
+    delta = .999
     cont = 0
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
