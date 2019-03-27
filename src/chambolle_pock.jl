@@ -27,6 +27,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     p.rank_update, p.converged, p.update_cont = 0, false, 0
     p.target_rank = 2*ones(length(conic_sets.sdpcone))
+    p.current_rank = 2*ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
 
     analysis = false
@@ -70,6 +71,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
+
+        analysis = false
+        linesearch_flag = true
     end
 
     # Fixed-point loop
@@ -79,10 +83,17 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Primal update
         @timeit "primal" primal_step!(pair, a, conic_sets, mat, arc, opt, p)
-        # Linesearch
-        linesearch!(pair, a, affine_sets, mat, opt, p)
+
+        # Dual update
+        if linesearch_flag
+            linesearch!(pair, a, affine_sets, mat, opt, p)
+        else
+            dual_step!(pair, a, affine_sets, mat, opt, p)
+        end
+
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
+        
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
@@ -109,7 +120,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < 0.9 * comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
@@ -119,27 +130,79 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Adaptive stepsizes
-        elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
-            p.beta *= (1 - p.adapt_level)
-            if p.beta <= opt.min_beta
-                p.beta = opt.min_beta
+        elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
+            if linesearch_flag
+                p.beta *= (1 - p.adapt_level)
+                if p.beta <= opt.min_beta
+                    p.beta = opt.min_beta
+                else
+                    p.adapt_level *= opt.adapt_decay
+                end
+                if analysis && opt.log_verbose
+                    println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+                end
             else
+                p.dual_step *= (1. - p.adapt_level)
+                p.primal_step /= (1. - p.adapt_level)
                 p.adapt_level *= opt.adapt_decay
             end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+        elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
+            if linesearch_flag
+                p.beta /= (1 - p.adapt_level)
+                if p.beta >= opt.max_beta
+                    p.beta = opt.max_beta
+                else
+                    p.adapt_level *= opt.adapt_decay
+                end
+                if analysis && opt.log_verbose
+                    println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+                end
+            else
+                p.dual_step /= (1. - p.adapt_level)
+                p.primal_step *= (1. - p.adapt_level)
+                p.adapt_level *= opt.adapt_decay
+            end
+        elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
+            if linesearch_flag
+                p.beta *= (1 - p.adapt_level)
+                if p.beta <= opt.min_beta
+                    p.beta = opt.min_beta
+                else
+                    p.adapt_level *= opt.adapt_decay
+                end
+                if analysis && opt.log_verbose
+                    println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+                end
+            else
+                p.dual_step *= (1. - p.adapt_level)
+                p.primal_step /= (1. - p.adapt_level)
+                p.adapt_level *= opt.adapt_decay
             end
         elseif opt.residual_relative_diff * primal_residual[k] < dual_residual[k] && k > p.window
-            p.beta /= (1 - p.adapt_level)
-            if p.beta >= opt.max_beta
-                p.beta = opt.max_beta
+            if linesearch_flag
+                p.beta /= (1 - p.adapt_level)
+                if p.beta >= opt.max_beta
+                    p.beta = opt.max_beta
+                else
+                    p.adapt_level *= opt.adapt_decay
+                end
+                if analysis && opt.log_verbose
+                    println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+                end
             else
+                p.dual_step /= (1. - p.adapt_level)
+                p.primal_step *= (1. - p.adapt_level)
                 p.adapt_level *= opt.adapt_decay
             end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
         end
+
+        # Adaptive reduce rank (heuristics)
+        # if p.rank_update > 3 * p.window && comb_residual[k - p.window] > comb_residual[k]
+        #     for (idx, sdp) in enumerate(conic_sets.sdpcone)
+        #         p.target_rank[idx] = min(p.target_rank[idx], sdp.sq_side, p.current_rank[idx] + 5)
+        #     end
+        #     p.rank_update = 0
+        # end
     end
 
     cont = 1
@@ -187,6 +250,22 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack, slack2, -ctr_primal), res_eq, res_dual, prim_obj, dual_obj, gap, time_)
 end
 
+function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
+
+    a.y_half .= pair.y .+ p.dual_step .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
+    copyto!(a.y_temp, a.y_half)
+    box_projection!(a.y_half, affine_sets, p.dual_step)
+    a.y_temp .-= p.dual_step .* a.y_half
+
+    @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
+        
+    copyto!(pair.y, a.y_temp)
+
+    p.primal_step_old = p.primal_step
+
+    return nothing
+end
+
 function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
@@ -208,6 +287,7 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
     delta = .999
     cont = 0
+    p.primal_step_old = p.primal_step
     p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
     for i in 1:opt.max_linsearch_steps
         cont += 1
@@ -244,8 +324,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     a.y_temp .+= pair.y_old
 
     copyto!(pair.y, a.y_temp)
-    p.primal_step_old = p.primal_step
     p.dual_step = p.beta * p.primal_step
-
+    
     return nothing
 end

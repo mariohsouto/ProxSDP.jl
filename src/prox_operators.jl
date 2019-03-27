@@ -27,6 +27,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
         end
     end
     for (idx, sdp) in enumerate(cones.sdpcone)
+        p.current_rank[idx] = 0
         if sdp.sq_side == 1
             a.m[idx][1] = max(0.0, a.m[idx][1])
             p.min_eig[idx] = a.m[idx][1]
@@ -36,8 +37,8 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                 if hasconverged(arc[idx])
                     fill!(a.m[idx].data, 0.0)
                     for i in 1:p.target_rank[idx]
-                        if unsafe_getvalues(arc[idx])[i] > opt.tol_psd
-                            current_rank += 1
+                        if unsafe_getvalues(arc[idx])[i] > 0.0 # opt.tol_psd
+                            p.current_rank[idx] += 1
                             vec = unsafe_getvectors(arc[idx])[:, i]
                             LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
                         end
@@ -47,11 +48,11 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
             if hasconverged(arc[idx])
                 @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc[idx]))
             else
-                @timeit "eigfact" full_eig!(a, idx, opt)
+                @timeit "eigfact" full_eig!(a, idx, opt, p)
             end
         else
             p.min_eig[idx] = 0.0
-            @timeit "eigfact" full_eig!(a, idx, opt)
+            @timeit "eigfact" full_eig!(a, idx, opt, p)
         end
     end
     @timeit "reshape2" begin
@@ -69,13 +70,13 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
     return nothing
 end
 
-function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
-    current_rank = 0
+function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)
+    p.current_rank[idx] = 0
     fact = eigen!(a.m[idx])
     fill!(a.m[idx].data, 0.0)
     for i in 1:length(fact.values)
-        if fact.values[i] > opt.tol_psd
-            current_rank += 1
+        if fact.values[i] > 0.0 # opt.tol_psd
+            p.current_rank[idx] += 1
             LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1.0, a.m[idx].data)
         end
     end
