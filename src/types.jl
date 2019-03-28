@@ -44,32 +44,32 @@ mutable struct Options
     function Options()
         opt = new()
 
-        opt.log_verbose = false
+        opt.log_verbose = true
         opt.log_freq = 100
         opt.timer_verbose = false
 
-        opt.max_iter = Int(1e+6)
+        opt.max_iter = Int(1e+4)
 
         opt.tol_primal = 1e-3
         opt.tol_dual = 1e-3
-        opt.tol_psd = 1e-10
-        opt.tol_soc = 1e-10
+        opt.tol_psd = 1e-8
+        opt.tol_soc = 1e-8
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
-        opt.min_beta = 1e-3
-        opt.max_beta = 1e+3
+        opt.min_beta = 1e-2
+        opt.max_beta = 1e+2
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
-        opt.convergence_window = 100
+        opt.convergence_window = 200
 
         opt.convergence_check = 50
 
-        opt.residual_relative_diff = 100.0
+        opt.residual_relative_diff = 10.0
 
         opt.max_linsearch_steps = 10000
 
-        opt.full_eig_decomp = false
+        opt.full_eig_decomp = true
 
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
@@ -106,10 +106,9 @@ mutable struct PrimalDual
 
     y::Vector{Float64}
     y_old::Vector{Float64}
-    y_aux::Vector{Float64}
 
     PrimalDual(aff) = new(
-        zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
+        zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
     )
 end
 
@@ -117,7 +116,6 @@ mutable struct AuxiliaryData
     m::Vector{Symmetric{Float64,Matrix{Float64}}}
     Mty::Vector{Float64}
     Mty_old::Vector{Float64}
-    Mty_aux::Vector{Float64}
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
     y_half::Vector{Float64}
@@ -129,7 +127,7 @@ mutable struct AuxiliaryData
     soc_s::Vector{ViewScalar}
     function AuxiliaryData(aff::AffineSets, cones::ConicSets) 
         new([Symmetric(zeros(sdp.sq_side, sdp.sq_side), :L) for sdp in cones.sdpcone], zeros(aff.n), zeros(aff.n),
-        zeros(aff.n), zeros(aff.p+aff.m), zeros(aff.p+aff.m), zeros(aff.p+aff.m), 
+        zeros(aff.p+aff.m), zeros(aff.p+aff.m), zeros(aff.p+aff.m), 
         zeros(aff.p+aff.m), zeros(aff.n), zeros(aff.n), zeros(aff.n),
         ViewVector[], ViewScalar[]
     )

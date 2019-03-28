@@ -143,7 +143,8 @@ end
 
 function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
 
-    arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
+    # arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
+    arc.TOL = 1e-6 * ones(T, 1)
     
     while true
         Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
@@ -250,4 +251,3 @@ function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter:
 
     return nothing
 end
-

@@ -1,4 +1,5 @@
 # this code was copied from the MOIWrapper file in SCS.jl
+
 using MathOptInterface
 const MOI = MathOptInterface
 const CI = MOI.ConstraintIndex
@@ -493,9 +494,6 @@ function MOI.optimize!(optimizer::Optimizer)
     aff.p += n_new_variables
     aff.extra = n_new_variables
 
-    # @show con.sdpcone
-
-    # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
     sol = @timeit "Main" chambolle_pock(aff, con, options)
 
     ret_val = sol.status

@@ -55,6 +55,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
             @timeit "eigfact" full_eig!(a, idx, opt, p)
         end
     end
+
     @timeit "reshape2" begin
         cont = 1
         @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
