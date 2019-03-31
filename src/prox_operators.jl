@@ -1,4 +1,5 @@
 
+<<<<<<< HEAD
 function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
     # Projection onto = b
     @inbounds @simd for i in 1:length(aff.b)
@@ -11,6 +12,8 @@ function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
     return nothing
 end
 
+=======
+>>>>>>> fix_file_splitting
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
 
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.0)
@@ -36,7 +39,11 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                 if hasconverged(arc[idx])
                     fill!(a.m[idx].data, 0.0)
                     for i in 1:p.target_rank[idx]
+<<<<<<< HEAD
                         if unsafe_getvalues(arc[idx])[i] > opt.tol_psd
+=======
+                        if unsafe_getvalues(arc[idx])[i] > 0.0
+>>>>>>> fix_file_splitting
                             current_rank += 1
                             vec = unsafe_getvectors(arc[idx])[:, i]
                             LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
@@ -69,22 +76,25 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
     return nothing
 end
 
-function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
-    current_rank = 0
-    fact = eigen!(a.m[idx])
-    fill!(a.m[idx].data, 0.0)
-    for i in 1:length(fact.values)
-        if fact.values[i] > opt.tol_psd
-            current_rank += 1
-            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1.0, a.m[idx].data)
-        end
+function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
+    for (idx, soc) in enumerate(cones.socone)
+        # @show "a", pair.x
+        soc_projection!(a.soc_v[idx], a.soc_s[idx])
+        # @show "b", pair.x
     end
     return nothing
 end
 
-function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
-    for (idx, soc) in enumerate(cones.socone)
-        soc_projection!(a.soc_v[idx], a.soc_s[idx])
+function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
+    current_rank = 0
+    # fact = eigen!(a.m[1], 1e-6, Inf)
+    fact = eigen!(a.m[idx])
+    fill!(a.m[idx].data, 0.0)
+    for i in 1:length(fact.values)
+        if fact.values[i] > 0.0
+            current_rank += 1
+            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1.0, a.m[idx].data)
+        end
     end
     return nothing
 end
@@ -100,6 +110,18 @@ function soc_projection!(v::ViewVector, s::ViewScalar)
         val = 0.5 * (1.0+s[]/nv)
         v .*= val
         s[] = val * nv
+    end
+    return nothing
+end
+
+function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
+    # Projection onto = b
+    @inbounds @simd for i in 1:length(aff.b)
+        v[i] = aff.b[i]
+    end
+    # Projection onto <= h
+    @inbounds @simd for i in 1:length(aff.h)
+        v[aff.p+i] = min(v[aff.p+i] / step, aff.h[i])
     end
     return nothing
 end
