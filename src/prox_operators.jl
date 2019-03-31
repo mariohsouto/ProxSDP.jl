@@ -1,19 +1,4 @@
 
-<<<<<<< HEAD
-function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
-    # Projection onto = b
-    @inbounds @simd for i in 1:length(aff.b)
-        v[i] = aff.b[i]
-    end
-    # Projection onto <= h
-    @inbounds @simd for i in 1:length(aff.h)
-        v[aff.p+i] = min(v[aff.p+i] / step, aff.h[i])
-    end
-    return nothing
-end
-
-=======
->>>>>>> fix_file_splitting
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
 
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.0)
@@ -39,11 +24,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                 if hasconverged(arc[idx])
                     fill!(a.m[idx].data, 0.0)
                     for i in 1:p.target_rank[idx]
-<<<<<<< HEAD
-                        if unsafe_getvalues(arc[idx])[i] > opt.tol_psd
-=======
                         if unsafe_getvalues(arc[idx])[i] > 0.0
->>>>>>> fix_file_splitting
                             current_rank += 1
                             vec = unsafe_getvectors(arc[idx])[:, i]
                             LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
