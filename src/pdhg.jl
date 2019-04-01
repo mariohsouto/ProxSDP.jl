@@ -166,14 +166,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     cont = 1
     @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
         if i != j
-            pair.x[cont] /= sqrt(2.0)
+            pair.x[cont] /= sqrt(2.)
         end
         cont += 1
     end
 
     # Remove scaling
-    pair.x /= sqrt(spectral_norm)
-    pair.y /= sqrt(spectral_norm)
+    pair.x ./= sqrt(spectral_norm)
+    pair.y ./= sqrt(spectral_norm)
 
     # Compute results
     time_ = time() - p.time0
