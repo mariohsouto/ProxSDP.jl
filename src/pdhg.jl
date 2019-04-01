@@ -10,8 +10,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     p.time0 = time()
 
-    p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h))
-    p.norm_c = norm(affine_sets.c)
+    p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h), Inf)
+    p.norm_c = norm(affine_sets.c, Inf)
 
     p.rank_update, p.converged, p.update_cont = 0, false, 0
     p.target_rank = 2*ones(length(conic_sets.sdpcone))
@@ -27,18 +27,19 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     @timeit "Init" begin
+
         # Scale objective function
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
         rhs_orig = vcat(affine_sets.b, affine_sets.h)
         norm_scaling(affine_sets, conic_sets)
+
         # Initialization
         pair = PrimalDual(affine_sets)
         a = AuxiliaryData(affine_sets, conic_sets)
         arc = [ARPACKAlloc(Float64, 1) for i in conic_sets.sdpcone]
         map_socs!(pair.x, conic_sets, a)
-
         primal_residual = CircularVector{Float64}(2*p.window)
         dual_residual = CircularVector{Float64}(2*p.window)
         comb_residual = CircularVector{Float64}(2*p.window)
@@ -47,15 +48,27 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
         rhs = vcat(affine_sets.b, affine_sets.h)
-        mat = Matrices(M, Mt, affine_sets.c)
-        mul!(a.Mtrhs, mat.Mt, rhs)
-        
+
         # Stepsize parameters and linesearch parameters
         if minimum(size(M)) >= 2
-            p.primal_step = 1.0 / Arpack.svds(M, nsv = 1)[1].S[1] #TODO review efficiency
+            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] #TODO review efficiency
         else
-            p.primal_step = 1.0 / maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
+            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
         end
+
+        # Normalize the linear system by the spectral norm of M
+        M /= spectral_norm
+        Mt /= spectral_norm
+        rhs /= sqrt(spectral_norm)
+        affine_sets.b /= sqrt(spectral_norm)
+        affine_sets.h /= sqrt(spectral_norm)
+        affine_sets.c /= sqrt(spectral_norm)
+
+        # Build struct for storing matrices
+        mat = Matrices(M, Mt, affine_sets.c)
+
+        # Initial primal and dual steps
+        p.primal_step = 1.
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
     end
@@ -70,7 +83,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Linesearch
         linesearch!(pair, a, affine_sets, mat, opt, p)
         # Compute residuals and update old iterates
-        @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p)
+        @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
@@ -158,6 +171,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         cont += 1
     end
 
+    # Remove scaling
+    pair.x /= sqrt(spectral_norm)
+    pair.y /= sqrt(spectral_norm)
+
     # Compute results
     time_ = time() - p.time0
     prim_obj = dot(c_orig, pair.x)
@@ -198,16 +215,15 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
     delta = .999
     cont = 0
-    p.primal_step = p.primal_step * sqrt(1.0 + p.theta)
+    p.primal_step = p.primal_step * sqrt(1. + p.theta)
     for i in 1:opt.max_linsearch_steps
         cont += 1
         p.theta = p.primal_step / p.primal_step_old
 
         @timeit "linesearch 1" begin
-            a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1.0 + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
+            a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1. + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
         end
         @timeit "linesearch 2" begin
-            # REF a.y_temp = a.y_half - beta * primal_step * box_projection(a.y_half, affine_sets, beta * primal_step)
             copyto!(a.y_temp, a.y_half)
             box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half

@@ -1,20 +1,18 @@
 
-function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params)
-    # Compute primal residual
-    a.Mty_old .+= .- a.Mty .+ (1.0 / (1.0 + p.primal_step)) .* (pair.x_old .- pair.x)
-    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + max(p.norm_rhs, maximum(abs.(a.Mx))))
-    primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + p.norm_c)
-    # primal_residual[p.iter] = norm(a.Mty_old, 2) / (1.0 + p.norm_c)
+function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params, aff)
+    
+    # Primal residual
+    Px = pair.x .- p.primal_step * a.Mty
+    Px_old = pair.x_old - p.primal_step * a.Mty_old
+    primal_residual[p.iter] = sqrt(aff.n) * norm(Px - Px_old, Inf) / max(p.norm_rhs, norm(Px_old, Inf), 1e-4)
 
-
-    # Compute dual residual
-    a.Mx_old .+= .- a.Mx .+ (1.0 / (1.0 + p.dual_step)) .* (pair.y_old .- pair.y)
-    dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + p.norm_rhs)
-    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + max(p.norm_rhs, maximum(abs.(a.Mx))))
-    # dual_residual[p.iter] = norm(a.Mx_old, 2) / (1.0 + p.norm_rhs)
+    # Dual residual
+    Py = pair.y - p.dual_step * a.Mx
+    Py_old = pair.y_old - p.dual_step * a.Mx_old
+    dual_residual[p.iter] = sqrt(aff.m + aff.p) * norm(Py - Py_old, Inf) / max(p.norm_c, norm(Py_old, Inf), 1e-4)
 
     # Compute combined residual
-    comb_residual[p.iter] = primal_residual[p.iter] + dual_residual[p.iter]
+    comb_residual[p.iter] = max(primal_residual[p.iter], dual_residual[p.iter])
 
     # Keep track of previous iterates
     copyto!(pair.x_old, pair.x)
