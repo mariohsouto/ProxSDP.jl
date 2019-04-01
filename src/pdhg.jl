@@ -140,26 +140,26 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
-        elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
-            p.beta *= (1 - p.adapt_level)
-            if p.beta <= opt.min_beta
-                p.beta = opt.min_beta
-            else
-                p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
-        elseif opt.residual_relative_diff * primal_residual[k] < dual_residual[k] && k > p.window
-            p.beta /= (1 - p.adapt_level)
-            if p.beta >= opt.max_beta
-                p.beta = opt.max_beta
-            else
-                p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
+        # elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
+        #     p.beta *= (1 - p.adapt_level)
+        #     if p.beta <= opt.min_beta
+        #         p.beta = opt.min_beta
+        #     else
+        #         p.adapt_level *= opt.adapt_decay
+        #     end
+        #     if analysis
+        #         println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+        #     end
+        # elseif opt.residual_relative_diff * primal_residual[k] < dual_residual[k] && k > p.window
+        #     p.beta /= (1 - p.adapt_level)
+        #     if p.beta >= opt.max_beta
+        #         p.beta = opt.max_beta
+        #     else
+        #         p.adapt_level *= opt.adapt_decay
+        #     end
+        #     if analysis
+        #         println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+        #     end
         end
     end
 

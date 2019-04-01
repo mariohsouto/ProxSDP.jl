@@ -51,8 +51,8 @@ mutable struct Options
 
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-8
-        opt.tol_soc = 1e-8
+        opt.tol_eig = 1e-6
+        opt.tol_soc = 1e-6
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
