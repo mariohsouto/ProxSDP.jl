@@ -78,7 +78,7 @@ end
 function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer, iter::Int64) where T
 
     tol = 0.0
-    v0 = zeros(eltype(A),(0,))
+    v0 = zeros(eltype(A), (0,))
 
     n = LinearAlgebra.checksquare(A)
 
@@ -86,7 +86,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.n = n
     arc.nev = nev
     arc.ncv = max(20, 2 * arc.nev + 1)
-    arc.maxiter = Int(1e+2)
+    arc.maxiter = Int(1e+3)
 
     arc.bmat = "I"
     arc.which = "LA"
@@ -102,7 +102,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)
 
-    arc.TOL = 1e-6 * ones(T, 1)
+    arc.TOL = 1e-8 * ones(T, 1)
 
     arc.v = Matrix{T}(undef, arc.n, arc.ncv)
     arc.workd = Vector{T}(undef, 3*arc.n)
