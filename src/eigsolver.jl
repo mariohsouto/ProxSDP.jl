@@ -85,8 +85,12 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     # eigs
     arc.n = n
     arc.nev = nev
+
+    # Hyperparameters that matter
     arc.ncv = max(20, 2 * arc.nev + 1)
+    arc.lworkl = arc.ncv * (arc.ncv + 8)
     arc.maxiter = Int(1e+3)
+    arc.TOL = 1e-6 * ones(T, 1)
 
     arc.bmat = "I"
     arc.which = "LA"
@@ -99,10 +103,6 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.Amat = A
     arc.x = Vector{T}(undef, arc.n)
     arc.y = Vector{T}(undef, arc.n)
-
-    arc.lworkl = arc.ncv * (arc.ncv + 8)
-
-    arc.TOL = 1e-6 * ones(T, 1)
 
     arc.v = Matrix{T}(undef, arc.n, arc.ncv)
     arc.workd = Vector{T}(undef, 3*arc.n)

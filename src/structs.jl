@@ -56,8 +56,9 @@ mutable struct Options
 
         opt.initial_theta = 1.0
         opt.initial_beta = 1.0
+        # Bounds on beta (dual_step / primal_step) [larger bounds may lead to inaccuracy]
         opt.min_beta = 1e-2
-        opt.max_beta = 1e+4
+        opt.max_beta = 1e+2
         opt.initial_adapt_level = 0.9
         opt.adapt_decay = 0.9
         opt.convergence_window = 100
