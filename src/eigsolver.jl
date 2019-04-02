@@ -102,7 +102,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
 
     arc.lworkl = arc.ncv * (arc.ncv + 8)
 
-    arc.TOL = 1e-8 * ones(T, 1)
+    arc.TOL = 1e-6 * ones(T, 1)
 
     arc.v = Matrix{T}(undef, arc.n, arc.ncv)
     arc.workd = Vector{T}(undef, 3*arc.n)
@@ -145,7 +145,7 @@ function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
     # arc.TOL .= max((1e-4 / iter), 1e-6) .* ones(T, 1)
     
     while true
-        @timeit "Arpack.saupd" Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
+        Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
         # x = view(arc.workd, arc.ipntr[1] + arc.zernm1)

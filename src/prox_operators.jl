@@ -1,7 +1,7 @@
 
 function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, arc::Vector{ARPACKAlloc{Float64}}, opt::Options, p::Params)
 
-    p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.0)
+    p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
     # Build symmetric matrix(es) X
     @timeit "reshape1" begin
         cont = 1
@@ -27,7 +27,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                         if unsafe_getvalues(arc[idx])[i] > 0.0
                             current_rank += 1
                             vec = unsafe_getvectors(arc[idx])[:, i]
-                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1.0, a.m[idx].data)
+                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1., a.m[idx].data)
                         end
                     end
                 end
@@ -68,8 +68,7 @@ end
 
 function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
     current_rank = 0
-    # fact = eigen!(a.m[1], 1e-6, Inf)
-    fact = eigen!(a.m[idx])
+    fact = eigen!(a.m[1], 1e-8, Inf)
     fill!(a.m[idx].data, 0.0)
     for i in 1:length(fact.values)
         if fact.values[i] > 0.0
