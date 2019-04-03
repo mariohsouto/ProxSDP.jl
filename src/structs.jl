@@ -4,9 +4,11 @@ struct CircularVector{T}
     l::Int
     CircularVector{T}(l::Integer) where T = new(zeros(T, l), l)
 end
+
 function Base.getindex(V::CircularVector{T}, i::Int) where T
     return V.v[mod1(i, V.l)]
 end
+
 function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
     V.v[mod1(i, V.l)] = val
 end
@@ -78,17 +80,20 @@ mutable struct Options
         return opt
     end
 end
+
 function Options(args)
     options = Options()
     parse_args!(options, args)
     return options
 end
+
 function parse_args!(options, args)
     for i in args
         parse_arg!(options, i)
     end
     return nothing
 end
+
 function parse_arg!(options::Options, arg)
     fields = fieldnames(Options)
     name = arg[1]
@@ -104,8 +109,8 @@ mutable struct AffineSets
     p::Int  # Number of linear equalities
     m::Int  # Number of linear inequalities
     extra::Int  # Number of adition linear equalities (for disjoint cones)
-    A::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
-    G::SparseMatrixCSC{Float64,Int64}#AbstractMatrix{T}
+    A::SparseMatrixCSC{Float64,Int64} 
+    G::SparseMatrixCSC{Float64,Int64}
     b::Vector{Float64}
     h::Vector{Float64}
     c::Vector{Float64}
@@ -145,13 +150,11 @@ end
 mutable struct PrimalDual
     x::Vector{Float64}
     x_old::Vector{Float64}
-
     y::Vector{Float64}
     y_old::Vector{Float64}
-    y_aux::Vector{Float64}
 
     PrimalDual(aff) = new(
-        zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
+        zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
     )
 end
 
@@ -162,21 +165,17 @@ mutable struct AuxiliaryData
     m::Vector{Symmetric{Float64,Matrix{Float64}}}
     Mty::Vector{Float64}
     Mty_old::Vector{Float64}
-    Mty_aux::Vector{Float64}
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
     y_half::Vector{Float64}
     y_temp::Vector{Float64}
-    MtMx::Vector{Float64}
-    MtMx_old::Vector{Float64}
-    Mtrhs::Vector{Float64}
     soc_v::Vector{ViewVector}
     soc_s::Vector{ViewScalar}
+
     function AuxiliaryData(aff::AffineSets, cones::ConicSets) 
-        new([Symmetric(zeros(sdp.sq_side, sdp.sq_side), :L) for sdp in cones.sdpcone], zeros(aff.n), zeros(aff.n),
-        zeros(aff.n), zeros(aff.p+aff.m), zeros(aff.p+aff.m), zeros(aff.p+aff.m), 
-        zeros(aff.p+aff.m), zeros(aff.n), zeros(aff.n), zeros(aff.n),
-        ViewVector[], ViewScalar[]
+        new([Symmetric(zeros(sdp.sq_side, sdp.sq_side), :L) for sdp in cones.sdpcone], 
+        zeros(aff.n), zeros(aff.n), zeros(aff.p+aff.m), zeros(aff.p+aff.m), 
+        zeros(aff.p+aff.m), zeros(aff.p+aff.m), ViewVector[], ViewScalar[]
     )
     end
 end
@@ -185,31 +184,25 @@ mutable struct Matrices
     M::SparseMatrixCSC{Float64,Int64}
     Mt::SparseMatrixCSC{Float64,Int64}
     c::Vector{Float64}
+
     Matrices(M, Mt, c) = new(M, Mt, c)
 end
 
 mutable struct Params
-
     target_rank::Vector{Int}
     rank_update::Int
     update_cont::Int
     min_eig::Vector{Float64}
-
     iter::Int
     converged::Bool
     iteration::Int
-
     primal_step::Float64
     primal_step_old::Float64
     dual_step::Float64
-
     theta::Float64
     beta::Float64
     adapt_level::Float64
-
     window::Int
-
-    # constants
     time0::Float64
     norm_c::Float64
     norm_rhs::Float64
