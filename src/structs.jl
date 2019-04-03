@@ -16,26 +16,22 @@ mutable struct Options
     log_verbose::Bool
     log_freq::Int
     timer_verbose::Bool
-    max_iter::Int
     tol_primal::Float64
     tol_dual::Float64
     tol_eig::Float64
     tol_soc::Float64
-
-    initial_theta::Float64
-    initial_beta::Float64
     min_beta::Float64
     max_beta::Float64
+    initial_beta::Float64
     initial_adapt_level::Float64
-    adapt_decay::Float64 # Rate the adaptivity decreases over time
+    adapt_decay::Float64
     convergence_window::Int
-
     convergence_check::Int
-
-    residual_relative_diff::Float64
-
+    max_iter::Int
     max_linsearch_steps::Int
-
+    delta::Float64
+    initial_theta::Float64
+    linsearch_decay::Float64
     full_eig_decomp::Bool
     max_target_rank_krylov_eigs::Int
     min_size_krylov_eigs::Int
@@ -43,34 +39,39 @@ mutable struct Options
     function Options()
         opt = new()
 
+        # Printing options
         opt.log_verbose = false
         opt.log_freq = 100
         opt.timer_verbose = false
 
-        opt.max_iter = Int(1e+5)
-
+        # Default tolerances
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
         opt.tol_eig = 1e-6
         opt.tol_soc = 1e-6
 
-        opt.initial_theta = 1.0
-        opt.initial_beta = 1.0
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to inaccuracy]
-        opt.min_beta = 1e-2
-        opt.max_beta = 1e+2
-        opt.initial_adapt_level = 0.9
-        opt.adapt_decay = 0.9
+        opt.min_beta = 1e-3
+        opt.max_beta = 1e+3
+        opt.initial_beta = 1.
+
+        # Adaptive primal-dual steps parameters [adapt_decay too close to 1. may lead to inaccuracy]
+        opt.initial_adapt_level = .9
+        opt.adapt_decay = .8
+
+        # PDHG parameters
         opt.convergence_window = 100
-
         opt.convergence_check = 50
+        opt.max_iter = Int(1e+5)
 
-        opt.residual_relative_diff = 100.0
-
+        # Linesearch parameters
         opt.max_linsearch_steps = 1000
+        opt.delta = .999
+        opt.initial_theta = 1.
+        opt.linsearch_decay = .95
 
+        # Spectral decomposition parameters
         opt.full_eig_decomp = false
-
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
 

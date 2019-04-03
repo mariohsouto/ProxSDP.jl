@@ -140,26 +140,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
-        elseif primal_residual[k] > opt.residual_relative_diff * dual_residual[k] && k > p.window
-            p.beta *= (1 - p.adapt_level)
-            if p.beta <= opt.min_beta
-                p.beta = opt.min_beta
-            else
-                p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
-        elseif opt.residual_relative_diff * primal_residual[k] < dual_residual[k] && k > p.window
-            p.beta /= (1 - p.adapt_level)
-            if p.beta >= opt.max_beta
-                p.beta = opt.max_beta
-            else
-                p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
         end
     end
 
@@ -213,9 +193,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
-    delta = .99
     cont = 0
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
+    
     for i in 1:opt.max_linsearch_steps
         cont += 1
         p.theta = p.primal_step / p.primal_step_old
@@ -239,10 +219,10 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             Mty_norm = norm(a.Mty)
         end
 
-        if sqrt(p.beta) * p.primal_step * Mty_norm <= delta * y_norm
+        if sqrt(p.beta) * p.primal_step * Mty_norm <= opt.delta * y_norm
             break
         else
-            p.primal_step *= 0.95
+            p.primal_step *= opt.linsearch_decay
         end
     end
 
