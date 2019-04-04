@@ -65,7 +65,7 @@ function print_header_2()
     println("----------------------------------------------------------------------")
     println(" Initializing Primal-Dual Hybrid Gradient method                      ")
     println("----------------------------------------------------------------------")
-    println("|  iter  | comb. res | prim. res |  dual res |    rank   |  time (s) |")
+    println("|  iter  | comb. res | prim. res |  dual res |  max rank |  time (s) |")
     println("----------------------------------------------------------------------")
 
     return nothing

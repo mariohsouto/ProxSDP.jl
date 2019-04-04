@@ -344,7 +344,7 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
 end
 
 #=
-    Different rom SCS
+    Different from SCS
 =#
 
 matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,n)))]
@@ -356,12 +356,6 @@ function MOI.optimize!(optimizer::Optimizer)
 
     cone = optimizer.cone
 
-    # if cone.q > 0
-    #     error("SOC constraints not supported")
-    # end
-    # if length(cone.qa) > 0
-    #     error("SOC constraints not supported")
-    # end
     if cone.ep > 0
         error("Primal Exponential Cone constraints not supported")
     end
@@ -371,19 +365,9 @@ function MOI.optimize!(optimizer::Optimizer)
     if length(cone.p) > 0
         error("Power Cone constraints not supported")
     end
-    # if length(cone.sa) >= 0
-    #     error("There must be exactely one SDP constraint")
-    # end
-
-    # @show cone.s
-    # @show cone.sa
 
     m = optimizer.data.m #rows
     n = optimizer.data.n #cols
-
-    # if cone.s != n
-    #     error("The number of columns must be equal to the number of entries in the PSD matrix")
-    # end
 
     preA = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
     preb = optimizer.data.b
@@ -393,17 +377,11 @@ function MOI.optimize!(optimizer::Optimizer)
 
     TimerOutputs.reset_timer!()
 
-    # @show preA
-    # @show Matrix(preA)
-    # @show cone
-
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
 
     A = preA[1:cone.f,:]
-    # @show Matrix(A)
     G = preA[cone.f+1:cone.f+cone.l,:]
-    # @show Matrix(G)
 
     b = preb[1:cone.f]
     h = preb[cone.f+1:cone.f+cone.l]
@@ -488,14 +466,10 @@ function MOI.optimize!(optimizer::Optimizer)
     aff.A = vcat(hcat(aff.A, spzeros(size(aff.A)[1], n_new_variables)), A2)
     aff.G = hcat(aff.G, spzeros(size(aff.G)[1], n_new_variables))
     append!(aff.c, zeros(n_new_variables))
-    # @show aff.n, n_new_variables, n_new_variables, n_tot_variables
     aff.n += n_new_variables
     aff.p += n_new_variables
     aff.extra = n_new_variables
 
-    # @show con.sdpcone
-
-    # sol = SCS_solve(SCS.Indirect, m, n, A, b, c, cone.f, cone.l, cone.qa, cone.sa, cone.ep, cone.ed, cone.p)
     sol = @timeit "Main" chambolle_pock(aff, con, options)
 
     ret_val = sol.status
