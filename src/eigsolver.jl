@@ -77,7 +77,7 @@ end
 
 function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer, iter::Int64) where T
 
-    tol = 0.0
+    tol = 0.
     v0 = zeros(eltype(A), (0,))
 
     n = LinearAlgebra.checksquare(A)

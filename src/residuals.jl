@@ -46,7 +46,7 @@ end
 
 function convergedrank(p::Params, cones::ConicSets, opt::Options)
     for (idx, sdp) in enumerate(cones.sdpcone)
-        if !(p.min_eig[idx] < opt.tol_eig || p.target_rank[idx] > opt.max_target_rank_krylov_eigs || sdp.sq_side < opt.min_size_krylov_eigs)
+        if !(p.min_eig[idx] < opt.tol_psd || p.target_rank[idx] > opt.max_target_rank_krylov_eigs || sdp.sq_side < opt.min_size_krylov_eigs)
             return false
         end
     end

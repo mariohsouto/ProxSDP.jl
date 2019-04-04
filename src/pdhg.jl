@@ -23,7 +23,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     if opt.log_verbose
-        printheader()
+        print_header_1()
+        print_parameters(opt, conic_sets)
+        if length(conic_sets.socone) + length(conic_sets.sdpcone) > 0
+            print_prob_data(conic_sets)
+        end
+        print_header_2()
     end
 
     @timeit "Init" begin
@@ -47,7 +52,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Diagonal scaling
         M = vcat(affine_sets.A, affine_sets.G)
         Mt = M'
-        rhs = vcat(affine_sets.b, affine_sets.h)
 
         # Stepsize parameters and linesearch parameters
         if minimum(size(M)) >= 2
@@ -59,7 +63,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Normalize the linear system by the spectral norm of M
         M /= spectral_norm
         Mt /= spectral_norm
-        rhs /= sqrt(spectral_norm)
         affine_sets.b /= sqrt(spectral_norm)
         affine_sets.h /= sqrt(spectral_norm)
         affine_sets.c /= sqrt(spectral_norm)
@@ -110,7 +113,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < 0.8 * comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < .8 * comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
@@ -143,6 +146,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
     end
 
+    # Remove scaling
     cont = 1
     @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
         if i != j
@@ -150,22 +154,32 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         cont += 1
     end
-
-    # Remove scaling
     pair.x ./= sqrt(spectral_norm)
     pair.y ./= sqrt(spectral_norm)
+    M *= spectral_norm
+    Mt *= spectral_norm
 
     # Compute results
     time_ = time() - p.time0
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
-    slack = A_orig * pair.x - b_orig
-    slack2 = G_orig * pair.x - h_orig
-    res_eq = norm(slack) / (1 + norm(b_orig))
+    rhs = vcat(b_orig, h_orig)
+    slack_primal = A_orig * pair.x - b_orig
+    res_primal = norm(slack_primal, 2) / (1. + norm(b_orig, 2))
+    # TODO: Fix dual variable postprocessing
+    # slack_dual = A_orig * pair.x - b_orig
+    slack_dual = G_orig * pair.x - h_orig
     res_dual = prim_obj - dual_obj
-    gap = (prim_obj - dual_obj) / abs(prim_obj) * 100
-    pair.x = pair.x[var_ordering]
+    # slack_dual = A_orig' * pair.y + c_orig
+    # res_dual = norm(slack_dual, 2) / (1. + norm(c_orig, 2))
+    
+    gap = abs(prim_obj - dual_obj) / abs(prim_obj) * 100
+    if opt.log_verbose
+        print_result(p.converged, time_, prim_obj, dual_obj, gap, res_primal, res_dual)
+    end
 
+    # Post processing
+    pair.x = pair.x[var_ordering]
     ctr_primal = Float64[]
     for soc in conic_sets.socone
         append!(ctr_primal, pair.x[soc.idx])
@@ -174,22 +188,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         append!(ctr_primal, pair.x[sdp.vec_i])
     end
 
-    if opt.log_verbose
-        println("----------------------------------------------------------------------")
-        if p.converged
-            println(" Solution metrics [solved]:")
-        else
-            println(" Solution metrics [failed to converge]:")
-        end
-        println(" Primal objective = $(round(prim_obj; digits = 5))")
-        println(" Dual objective = $(round(dual_obj; digits = 5))")
-        println(" Duality gap (%) = $(round(gap; digits = 2)) %")
-        println(" Duality residual = $(round(res_dual; digits = 5))")
-        println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_eq; digits = 6))")
-        println(" time elapsed = $(round(time_; digits = 6))")
-        println("======================================================================")
-    end
-    return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack, slack2, -ctr_primal), res_eq, res_dual, prim_obj, dual_obj, gap, time_)
+    return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack_primal, slack_dual, -ctr_primal), res_primal, res_dual, prim_obj, dual_obj, gap, time_)
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)

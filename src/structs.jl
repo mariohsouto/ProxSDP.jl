@@ -13,14 +13,13 @@ function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
     V.v[mod1(i, V.l)] = val
 end
 
-# --------------------------------
 mutable struct Options
     log_verbose::Bool
     log_freq::Int
     timer_verbose::Bool
     tol_primal::Float64
     tol_dual::Float64
-    tol_eig::Float64
+    tol_psd::Float64
     tol_soc::Float64
     min_beta::Float64
     max_beta::Float64
@@ -49,7 +48,7 @@ mutable struct Options
         # Default tolerances
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_eig = 1e-6
+        opt.tol_psd = 1e-6
         opt.tol_soc = 1e-6
 
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to inaccuracy]

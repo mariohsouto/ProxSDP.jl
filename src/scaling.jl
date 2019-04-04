@@ -40,7 +40,7 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
 end
 
 function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
-    cte = (sqrt(2.0) / 2.0)
+    cte = (sqrt(2.) / 2.)
     rows = rowvals(affine_sets.A)
     cont = 1
     for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
