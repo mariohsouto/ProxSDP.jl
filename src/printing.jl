@@ -18,6 +18,28 @@ function print_parameters(opt::Options, conic_sets::ConicSets)
         println("  tol_primal $(opt.tol_primal) tol_dual $(opt.tol_dual) ")
     end
     println("  max_iter $(opt.max_iter) max_beta $(opt.max_beta) min_beta $(opt.min_beta)")
+
+    return nothing
+end
+
+function print_constraints(aff::AffineSets)
+    println(" Constraints:")
+    if aff.p >= 1 && aff.m >= 1
+        println("  $(aff.p) linear equalities and $(aff.m) linear inequalities")
+    elseif aff.p == 1 && aff.m >= 1
+        println("  $(aff.p) linear equality and $(aff.m) linear inequalities")
+    elseif aff.p >= 1 && aff.m == 1
+        println("  $(aff.p) linear equalities and $(aff.m) linear inequality")
+    elseif aff.p == 1
+        println("  $(aff.p) linear equality ")
+    elseif aff.p >= 1
+        println("  $(aff.p) linear equalities ")
+    elseif aff.m == 1
+        println("  $(aff.m) linear inequality ")
+    else
+        println("  $(aff.m) linear inequalities ")
+    end
+
     return nothing
 end
 
@@ -105,9 +127,9 @@ end
 function print_result(convergence_flag::Bool, time_::Float64, prim_obj::Float64, dual_obj::Float64, gap::Float64, res_primal::Float64, res_dual::Float64)
     println("----------------------------------------------------------------------")
     if convergence_flag
-        println(" Optimal solution found in $(round(time_; digits = 2)) seconds.")
+        println(" Optimal solution found in $(round(time_; digits = 2)) seconds")
     else
-        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds.")
+        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds")
     end
     println(" Primal objective = $(round(prim_obj; digits = 5))")
     println(" Dual objective = $(round(dual_obj; digits = 5))")

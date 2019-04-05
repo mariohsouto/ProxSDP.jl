@@ -78,7 +78,7 @@ mutable struct Options
         opt.min_size_krylov_eigs = 100
 
         # Reduce rank [warning: heuristic]
-        opt.reduce_rank = true
+        opt.reduce_rank = false
 
         return opt
     end

@@ -91,7 +91,7 @@ function soc_projection!(v::ViewVector, s::ViewScalar)
     elseif nv <= s[]
         #do nothing
     else
-        val = 0.5 * (1.0+s[]/nv)
+        val = .5 * (1. + s[] / nv)
         v .*= val
         s[] = val * nv
     end
