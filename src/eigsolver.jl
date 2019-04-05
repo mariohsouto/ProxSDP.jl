@@ -249,4 +249,3 @@ function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter:
 
     return nothing
 end
-

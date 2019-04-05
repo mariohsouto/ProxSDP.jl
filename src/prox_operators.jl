@@ -15,6 +15,7 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
         end
     end
     for (idx, sdp) in enumerate(cones.sdpcone)
+        p.current_rank[idx] = 0
         if sdp.sq_side == 1
             a.m[idx][1] = max(0., a.m[idx][1])
             p.min_eig[idx] = a.m[idx][1]
@@ -24,10 +25,12 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
                 if hasconverged(arc[idx])
                     fill!(a.m[idx].data, 0.)
                     for i in 1:p.target_rank[idx]
-                        if unsafe_getvalues(arc[idx])[i] > 0.
-                            current_rank += 1
+                        if unsafe_getvalues(arc[idx])[i] > 0. 
                             vec = unsafe_getvectors(arc[idx])[:, i]
                             LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1., a.m[idx].data)
+                            if unsafe_getvalues(arc[idx])[i] > opt.tol_psd
+                                p.current_rank[idx] += 1
+                            end
                         end
                     end
                 end
@@ -35,13 +38,14 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
             if hasconverged(arc[idx])
                 @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc[idx]))
             else
-                @timeit "eigfact" full_eig!(a, idx, opt)
+                @timeit "eigfact" full_eig!(a, idx, opt, p)
             end
         else
             p.min_eig[idx] = 0.
-            @timeit "eigfact" full_eig!(a, idx, opt)
+            @timeit "eigfact" full_eig!(a, idx, opt, p)
         end
     end
+
     @timeit "reshape2" begin
         cont = 1
         @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
@@ -57,6 +61,21 @@ function sdp_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::Conic
     return nothing
 end
 
+function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)
+    p.current_rank[idx] = 0
+    fact = eigen!(a.m[idx], 0., Inf)
+    fill!(a.m[idx].data, 0.)
+    for i in 1:length(fact.values)
+        if fact.values[i] > 0.
+            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1., a.m[idx].data)
+            if fact.values[i] > opt.tol_psd
+                p.current_rank[idx] += 1
+            end
+        end
+    end
+    return nothing
+end
+
 function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
         soc_projection!(a.soc_v[idx], a.soc_s[idx])
@@ -64,24 +83,11 @@ function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicS
     return nothing
 end
 
-function full_eig!(a::AuxiliaryData, idx::Int, opt::Options)
-    current_rank = 0
-    fact = eigen!(a.m[1], 1e-8, Inf)
-    fill!(a.m[idx].data, 0.0)
-    for i in 1:length(fact.values)
-        if fact.values[i] > 0.0
-            current_rank += 1
-            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1.0, a.m[idx].data)
-        end
-    end
-    return nothing
-end
-
 function soc_projection!(v::ViewVector, s::ViewScalar)
     nv = norm(v)
     if nv <= -s[]
-        s[] = 0.0
-        v .= 0.0
+        s[] = 0.
+        v .= 0.
     elseif nv <= s[]
         #do nothing
     else

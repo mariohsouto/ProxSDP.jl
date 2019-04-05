@@ -36,6 +36,7 @@ mutable struct Options
     full_eig_decomp::Bool
     max_target_rank_krylov_eigs::Int
     min_size_krylov_eigs::Int
+    reduce_rank::Bool
 
     function Options()
         opt = new()
@@ -48,8 +49,8 @@ mutable struct Options
         # Default tolerances
         opt.tol_primal = 1e-4
         opt.tol_dual = 1e-4
-        opt.tol_psd = 1e-6
-        opt.tol_soc = 1e-6
+        opt.tol_psd = 1e-8
+        opt.tol_soc = 1e-8
 
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to inaccuracy]
         opt.min_beta = 1e-3
@@ -75,6 +76,9 @@ mutable struct Options
         opt.full_eig_decomp = false
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
+
+        # Reduce rank [warning: heuristic]
+        opt.reduce_rank = true
 
         return opt
     end
@@ -188,6 +192,7 @@ mutable struct Matrices
 end
 
 mutable struct Params
+    current_rank::Vector{Int}
     target_rank::Vector{Int}
     rank_update::Int
     update_cont::Int

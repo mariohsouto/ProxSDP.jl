@@ -1,4 +1,5 @@
 # this code was copied from the MOIWrapper file in SCS.jl
+
 using MathOptInterface
 const MOI = MathOptInterface
 const CI = MOI.ConstraintIndex

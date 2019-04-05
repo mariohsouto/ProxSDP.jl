@@ -1,4 +1,3 @@
-
 function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
 
     p = Params()
@@ -15,6 +14,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     p.rank_update, p.converged, p.update_cont = 0, false, 0
     p.target_rank = 2*ones(length(conic_sets.sdpcone))
+    p.current_rank = 2*ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
 
     analysis = false
@@ -142,6 +142,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
             if analysis
                 println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
+            end
+        end
+
+        # Adaptive reduce rank [warning: heuristic]
+        if opt.reduce_rank
+            if p.rank_update > 10 * p.window && comb_residual[k - p.window] > comb_residual[k]
+                for (idx, sdp) in enumerate(conic_sets.sdpcone)
+                    p.target_rank[idx] = min(p.target_rank[idx], sdp.sq_side, max(trunc(Int, p.target_rank[idx] / 2.), p.current_rank[idx] + 3))
+                end
+                p.rank_update = 0
             end
         end
     end

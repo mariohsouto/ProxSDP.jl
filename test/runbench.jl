@@ -1,6 +1,9 @@
 path = joinpath(dirname(@__FILE__), "..", "..")
 push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
+
+# using Debugger 
+
 # using JuMP
 is_julia1 = VERSION >= v"1.0"
 if is_julia1
@@ -22,7 +25,7 @@ sets_to_test = Symbol[]
 push!(sets_to_test, :SDPLIB)
 # push!(sets_to_test, :SENSORLOC)
 
-@static if use_MOI#Base.libblas_name == "libmkl_rt"
+@static if use_MOI
     using ProxSDP, MathOptInterface
     if is_julia1
         LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
