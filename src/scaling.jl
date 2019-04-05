@@ -1,36 +1,4 @@
 
-function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
-    cte = (sqrt(2.0) / 2.0)
-    rows = rowvals(affine_sets.A)
-    cont = 1
-    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
-        if i != j
-            for line in nzrange(affine_sets.A, cont)
-                affine_sets.A[rows[line], cont] *= cte
-            end
-        end
-        cont += 1
-    end
-    rows = rowvals(affine_sets.G)
-    cont = 1
-    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
-        if i != j
-            for line in nzrange(affine_sets.G, cont)
-                affine_sets.G[rows[line], cont] *= cte
-            end
-        end
-        cont += 1
-    end
-    cont = 1
-    @inbounds for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
-        if i != j
-            affine_sets.c[cont] *= cte
-        end
-        cont += 1
-    end
-    return nothing
-end
-
 function preprocess!(aff::AffineSets, conic_sets::ConicSets)
     c_orig = zeros(1)
     if length(conic_sets.sdpcone) >= 1 || length(conic_sets.socone) >= 1
@@ -69,4 +37,36 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
 
     aff.A, aff.G, aff.c = aff.A[:, ord], aff.G[:, ord], aff.c[ord]
     return c_orig[ord], sortperm(ord)
+end
+
+function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
+    cte = (sqrt(2.) / 2.)
+    rows = rowvals(affine_sets.A)
+    cont = 1
+    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+        if i != j
+            for line in nzrange(affine_sets.A, cont)
+                affine_sets.A[rows[line], cont] *= cte
+            end
+        end
+        cont += 1
+    end
+    rows = rowvals(affine_sets.G)
+    cont = 1
+    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+        if i != j
+            for line in nzrange(affine_sets.G, cont)
+                affine_sets.G[rows[line], cont] *= cte
+            end
+        end
+        cont += 1
+    end
+    cont = 1
+    @inbounds for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+        if i != j
+            affine_sets.c[cont] *= cte
+        end
+        cont += 1
+    end
+    return nothing
 end

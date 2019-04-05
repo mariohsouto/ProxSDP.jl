@@ -34,9 +34,7 @@ push!(sets_to_test, :SDPLIB)
     end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
-    # optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)
-    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true)
-
+    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true)#, tol_primal = 1e-3, tol_dual = 1e-3)
 else
     using JuMP
     # using CSDP
@@ -114,8 +112,8 @@ if true
         "gpp500-2.dat-s",
         "gpp500-3.dat-s",
         "gpp500-4.dat-s",
-        # "equalG11.dat-s",
-        # "equalG51.dat-s",
+        "equalG11.dat-s",
+        "equalG51.dat-s",
     ]
     MAXCUT_TEST_SET = [
         "mcp124-1.dat-s",
