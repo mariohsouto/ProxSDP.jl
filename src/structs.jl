@@ -37,6 +37,7 @@ mutable struct Options
     max_target_rank_krylov_eigs::Int
     min_size_krylov_eigs::Int
     reduce_rank::Bool
+    rank_slack::Int
 
     function Options()
         opt = new()
@@ -77,8 +78,9 @@ mutable struct Options
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
 
-        # Reduce rank [warning: heuristic]
+        # Reduce rank [warning: heuristics]
         opt.reduce_rank = false
+        opt.rank_slack = 3
 
         return opt
     end

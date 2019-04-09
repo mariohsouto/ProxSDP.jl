@@ -107,7 +107,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.update_cont += 1
                 if p.update_cont > 0
                     for (idx, sdp) in enumerate(conic_sets.sdpcone)
-                        p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                        if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
+                            p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                        end
                     end
                     p.rank_update, p.update_cont = 0, 0
                 end
@@ -118,7 +120,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
-                    p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                    if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
+                        p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                    end
                 end
                 p.rank_update, p.update_cont = 0, 0
             end
@@ -148,7 +152,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Adaptive reduce rank [warning: heuristic]
         if opt.reduce_rank
-            if p.rank_update > 10 * p.window && comb_residual[k - p.window] >= comb_residual[k]
+            if p.rank_update > p.window && comb_residual[k - p.window] >= comb_residual[k]
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
                     p.target_rank[idx] = min(p.target_rank[idx], sdp.sq_side, max(trunc(Int, p.target_rank[idx] / 2.), p.current_rank[idx] + 3))
                 end
