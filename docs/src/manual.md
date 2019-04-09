@@ -13,6 +13,7 @@ Argument | Description | Type | Values (default)
 log_verbose | print evolution of the process | `Bool` |  `false`
 log_freq | print evoluition of the process every n iterations | `Int` |  `100`
 timer_verbose | Outputs a time logger | `Bool` |  `false`
+time_limit | Maximum time the algorithm can try to solve in seconds | `Float64` |  `360000.0`
 max_iter | Maximum number of iterations | `Int` |  `1000000`
 tol_primal | Primal error tolerance | `Float64` |  `1e-3`
 tol_dual | Dual error tolerance | `Float64` |  `1e-3`
