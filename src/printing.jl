@@ -124,12 +124,14 @@ function print_progress(primal_res::Float64, dual_res::Float64, p::Params)
     return nothing
 end
 
-function print_result(convergence_flag::Bool, time_::Float64, prim_obj::Float64, dual_obj::Float64, gap::Float64, res_primal::Float64, res_dual::Float64)
+function print_result(stop_reason::Int, time_::Float64, prim_obj::Float64, dual_obj::Float64, gap::Float64, res_primal::Float64, res_dual::Float64)
     println("----------------------------------------------------------------------")
-    if convergence_flag
+    if stop_reason == 1
         println(" Optimal solution found in $(round(time_; digits = 2)) seconds")
-    else
-        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds")
+    elseif stop_reason == 2
+        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, time_limit reached")
+    elseif stop_reason == 3
+        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
     end
     println(" Primal objective = $(round(prim_obj; digits = 5))")
     println(" Dual objective = $(round(dual_obj; digits = 5))")

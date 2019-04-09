@@ -12,7 +12,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h), Inf)
     p.norm_c = norm(affine_sets.c, Inf)
 
-    p.rank_update, p.converged, p.update_cont = 0, false, 0
+    p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
     p.target_rank = 2*ones(length(conic_sets.sdpcone))
     p.current_rank = 2*ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
@@ -97,7 +97,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.rank_update += 1
         if primal_residual[k] < opt.tol_primal && dual_residual[k] < opt.tol_dual && k > opt.convergence_check
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
-                p.converged = true
+                p.stop_reason = 1 # Optimal
                 best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 if opt.log_verbose
                     print_progress(primal_residual[k], dual_residual[k], p)
@@ -159,6 +159,22 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.rank_update = 0
             end
         end
+        # Time_limit stop condition
+        if time() - p.time0 > opt.time_limit
+            if opt.log_verbose
+                print_progress(primal_residual[k], dual_residual[k], p)
+            end
+            p.stop_reason = 2 # Time limit
+            break
+        end
+        # Max_iter stop condition
+        if opt.max_iter == k
+            if opt.log_verbose
+                print_progress(primal_residual[k], dual_residual[k], p)
+            end
+            p.stop_reason = 3 # Iteration limit
+            break
+        end
     end
 
     # Remove scaling
@@ -190,7 +206,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     
     gap = abs(prim_obj - dual_obj) / abs(prim_obj) * 100
     if opt.log_verbose
-        print_result(p.converged, time_, prim_obj, dual_obj, gap, res_primal, res_dual)
+        print_result(p.stop_reason, time_, prim_obj, dual_obj, gap, res_primal, res_dual)
     end
 
     # Post processing
@@ -203,7 +219,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         append!(ctr_primal, pair.x[sdp.vec_i])
     end
 
-    return CPResult(Int(p.converged), pair.x, pair.y, -vcat(slack_primal, slack_dual, -ctr_primal), res_primal, res_dual, prim_obj, dual_obj, gap, time_)
+    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(slack_primal, slack_dual, -ctr_primal), res_primal, res_dual, prim_obj, dual_obj, gap, time_)
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)

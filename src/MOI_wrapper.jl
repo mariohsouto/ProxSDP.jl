@@ -1,5 +1,3 @@
-# this code was copied from the MOIWrapper file in SCS.jl
-
 using MathOptInterface
 const MOI = MathOptInterface
 const CI = MOI.ConstraintIndex
@@ -344,10 +342,6 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
     return nothing
 end
 
-#=
-    Different from SCS
-=#
-
 matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,n)))]
 
 function MOI.optimize!(optimizer::Optimizer)
@@ -587,26 +581,22 @@ ivec(X) = Matrix(Symmetric(ivech(X),:U))
 =#
 
 # Implements getter for result value and statuses
-# SCS returns one of the following integers:
-# -7 SCS_INFEASIBLE_INACCURATE
-# -6 SCS_UNBOUNDED_INACCURATE
-# -5 SCS_SIGINT
-# -4 SCS_FAILED
-# -3 SCS_INDETERMINATE
-# -2 SCS_INFEASIBLE  : primal infeasible, dual unbounded
-# -1 SCS_UNBOUNDED   : primal unbounded, dual infeasible
-#  0 SCS_UNFINISHED  : never returned, used as placeholder
-#  1 SCS_SOLVED
-#  2 SCS_SOLVED_INACCURATE
+# ProxSDP returns one of the following integers:
+# 0 - MOI.OPTIMIZE_NOT_CALLED
+# 1 - MOI.OPTIMAL
+# 2 - MOI.TIME_LIMIT
+# 3 - MOI.ITERATION_LIMIT
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
-    @assert -7 <= s <= 2
-    if s == 1
-        return MOI.OPTIMAL
-    elseif s == 0
+    @assert 0 <= s <= 3
+    if s == 0
         return MOI.OPTIMIZE_NOT_CALLED
-    else
-        return MOI.IterationLimit
+    elseif s == 1
+        return MOI.OPTIMAL
+    elseif s == 2
+        return MOI.TIME_LIMIT
+    elseif s == 3
+        return MOI.ITERATION_LIMIT
     end
 end
 
