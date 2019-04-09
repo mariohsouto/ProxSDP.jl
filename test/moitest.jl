@@ -15,6 +15,8 @@ const optimizer_lin_hd = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), Prox
 const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_unsupportedarg = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(unsupportedarg = 10))
+const optimizer_maxiter = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(max_iter = 1, log_verbose = true))
+const optimizer_timelimit = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = true))
 
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
@@ -559,3 +561,5 @@ end
 @testset "Unsupported argument" begin
     @test_throws ErrorException MOI.optimize!(optimizer_unsupportedarg)
 end
+
+include("test_terminationstatus.jl")

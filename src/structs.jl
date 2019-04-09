@@ -17,6 +17,7 @@ mutable struct Options
     log_verbose::Bool
     log_freq::Int
     timer_verbose::Bool
+    time_limit::Float64
     tol_primal::Float64
     tol_dual::Float64
     tol_psd::Float64
@@ -46,6 +47,7 @@ mutable struct Options
         opt.log_verbose = false
         opt.log_freq = 100
         opt.timer_verbose = false
+        opt.time_limit = 360000.0 #100 hours
 
         # Default tolerances
         opt.tol_primal = 1e-4
@@ -200,7 +202,7 @@ mutable struct Params
     update_cont::Int
     min_eig::Vector{Float64}
     iter::Int
-    converged::Bool
+    stop_reason::Int
     iteration::Int
     primal_step::Float64
     primal_step_old::Float64
