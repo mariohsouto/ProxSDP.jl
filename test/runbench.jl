@@ -2,9 +2,6 @@ path = joinpath(dirname(@__FILE__), "..", "..")
 push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
 
-# using Debugger 
-
-# using JuMP
 is_julia1 = VERSION >= v"1.0"
 if is_julia1
     using Test
@@ -16,7 +13,6 @@ if is_julia1
 else
     using Base.Test
 end
-# import Base.is_empty
 
 use_MOI = true
 sets_to_test = Symbol[]
