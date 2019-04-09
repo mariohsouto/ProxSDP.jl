@@ -63,7 +63,7 @@ mutable struct Options
         opt.adapt_decay = .8
 
         # PDHG parameters
-        opt.convergence_window = 100
+        opt.convergence_window = 200
         opt.convergence_check = 50
         opt.max_iter = Int(1e+5)
 
