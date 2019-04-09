@@ -21,8 +21,6 @@ const optimizer_timelimit = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), P
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
 
-include("test_terminationstatus.jl")
-
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
 end
@@ -563,3 +561,5 @@ end
 @testset "Unsupported argument" begin
     @test_throws ErrorException MOI.optimize!(optimizer_unsupportedarg)
 end
+
+include("test_terminationstatus.jl")

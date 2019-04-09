@@ -167,14 +167,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             p.stop_reason = 2 # Time limit
             break
         end
-        # Max_iter stop condition
-        if opt.max_iter == k
-            if opt.log_verbose
-                print_progress(primal_residual[k], dual_residual[k], p)
-            end
-            p.stop_reason = 3 # Iteration limit
-            break
-        end
+    end
+
+    # Max_iter stop condition
+    if opt.max_iter == p.iter
+        p.stop_reason = 3 # Iteration limit
     end
 
     # Remove scaling
