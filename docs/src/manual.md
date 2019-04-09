@@ -23,8 +23,8 @@ initial_beta | Initial primal/dual step ratio | `Float64` |  `1.0`
 min_beta | Minimum primal/dual step ratio | `Float64` |  `1e-4`
 max_beta | Maximum primal/dual step ratio | `Float64` |  `1e+4`
 convergence_window | Minimum number of iterations to update target rank | `Int` |  `200`
-max_linsearch_steps | Maximum number of iterations for linesearch | `Int` |  `1000`
-full_eig_decomp | Flag for using full eigenvalue decomposition | `Bool` |  `false`
+max\_linsearch\_steps | Maximum number of iterations for linesearch | `Int` |  `1000`
+full\_eig\_decomp | Flag for using full eigenvalue decomposition | `Bool` |  `false`
 
 ## JuMP example
 
