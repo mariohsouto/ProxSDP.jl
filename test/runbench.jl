@@ -30,7 +30,7 @@ push!(sets_to_test, :SDPLIB)
     end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
-    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true)#, tol_primal = 1e-3, tol_dual = 1e-3)
+    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true, reduce_rank=true, convergence_window=200)#, tol_primal = 1e-3, tol_dual = 1e-3)
 else
     using JuMP
     # using CSDP
