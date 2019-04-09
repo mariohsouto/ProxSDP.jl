@@ -107,7 +107,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.update_cont += 1
                 if p.update_cont > 0
                     for (idx, sdp) in enumerate(conic_sets.sdpcone)
-                        if p.current_rank[idx] + 3 >= p.target_rank[idx]
+                        if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                             p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
                         end
                     end
@@ -120,7 +120,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             p.update_cont += 1
             if p.update_cont > 20
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
-                    if p.current_rank[idx] + 3 >= p.target_rank[idx]
+                    if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
                     end
                 end
