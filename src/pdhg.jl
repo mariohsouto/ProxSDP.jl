@@ -73,14 +73,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
 
+        # Update iterator
         p.iter = k
 
-        # Primal update
+        # Primal step
         @timeit "primal" primal_step!(pair, a, conic_sets, mat, arc, opt, p)
-        # Linesearch
+
+        # Linesearch (dual step)
         linesearch!(pair, a, affine_sets, mat, opt, p)
+
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
+
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
@@ -146,6 +150,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.rank_update = 0
             end
         end
+
         # Time_limit stop condition
         if time() - p.time0 > opt.time_limit
             if opt.log_verbose
@@ -154,6 +159,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             p.stop_reason = 2 # Time limit
             break
         end
+        
         # Max_iter stop condition
         if opt.max_iter == p.iter
             if opt.log_verbose
