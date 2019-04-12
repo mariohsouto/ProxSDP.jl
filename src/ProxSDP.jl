@@ -1,9 +1,12 @@
 module ProxSDP
 
-    using MathOptInterface, TimerOutputs
+    using MathOptInterface
+    using TimerOutputs
     using Arpack
     using Compat
     using Printf
+    using SparseArrays
+    using LinearAlgebra
 
     include("MOI_wrapper.jl")
     include("eigsolver.jl")

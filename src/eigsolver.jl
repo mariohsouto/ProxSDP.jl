@@ -1,11 +1,6 @@
 
 # import Base.LinAlg: BlasInt, ARPACKException
 import LinearAlgebra: BlasInt, ARPACKException
-using LinearAlgebra
-using TimerOutputs
-
-# Base.LinAlg.ARPACK
-using Arpack
 
 mutable struct ARPACKAlloc{T}
 

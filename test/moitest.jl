@@ -55,7 +55,7 @@ end
         # bridge
         "rootdet","geomean",
         # affine in cone
-        "psdt1f","psdt0f","soc2p", "soc2n", "rsoc",
+        "psdt1f","psdt0f","soc2p", "soc2n", "rsoc","soc1f",
         # square psd
         "psds", "rootdets",
         # exp cone
@@ -69,8 +69,7 @@ end
 @testset "MOI Continuous Conic with VectorSlack" begin
     MOIT.contconictest(MOIB.VectorSlack{Float64}(optimizer_lin_hd), config_conic, [
         # bridge
-        "rootdet",
-        "geomean",
+        "rootdet","geomean",
         # affine in cone
         "rsoc",
         # square psd
@@ -169,10 +168,10 @@ end
         ], 0.0), MOI.EqualTo(4.0))
 
     b1 = MOI.add_constraint(optimizer, 
-        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[1]])), MOI.PositiveSemidefiniteConeTriangle(1))
+        MOI.VectorOfVariables([X[1]]), MOI.PositiveSemidefiniteConeTriangle(1))
 
     b2 = MOI.add_constraint(optimizer, 
-        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[2]])), MOI.PositiveSemidefiniteConeTriangle(1))
+        MOI.VectorOfVariables([X[2]]), MOI.PositiveSemidefiniteConeTriangle(1))
 
     MOI.set(optimizer, 
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
@@ -201,7 +200,7 @@ end
 
     # add sdp constraints - only ensuring positivenesse of the diagonal
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.add_constraint(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(4))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(4))
 
     c1 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
@@ -244,7 +243,7 @@ end
 
     # add sdp constraints - only ensuring positivenesse of the diagonal
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.add_constraint(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(2))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
 
     c1 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
