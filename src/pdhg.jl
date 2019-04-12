@@ -193,19 +193,23 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     time_ = time() - p.time0
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
-    rhs = vcat(b_orig, h_orig)
-    slack_primal = A_orig * pair.x - b_orig
-    res_primal = norm(slack_primal, 2) / (1. + norm(b_orig, 2))
-    # TODO: Fix dual variable postprocessing
-    # slack_dual = A_orig * pair.x - b_orig
-    slack_dual = G_orig * pair.x - h_orig
-    res_dual = prim_obj - dual_obj
-    # slack_dual = A_orig' * pair.y + c_orig
-    # res_dual = norm(slack_dual, 2) / (1. + norm(c_orig, 2))
+
+    # Equality feasibility error
+    equa_error = A_orig * pair.x - b_orig
+    equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
     
+    # Inequality feasibility error
+    slack_ineq = G_orig * pair.x - h_orig
+    ineq_error = max.(slack_ineq, 0.)
+    ineq_feasibility = norm(ineq_error, 2) / (1. + norm(h_orig, 2))
+
+    # Duality gap
+    res_dual = prim_obj - dual_obj
     gap = abs(prim_obj - dual_obj) / abs(prim_obj) * 100
+
+    # Print result
     if opt.log_verbose
-        print_result(p.stop_reason, time_, prim_obj, dual_obj, gap, res_primal, res_dual)
+        print_result(p.stop_reason, time_, prim_obj, dual_obj, gap, equa_feasibility, ineq_feasibility)
     end
 
     # Post processing
@@ -218,7 +222,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         append!(ctr_primal, pair.x[sdp.vec_i])
     end
 
-    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(slack_primal, slack_dual, -ctr_primal), res_primal, res_dual, prim_obj, dual_obj, gap, time_)
+    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(equa_error, slack_ineq, -ctr_primal), equa_feasibility, ineq_feasibility, prim_obj, dual_obj, gap, time_)
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)

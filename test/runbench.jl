@@ -16,9 +16,9 @@ end
 
 use_MOI = true
 sets_to_test = Symbol[]
-# push!(sets_to_test, :MIMO)
+push!(sets_to_test, :MIMO)
 # push!(sets_to_test, :RANDSDP)
-push!(sets_to_test, :SDPLIB)
+# push!(sets_to_test, :SDPLIB)
 # push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI

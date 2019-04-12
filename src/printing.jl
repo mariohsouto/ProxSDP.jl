@@ -124,8 +124,9 @@ function print_progress(primal_res::Float64, dual_res::Float64, p::Params)
     return nothing
 end
 
-function print_result(stop_reason::Int, time_::Float64, prim_obj::Float64, dual_obj::Float64, gap::Float64, res_primal::Float64, res_dual::Float64)
+function print_result(stop_reason::Int, time_::Float64, prim_obj::Float64, dual_obj::Float64, gap::Float64, equa_feasibility::Float64, ineq_feasibility::Float64)
     println("----------------------------------------------------------------------")
+    println(" Solver status:")
     if stop_reason == 1
         println(" Optimal solution found in $(round(time_; digits = 2)) seconds")
     elseif stop_reason == 2
@@ -133,13 +134,13 @@ function print_result(stop_reason::Int, time_::Float64, prim_obj::Float64, dual_
     elseif stop_reason == 3
         println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
     end
-    println(" Primal objective = $(round(prim_obj; digits = 5))")
-    println(" Dual objective = $(round(dual_obj; digits = 5))")
-    println(" Duality gap (%) = $(round(gap; digits = 2)) %")
-    # println("----------------------------------------------------------------------")
-    # println(" Residual metrics:")
-    # println(" ||A(X) - b|| / (1 + ||b||) = $(round(res_primal; digits = 6))")
-    # println(" ||A'(y) + c|| / (1 + ||c||) = $(round(res_dual; digits = 6))")
+    println("  Primal objective = $(round(prim_obj; digits = 5))")
+    println("  Dual objective = $(round(dual_obj; digits = 5))")
+    println("  Duality gap (%) = $(round(gap; digits = 2)) %")
+    println("----------------------------------------------------------------------")
+    println(" Primal feasibility:")
+    println("  ||A(X) - b|| / (1 + ||b||) = $(round(equa_feasibility; digits = 6))    [linear equalities] ")
+    println("  ||max(G(X) - h, 0)|| / (1 + ||h||) = $(round(ineq_feasibility; digits = 6))    [linear inequalities]")
     println("======================================================================")
 
     return nothing
