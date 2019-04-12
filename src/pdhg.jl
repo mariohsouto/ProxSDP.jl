@@ -10,8 +10,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h), Inf)
     p.norm_c = norm(affine_sets.c, Inf)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
-    p.target_rank = 2*ones(length(conic_sets.sdpcone))
-    p.current_rank = 2*ones(length(conic_sets.sdpcone))
+    p.target_rank = 2 * ones(length(conic_sets.sdpcone))
+    p.current_rank = 2 * ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
 
     # Print header

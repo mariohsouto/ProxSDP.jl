@@ -34,6 +34,7 @@ end
 function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
         if soc_gap(a.soc_v[idx], a.soc_s[idx]) >= opt.tol_soc
+            
             return false
         end
     end
@@ -43,7 +44,7 @@ end
 
 function soc_gap(v::ViewVector, s::ViewScalar)
 
-    return norm(v) - s[]
+    return norm(v, 2) - s[]
 end
 
 function convergedrank(p::Params, cones::ConicSets, opt::Options)
@@ -52,6 +53,6 @@ function convergedrank(p::Params, cones::ConicSets, opt::Options)
             return false
         end
     end
-    
+
     return true
 end
