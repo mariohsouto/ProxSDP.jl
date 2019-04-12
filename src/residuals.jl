@@ -37,10 +37,12 @@ function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, o
             return false
         end
     end
+
     return true
 end
 
 function soc_gap(v::ViewVector, s::ViewScalar)
+
     return norm(v) - s[]
 end
 
@@ -50,5 +52,6 @@ function convergedrank(p::Params, cones::ConicSets, opt::Options)
             return false
         end
     end
+    
     return true
 end

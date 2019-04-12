@@ -1,27 +1,20 @@
 function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
 
+    # Initialize parameters
     p = Params()
-
-    p.theta = opt.initial_theta             # Overrelaxation parameter
-    p.adapt_level = opt.initial_adapt_level # Factor by which the stepsizes will be balanced 
-    p.window = opt.convergence_window       # Convergence check window
+    p.theta = opt.initial_theta             
+    p.adapt_level = opt.initial_adapt_level 
+    p.window = opt.convergence_window       
     p.beta = opt.initial_beta
-
     p.time0 = time()
-
     p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h), Inf)
     p.norm_c = norm(affine_sets.c, Inf)
-
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
     p.target_rank = 2*ones(length(conic_sets.sdpcone))
     p.current_rank = 2*ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
 
-    analysis = false
-    if analysis
-        p.window = 1
-    end
-
+    # Print header
     if opt.log_verbose
         print_header_1()
         print_parameters(opt, conic_sets)
@@ -135,18 +128,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             else
                 p.adapt_level *= opt.adapt_decay
             end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
         elseif primal_residual[k] < 10. * opt.tol_primal && dual_residual[k] > 10. * opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
             else
                 p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
         end
 

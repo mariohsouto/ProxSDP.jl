@@ -500,6 +500,7 @@ function get_indices_cone(A, rows, n_vars, first_ind_local)
             vec_inds[position] = var_idx
         end
     end
+
     return vec_inds
 end
 
@@ -526,6 +527,7 @@ function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int, In::Vecto
         end
     end
     @assert cont-1 == n_dups
+
     return n_dups
 end
 
@@ -553,6 +555,7 @@ function fix_duplicates!(vec::Vector{Int}, n::Int, In::Vector{Int}, Jn::Vector{I
     append!(In, collect(1:n_dups) .+ n)
     append!(Vn,  ones(n_dups))
     append!(Vn, -ones(n_dups))
+
     return n_dups
 end
 
@@ -571,6 +574,7 @@ function ivech(v::AbstractVector{T}) where T
     n = sympackeddim(length(v))
     out = zeros(n, n)
     ivech!(out, v)
+    
     return out
 end
 
