@@ -128,11 +128,11 @@ function print_result(stop_reason::Int, time_::Float64, prim_obj::Float64, dual_
     println("----------------------------------------------------------------------")
     println(" Solver status:")
     if stop_reason == 1
-        println(" Optimal solution found in $(round(time_; digits = 2)) seconds")
+        println("  Optimal solution found in $(round(time_; digits = 2)) seconds")
     elseif stop_reason == 2
-        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, time_limit reached")
+        println("  ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, time_limit reached")
     elseif stop_reason == 3
-        println(" ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
+        println("  ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
     end
     println("  Primal objective = $(round(prim_obj; digits = 5))")
     println("  Dual objective = $(round(dual_obj; digits = 5))")
