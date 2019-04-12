@@ -266,11 +266,12 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
-    # Projection onto the psd cone
+    # Projection onto the p.s.d. cone
     if length(cones.sdpcone) >= 1
         @timeit "sdp proj" sdp_cone_projection!(pair.x, a, cones, arc, opt, p)
     end
 
+    # Projection onto the second order cone
     if length(cones.socone) >= 1
         @timeit "soc proj" so_cone_projection!(pair.x, a, cones, opt, p)
     end
