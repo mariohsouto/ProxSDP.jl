@@ -49,9 +49,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Stepsize parameters and linesearch parameters
         if minimum(size(M)) >= 2
-            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] #TODO review efficiency
+            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
-            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
+            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S)
         end
 
         # Normalize the linear system by the spectral norm of M
@@ -159,7 +159,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             p.stop_reason = 2 # Time limit
             break
         end
-        
+
         # Max_iter stop condition
         if opt.max_iter == p.iter
             if opt.log_verbose
