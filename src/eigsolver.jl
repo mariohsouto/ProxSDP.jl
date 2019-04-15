@@ -85,7 +85,7 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.ncv = max(20, 2 * arc.nev + 1)
     arc.lworkl = arc.ncv * (arc.ncv + 8)
     arc.maxiter = Int(1e+3)
-    arc.TOL = 1e-6 * ones(T, 1)
+    arc.TOL = 1e-8 * ones(T, 1)
 
     arc.bmat = "I"
     arc.which = "LA"

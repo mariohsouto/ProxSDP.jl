@@ -47,7 +47,7 @@ mutable struct Options
         opt.log_verbose = false
         opt.log_freq = 100
         opt.timer_verbose = false
-        opt.time_limit = 360000.0 #100 hours
+        opt.time_limit = 360000. #100 hours
 
         # Default tolerances
         opt.tol_primal = 1e-4

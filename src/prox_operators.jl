@@ -73,6 +73,7 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)
             end
         end
     end
+    
     return nothing
 end
 
@@ -80,11 +81,12 @@ function so_cone_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicS
     for (idx, soc) in enumerate(cones.socone)
         soc_projection!(a.soc_v[idx], a.soc_s[idx])
     end
+
     return nothing
 end
 
 function soc_projection!(v::ViewVector, s::ViewScalar)
-    nv = norm(v)
+    nv = norm(v, 2)
     if nv <= -s[]
         s[] = 0.
         v .= 0.
@@ -95,6 +97,7 @@ function soc_projection!(v::ViewVector, s::ViewScalar)
         v .*= val
         s[] = val * nv
     end
+
     return nothing
 end
 
@@ -107,5 +110,6 @@ function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
     @inbounds @simd for i in 1:length(aff.h)
         v[aff.p+i] = min(v[aff.p+i] / step, aff.h[i])
     end
+
     return nothing
 end

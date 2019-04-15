@@ -1,27 +1,20 @@
 function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
 
+    # Initialize parameters
     p = Params()
-
-    p.theta = opt.initial_theta             # Overrelaxation parameter
-    p.adapt_level = opt.initial_adapt_level # Factor by which the stepsizes will be balanced 
-    p.window = opt.convergence_window       # Convergence check window
+    p.theta = opt.initial_theta             
+    p.adapt_level = opt.initial_adapt_level 
+    p.window = opt.convergence_window       
     p.beta = opt.initial_beta
-
     p.time0 = time()
-
     p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h), Inf)
     p.norm_c = norm(affine_sets.c, Inf)
-
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
-    p.target_rank = 2*ones(length(conic_sets.sdpcone))
-    p.current_rank = 2*ones(length(conic_sets.sdpcone))
+    p.target_rank = 2 * ones(length(conic_sets.sdpcone))
+    p.current_rank = 2 * ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
 
-    analysis = false
-    if analysis
-        p.window = 1
-    end
-
+    # Print header
     if opt.log_verbose
         print_header_1()
         print_parameters(opt, conic_sets)
@@ -56,9 +49,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Stepsize parameters and linesearch parameters
         if minimum(size(M)) >= 2
-            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] #TODO review efficiency
+            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
-            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S) #TODO review efficiency
+            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S)
         end
 
         # Normalize the linear system by the spectral norm of M
@@ -80,14 +73,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
 
+        # Update iterator
         p.iter = k
 
-        # Primal update
+        # Primal step
         @timeit "primal" primal_step!(pair, a, conic_sets, mat, arc, opt, p)
-        # Linesearch
+
+        # Linesearch (dual step)
         linesearch!(pair, a, affine_sets, mat, opt, p)
+
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
+
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
@@ -135,18 +132,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             else
                 p.adapt_level *= opt.adapt_decay
             end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
-            end
         elseif primal_residual[k] < 10. * opt.tol_primal && dual_residual[k] > 10. * opt.tol_dual && k > p.window
             p.beta /= (1 - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
             else
                 p.adapt_level *= opt.adapt_decay
-            end
-            if analysis
-                println("Debug: Beta = $(p.beta), AdaptLevel = $(p.adapt_level)")
             end
         end
 
@@ -159,6 +150,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.rank_update = 0
             end
         end
+
         # Time_limit stop condition
         if time() - p.time0 > opt.time_limit
             if opt.log_verbose
@@ -167,6 +159,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             p.stop_reason = 2 # Time limit
             break
         end
+
         # Max_iter stop condition
         if opt.max_iter == p.iter
             if opt.log_verbose
@@ -193,19 +186,23 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     time_ = time() - p.time0
     prim_obj = dot(c_orig, pair.x)
     dual_obj = - dot(rhs_orig, pair.y)
-    rhs = vcat(b_orig, h_orig)
-    slack_primal = A_orig * pair.x - b_orig
-    res_primal = norm(slack_primal, 2) / (1. + norm(b_orig, 2))
-    # TODO: Fix dual variable postprocessing
-    # slack_dual = A_orig * pair.x - b_orig
-    slack_dual = G_orig * pair.x - h_orig
-    res_dual = prim_obj - dual_obj
-    # slack_dual = A_orig' * pair.y + c_orig
-    # res_dual = norm(slack_dual, 2) / (1. + norm(c_orig, 2))
+
+    # Equality feasibility error
+    equa_error = A_orig * pair.x - b_orig
+    equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
     
+    # Inequality feasibility error
+    slack_ineq = G_orig * pair.x - h_orig
+    ineq_error = max.(slack_ineq, 0.)
+    ineq_feasibility = norm(ineq_error, 2) / (1. + norm(h_orig, 2))
+
+    # Duality gap
+    res_dual = prim_obj - dual_obj
     gap = abs(prim_obj - dual_obj) / abs(prim_obj) * 100
+
+    # Print result
     if opt.log_verbose
-        print_result(p.stop_reason, time_, prim_obj, dual_obj, gap, res_primal, res_dual)
+        print_result(p.stop_reason, time_, prim_obj, dual_obj, gap, equa_feasibility, ineq_feasibility)
     end
 
     # Post processing
@@ -218,7 +215,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         append!(ctr_primal, pair.x[sdp.vec_i])
     end
 
-    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(slack_primal, slack_dual, -ctr_primal), res_primal, res_dual, prim_obj, dual_obj, gap, time_)
+    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(equa_error, slack_ineq, -ctr_primal), equa_feasibility, ineq_feasibility, prim_obj, dual_obj, gap, time_)
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
@@ -269,11 +266,12 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
-    # Projection onto the psd cone
+    # Projection onto the p.s.d. cone
     if length(cones.sdpcone) >= 1
         @timeit "sdp proj" sdp_cone_projection!(pair.x, a, cones, arc, opt, p)
     end
 
+    # Projection onto the second order cone
     if length(cones.socone) >= 1
         @timeit "soc proj" so_cone_projection!(pair.x, a, cones, opt, p)
     end
