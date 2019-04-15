@@ -16,9 +16,9 @@ end
 
 use_MOI = true
 sets_to_test = Symbol[]
-push!(sets_to_test, :MIMO)
+# push!(sets_to_test, :MIMO)
 # push!(sets_to_test, :RANDSDP)
-# push!(sets_to_test, :SDPLIB)
+push!(sets_to_test, :SDPLIB)
 # push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI
@@ -52,7 +52,7 @@ println2(FILE, class::String, ref::String, sol::Nothing) = nothing
 
 RANDSDP_TEST_SET = 1:1
 SENSORLOC_TEST_SET = 50:50:200
-MIMO_TEST_SET = [100, 500, 1000, 2000]
+MIMO_TEST_SET = [100, 1000, 2000]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
     "gpp124-1.dat-s",
@@ -86,9 +86,9 @@ MAXCUT_TEST_SET = [
     "mcp500-4.dat-s",
     "maxG11.dat-s"  ,
     "maxG51.dat-s"  ,
-    # "maxG32.dat-s"  ,
-    # "maxG55.dat-s"  ,
-    # "maxG60.dat-s"  ,
+    "maxG32.dat-s"  ,
+    "maxG55.dat-s"  ,
+    "maxG60.dat-s"  ,
 ]
 
 if use_MOI
