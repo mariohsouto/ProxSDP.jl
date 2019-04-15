@@ -414,6 +414,10 @@ matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,
 
 function MOI.optimize!(optimizer::Optimizer)
 
+    TimerOutputs.reset_timer!()
+
+    @timeit "proproc" begin
+
     # parse options
     options = Options(optimizer.params)
 
@@ -441,7 +445,7 @@ function MOI.optimize!(optimizer::Optimizer)
     objconstant = optimizer.data.objconstant
     c = optimizer.data.c
 
-    TimerOutputs.reset_timer!()
+    
 
     # EQ cone.f, LEQ cone.l
     # Build Prox SDP Affine Sets
@@ -552,6 +556,8 @@ function MOI.optimize!(optimizer::Optimizer)
     #= 
         Solve modified problem
     =#
+
+    end
 
     sol = @timeit "Main" chambolle_pock(aff, con, options)
 
