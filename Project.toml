@@ -4,10 +4,10 @@ authors = ["mariohsouto <mariohsouto@gmail.com>"]
 version = "0.1.2"
 
 [deps]
-MathOptInterface 0.8.2
-TimerOutputs 0.4.0
-Arpack 0.3.0
-Compat 1.0
+MathOptInterface = "0.8.2"
+TimerOutputs = "0.4.0"
+Arpack = "0.3.0" 
+Compat = "1.0"
 
 [compat]
 julia 1.0
