@@ -8,7 +8,6 @@ version = "0.1.2"
 MathOptInterface = "0.8.2"
 TimerOutputs = "0.4"
 Arpack = "0.3" 
-Compat = "2"
 
 [compat]
 julia = "1"
