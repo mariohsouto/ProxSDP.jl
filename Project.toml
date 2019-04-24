@@ -1,6 +1,5 @@
 name = "ProxSDP"
 uuid = "d18b1ae4-66a7-11e9-0cda-837a2a25fe0f"
-authors = ["mariohsouto <mariohsouto@gmail.com>"]
 repo = "https://github.com/mariohsouto/ProxSDP.jl.git"
 version = "0.1.2"
 
@@ -8,6 +7,7 @@ version = "0.1.2"
 MathOptInterface = "0.8.2"
 TimerOutputs = "0.4"
 Arpack = "0.3" 
+Compat = "2"
 
 [compat]
 julia = "1"
