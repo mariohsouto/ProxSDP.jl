@@ -4,10 +4,10 @@ repo = "https://github.com/mariohsouto/ProxSDP.jl.git"
 version = "0.1.2"
 
 [deps]
-MathOptInterface = "0.8.2"
-TimerOutputs = "0.4"
-Arpack = "0.3" 
-Compat = "2"
+MathOptInterface = "589cd2252c5fb1aacbfb0852a931a8a703265746"
+TimerOutputs = "d7406d84585d1a14bdeaf076f99d62cb0a534ddd"
+Arpack = "04defa4276407b4401734da5dea3ac4615b9b443" 
+Compat = "439bc221b44510bd356f15ee19884b80ae8caa5b"
 
 [compat]
 julia = "1"
