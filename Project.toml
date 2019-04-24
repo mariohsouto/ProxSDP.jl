@@ -2,3 +2,12 @@ name = "ProxSDP"
 uuid = "d18b1ae4-66a7-11e9-0cda-837a2a25fe0f"
 authors = ["mariohsouto <mariohsouto@gmail.com>"]
 version = "0.1.2"
+
+[deps]
+MathOptInterface 0.8.2
+TimerOutputs 0.4.0
+Arpack 0.3.0
+Compat 1.0
+
+[compat]
+julia 1.0
