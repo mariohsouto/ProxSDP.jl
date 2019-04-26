@@ -11,6 +11,13 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
+[compat]
+julia = "^1"
+MathOptInterface = "~0.8.2"
+TimerOutputs = "~0.4.0"
+Arpack = "~0.3.0"
+Compat = "^1"
+
 [extras]
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
