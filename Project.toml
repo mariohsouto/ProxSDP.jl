@@ -1,5 +1,5 @@
 name = "ProxSDP"
-uuid = "d18b1ae4-66a7-11e9-0cda-837a2a25fe0f"
+uuid = "65e78d25-6039-50a4-9445-38022e3d2eb3"
 repo = "https://github.com/mariohsouto/ProxSDP.jl.git"
 version = "0.2.0"
 
