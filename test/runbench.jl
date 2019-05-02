@@ -24,6 +24,7 @@ push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
+    # using MosekTools
     if is_julia1
         LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
         LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
@@ -32,14 +33,24 @@ push!(sets_to_test, :SENSORLOC)
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
     optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
+    # optimizer = Mosek.Optimizer()
+    # @show optimizer = MathOptInterface.Bridges.full_bridge_optimizer(Mosek.Optimizer(), Float64)
 else
     using JuMP
+    using ProxSDP
+    optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
+
     # using CSDP
     # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
-    using SCS
-    optimizer = SCSSolver(eps=1e-4, verbose=true)
-    # using Mosek
-    # optimizer = MosekSolver()
+    # using SCS
+    # optimizer = SCSSolver(eps=1e-4, verbose=true)
+    # using MosekTools
+    # optimizer = Mosek.Optimizer()
+
+end
+
+function ProxSDP.get_solution(opt)
+    nothing
 end
 
 NOW = is_julia1 ? replace("$(now())",":"=>"_") : replace("$(now())",":","_")
