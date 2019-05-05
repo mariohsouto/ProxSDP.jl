@@ -11,8 +11,10 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
     teste = @time optimize!(model)
 
     XX = value.(X)
-
+    
     verbose && randsdp_eval(A,b,C,n,m,XX)
-
-    return nothing
+    
+    objval = objective_value(model)
+    stime = MOI.get(model, MOI.SolveTime())
+    return (objval,stime)
 end

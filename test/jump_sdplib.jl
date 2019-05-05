@@ -23,5 +23,7 @@ function jump_sdplib(solver, path; verbose = false, test = false)
 
     verbose && sdplib_eval(F,c,n,m,XX)
 
-    return nothing
+    objval = objective_value(model)
+    stime = MOI.get(model, MOI.SolveTime())
+    return (objval,stime)
 end

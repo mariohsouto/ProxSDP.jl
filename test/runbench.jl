@@ -61,6 +61,10 @@ function println2(FILE, class::String, ref::String, sol::ProxSDP.MOISolution)
     flush(FILE)
 end
 println2(FILE, class::String, ref::String, sol::Nothing) = nothing
+function println2(FILE, class::String, ref::String, sol)
+    println(FILE, "$class, $ref, $(sol[2]), $(sol[1])")
+    flush(FILE)
+end
 
 RANDSDP_TEST_SET = 1:1
 SENSORLOC_TEST_SET = 50:50:300

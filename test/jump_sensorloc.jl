@@ -55,5 +55,7 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     verbose && sensorloc_eval(n, m, x_true, XX)
 
-    return nothing
+    objval = objective_value(model)
+    stime = MOI.get(model, MOI.SolveTime())
+    return (objval,stime)
 end

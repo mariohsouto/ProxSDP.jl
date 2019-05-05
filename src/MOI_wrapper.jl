@@ -85,6 +85,8 @@ function MOI.empty!(optimizer::Optimizer)
     optimizer.sol.ret_val = 0
 end
 
+MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.time
+
 MOIU.needs_allocate_load(instance::Optimizer) = true
 
 function MOI.supports(::Optimizer,

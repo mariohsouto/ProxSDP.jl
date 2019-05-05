@@ -27,5 +27,7 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
 
     verbose && mimo_eval(s,H,y,L,XX)
 
-    return nothing
+    objval = objective_value(model)
+    stime = MOI.get(model, MOI.SolveTime())
+    return (objval,stime)
 end
