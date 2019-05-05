@@ -15,7 +15,7 @@ else
 end
 # import Base.is_empty
 
-use_MOI = true
+use_MOI = false
 sets_to_test = Symbol[]
 push!(sets_to_test, :MIMO)
 push!(sets_to_test, :RANDSDP)
@@ -38,7 +38,7 @@ push!(sets_to_test, :SENSORLOC)
 else
     using JuMP
     using ProxSDP
-    optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
+    optimizer = () -> ProxSDP.Optimizer(log_verbose=false, timer_verbose = false)
 
     # using CSDP
     # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
@@ -145,93 +145,74 @@ if true
     ]
 end
 
+include("base_randsdp.jl")
+include("moi_randsdp.jl")
+include("jump_randsdp.jl")
+
+include("base_mimo.jl")
+include("moi_mimo.jl")
+include("jump_mimo.jl")
+
+include("base_sensorloc.jl")
+include("moi_sensorloc.jl")
+include("jump_sensorloc.jl")
+
+include("base_sdplib.jl")
+include("moi_sdplib.jl")
+include("jump_sdplib.jl")
+
 if use_MOI
-    if :RANDSDP in sets_to_test
-        include("base_randsdp.jl")
-        include("moi_randsdp.jl")
-        println("RANDSDP")
-        moi_randsdp(optimizer, 0, 5, 5)
-        for i in RANDSDP_TEST_SET
-            @show i
-            sol = moi_randsdp(optimizer, i, 5, 5)
-            println2(FILE, "RANDSDP", "$i", sol)
-        end
-    end
-    if :MIMO in sets_to_test
-        include("base_mimo.jl")
-        include("moi_mimo.jl")
-        println("MIMO")
-        moi_mimo(optimizer, 0, 100)
-        for n in MIMO_TEST_SET
-            @show n
-            sol = moi_mimo(optimizer, 0, n)
-            println2(FILE, "MIMO", "$n", sol)
-        end
-    end
-    if :SENSORLOC in sets_to_test
-        include("base_sensorloc.jl")
-        include("moi_sensorloc.jl")
-        println("SENSORLOC")
-        for n in SENSORLOC_TEST_SET
-            @show n
-            sol = moi_sensorloc(optimizer, 0, n)
-            println2(FILE, "SENSORLOC", "$n", sol)
-        end
-    end
-    if :SDPLIB in sets_to_test
-        include("base_sdplib.jl")
-        include("moi_sdplib.jl")
-        println("gpp")
-        for name in GPP_TEST_SET
-            println(name)
-            sol = moi_sdplib(optimizer, joinpath(datapath, name))
-            println2(FILE, "SDPLIB_gp", name, sol)
-        end
-        println("max_cut")
-        for name in MAXCUT_TEST_SET
-            println(name)
-            sol = moi_sdplib(optimizer, joinpath(datapath, name))
-            println2(FILE, "SDPLIB_mc", name, sol)
-        end
-    end
+    _randsdp = moi_randsdp
+    _mimo = moi_mimo
+    _sensorloc = moi_sensorloc
+    _sdplib = moi_sdplib
 else
-    if :RANDSDP in sets_to_test
-        include("base_randsdp.jl")
-        include("jump_randsdp.jl")
-        jump_randsdp(optimizer, 0, 5, 5)
-        for i in RANDSDP_TEST_SET
-            jump_randsdp(optimizer, i, 5, 5)
-        end
-    end
-    if :MIMO in sets_to_test
-        include("base_mimo.jl")
-        include("jump_mimo.jl")
-        jump_mimo(optimizer, 0, 10)
-        for n in MIMO_TEST_SET
-            @show n
-            jump_mimo(optimizer, 0, n)
-        end
-    end
-    if :SDPLIB in sets_to_test
-        include("base_sdplib.jl")
-        include("jump_sdplib.jl")
-        for name in GPP_TEST_SET
-            jump_sdplib(optimizer, joinpath(datapath, name))
-        end
-        println2("max_cut")
-        for name in MAXCUT_TEST_SET
-            jump_sdplib(optimizer, joinpath(datapath, name))
-        end
-    end
-    if :SENSORLOC in sets_to_test
-        include("base_sensorloc.jl")
-        include("jump_sensorloc.jl")
-        jump_sensorloc(optimizer, 0, 10)
-        for n in SENSORLOC_TEST_SET
-            @show n
-            jump_sensorloc(optimizer, 0, n)
-        end
+    _randsdp = jump_randsdp
+    _mimo = jump_mimo
+    _sensorloc = jump_sensorloc
+    _sdplib = jump_sdplib
+end
+
+if :RANDSDP in sets_to_test
+    println("RANDSDP")
+    _randsdp(optimizer, 0, 5, 5)
+    for i in RANDSDP_TEST_SET
+        @show i
+        sol = _randsdp(optimizer, i, 5, 5)
+        println2(FILE, "RANDSDP", "$i", sol)
     end
 end
+if :MIMO in sets_to_test
+    println("MIMO")
+    _mimo(optimizer, 0, 100)
+    for n in MIMO_TEST_SET
+        @show n
+        sol = _mimo(optimizer, 0, n)
+        println2(FILE, "MIMO", "$n", sol)
+    end
+end
+if :SENSORLOC in sets_to_test
+    println("SENSORLOC")
+    for n in SENSORLOC_TEST_SET
+        @show n
+        sol = _sensorloc(optimizer, 0, n)
+        println2(FILE, "SENSORLOC", "$n", sol)
+    end
+end
+if :SDPLIB in sets_to_test
+    println("gpp")
+    for name in GPP_TEST_SET
+        println(name)
+        sol = _sdplib(optimizer, joinpath(datapath, name))
+        println2(FILE, "SDPLIB_gp", name, sol)
+    end
+    println("max_cut")
+    for name in MAXCUT_TEST_SET
+        println(name)
+        sol = _sdplib(optimizer, joinpath(datapath, name))
+        println2(FILE, "SDPLIB_mc", name, sol)
+    end
+end
+
 
 close(FILE)

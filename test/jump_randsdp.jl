@@ -4,11 +4,11 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
 
     model = Model(with_optimizer(solver))
     @variable(model, X[1:n, 1:n], PSD)
-    @objective(model, Min, sum(C[i, j] * X[i, j] for i in 1:n, j in 1:n))
-    @constraint(model, ctr[k in 1:m], sum(A[k][i, j] * X[i, j] for i in 1:n, j in 1:n) == b[k])
+    @objective(model, Min, sum(C[i, j] * X[i, j] for j in 1:n, i in 1:n))
+    @constraint(model, ctr[k in 1:m], sum(A[k][i, j] * X[i, j] for j in 1:n, i in 1:n) == b[k])
     # @constraint(model, bla, sum(C[i, j] * X[i, j] for i in 1:n, j in 1:n)<=0.1)
 
-    teste = optimize!(model)
+    teste = @time optimize!(model)
 
     XX = value.(X)
 

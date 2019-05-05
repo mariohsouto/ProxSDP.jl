@@ -1,5 +1,5 @@
 
-function jump_sensorloc(solver, seed, n, verbose)
+function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
@@ -9,8 +9,8 @@ function jump_sensorloc(solver, seed, n, verbose)
     @variable(model, X[1:n+2, 1:n+2], PSD)
 
     # Constraint with distances from anchors to sensors
-    for k in 1:m
-        for j in 1:n
+    for j in 1:n
+        for k in 1:m
             e = zeros(n, 1)
             e[j] = -1.0
             v = vcat(a[k], e)
@@ -47,9 +47,9 @@ function jump_sensorloc(solver, seed, n, verbose)
     # Feasibility objective function
     # L = eye(n+1)
     # @objective(model, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
-    @objective(model, Min, sum(0.0 * X[i, j] for i in 1:n+1, j in 1:n+1))
+    @objective(model, Min, sum(0.0 * X[i, j] for j in 1:n+1, i in 1:n+1))
     
-    @time teste = optimize!(model)
+    teste = @time optimize!(model)
 
     XX = value.(X)
 
@@ -57,5 +57,3 @@ function jump_sensorloc(solver, seed, n, verbose)
 
     return nothing
 end
-
-getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])

@@ -1,6 +1,5 @@
 
-function jump_sdplib(solver, path, verbose = false)
-    tic()
+function jump_sdplib(solver, path; verbose = false, test = false)
 
     println("running: $(path)")
 
@@ -18,7 +17,7 @@ function jump_sdplib(solver, path, verbose = false)
         @constraint(model, sum(F[k][idx...] * X[idx...] for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
     end
     
-    @time teste = optimize!(model)
+    teste = @time optimize!(model)
 
     XX = value.(X)
 
