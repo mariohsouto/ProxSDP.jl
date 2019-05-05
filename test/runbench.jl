@@ -24,7 +24,7 @@ push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI#Base.libblas_name == "libmkl_rt"
     using ProxSDP, MathOptInterface
-    # using MosekTools
+    using MosekTools
     if is_julia1
         LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
         LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
@@ -32,21 +32,20 @@ push!(sets_to_test, :SENSORLOC)
     end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
-    optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
+    # optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
     # optimizer = Mosek.Optimizer()
     # @show optimizer = MathOptInterface.Bridges.full_bridge_optimizer(Mosek.Optimizer(), Float64)
 else
+    solvers = Tuple{String, Function}[]
     using JuMP
     using ProxSDP
-    optimizer = () -> ProxSDP.Optimizer(log_verbose=false, timer_verbose = false)
-
+    push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(log_verbose=false, timer_verbose = false)))
+    using MosekTools
+    push!(solvers, ("MOSEK", () -> Mosek.Optimizer()))
     # using CSDP
     # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
     # using SCS
     # optimizer = SCSSolver(eps=1e-4, verbose=true)
-    # using MosekTools
-    # optimizer = Mosek.Optimizer()
-
 end
 
 function ProxSDP.get_solution(opt)
@@ -63,6 +62,10 @@ end
 println2(FILE, class::String, ref::String, sol::Nothing) = nothing
 function println2(FILE, class::String, ref::String, sol)
     println(FILE, "$class, $ref, $(sol[2]), $(sol[1])")
+    flush(FILE)
+end
+function println2(FILE, solver::String, class::String, ref::String, sol)
+    println(FILE, "$solver, $class, $ref, $(sol[2]), $(sol[1])")
     flush(FILE)
 end
 
@@ -177,44 +180,46 @@ else
     _sdplib = jump_sdplib
 end
 
-if :RANDSDP in sets_to_test
-    println("RANDSDP")
-    _randsdp(optimizer, 0, 5, 5)
-    for i in RANDSDP_TEST_SET
-        @show i
-        sol = _randsdp(optimizer, i, 5, 5)
-        println2(FILE, "RANDSDP", "$i", sol)
+for optimizer in solvers
+    if :RANDSDP in sets_to_test
+        println("RANDSDP")
+        _randsdp(optimizer[2], 0, 5, 5)
+        for i in RANDSDP_TEST_SET
+            @show i
+            sol = _randsdp(optimizer[2], i, 5, 5)
+            println2(FILE, optimizer[1], "RANDSDP", "$i", sol)
+        end
     end
-end
-if :MIMO in sets_to_test
-    println("MIMO")
-    _mimo(optimizer, 0, 100)
-    for n in MIMO_TEST_SET
-        @show n
-        sol = _mimo(optimizer, 0, n)
-        println2(FILE, "MIMO", "$n", sol)
+    if :MIMO in sets_to_test
+        println("MIMO")
+        _mimo(optimizer[2], 0, 100)
+        for n in MIMO_TEST_SET
+            @show n
+            sol = _mimo(optimizer[2], 0, n)
+            println2(FILE, optimizer[1], "MIMO", "$n", sol)
+        end
     end
-end
-if :SENSORLOC in sets_to_test
-    println("SENSORLOC")
-    for n in SENSORLOC_TEST_SET
-        @show n
-        sol = _sensorloc(optimizer, 0, n)
-        println2(FILE, "SENSORLOC", "$n", sol)
+    if :SENSORLOC in sets_to_test
+        println("SENSORLOC")
+        for n in SENSORLOC_TEST_SET
+            @show n
+            sol = _sensorloc(optimizer[2], 0, n)
+            println2(FILE, optimizer[1], "SENSORLOC", "$n", sol)
+        end
     end
-end
-if :SDPLIB in sets_to_test
-    println("gpp")
-    for name in GPP_TEST_SET
-        println(name)
-        sol = _sdplib(optimizer, joinpath(datapath, name))
-        println2(FILE, "SDPLIB_gp", name, sol)
-    end
-    println("max_cut")
-    for name in MAXCUT_TEST_SET
-        println(name)
-        sol = _sdplib(optimizer, joinpath(datapath, name))
-        println2(FILE, "SDPLIB_mc", name, sol)
+    if :SDPLIB in sets_to_test
+        println("gpp")
+        for name in GPP_TEST_SET
+            println(name)
+            sol = _sdplib(optimizer[2], joinpath(datapath, name))
+            println2(FILE, optimizer[1], "SDPLIB_gp", name, sol)
+        end
+        println("max_cut")
+        for name in MAXCUT_TEST_SET
+            println(name)
+            sol = _sdplib(optimizer[2], joinpath(datapath, name))
+            println2(FILE, optimizer[1], "SDPLIB_mc", name, sol)
+        end
     end
 end
 
