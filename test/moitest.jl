@@ -14,9 +14,16 @@ const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP
 const optimizer_lin_hd = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-5, tol_dual = 1e-5))
 const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_unsupportedarg = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(unsupportedarg = 10))
+const optimizer_maxiter = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(max_iter = 1, log_verbose = true))
+const optimizer_timelimit = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = true))
 
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-3)
+const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
+
+@testset "SolverName" begin
+    @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
+end
 
 @testset "Unit" begin
     MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer_lin), config,[
@@ -48,7 +55,7 @@ end
         # bridge
         "rootdet","geomean",
         # affine in cone
-        "psdt1f","psdt0f","soc2p", "soc2n", "rsoc",
+        "psdt1f","psdt0f","soc2p", "soc2n", "rsoc","soc1f",
         # square psd
         "psds", "rootdets",
         # exp cone
@@ -62,8 +69,7 @@ end
 @testset "MOI Continuous Conic with VectorSlack" begin
     MOIT.contconictest(MOIB.VectorSlack{Float64}(optimizer_lin_hd), config_conic, [
         # bridge
-        "rootdet",
-        "geomean",
+        "rootdet","geomean",
         # affine in cone
         "rsoc",
         # square psd
@@ -162,10 +168,10 @@ end
         ], 0.0), MOI.EqualTo(4.0))
 
     b1 = MOI.add_constraint(optimizer, 
-        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[1]])), MOI.PositiveSemidefiniteConeTriangle(1))
+        MOI.VectorOfVariables([X[1]]), MOI.PositiveSemidefiniteConeTriangle(1))
 
     b2 = MOI.add_constraint(optimizer, 
-        MOI.VectorAffineFunction{Float64}(MOI.VectorOfVariables([X[2]])), MOI.PositiveSemidefiniteConeTriangle(1))
+        MOI.VectorOfVariables([X[2]]), MOI.PositiveSemidefiniteConeTriangle(1))
 
     MOI.set(optimizer, 
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), 
@@ -194,7 +200,7 @@ end
 
     # add sdp constraints - only ensuring positivenesse of the diagonal
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.add_constraint(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(4))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(4))
 
     c1 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
@@ -237,7 +243,7 @@ end
 
     # add sdp constraints - only ensuring positivenesse of the diagonal
     vov = MOI.VectorOfVariables(X)
-    cX = MOI.add_constraint(optimizer, MOI.VectorAffineFunction{Float64}(vov), MOI.PositiveSemidefiniteConeTriangle(2))
+    cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(2))
 
     c1 = MOI.add_constraint(optimizer, 
         MOI.ScalarAffineFunction([
@@ -548,5 +554,11 @@ end
 end
 
 @testset "Print" begin
-    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-4, rtol=1e-3))
+    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-3, rtol=1e-3))
 end
+
+@testset "Unsupported argument" begin
+    @test_throws ErrorException MOI.optimize!(optimizer_unsupportedarg)
+end
+
+include("test_terminationstatus.jl")

@@ -1,7 +1,7 @@
 path = joinpath(dirname(@__FILE__), "..", "..")
 push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
-# using JuMP
+
 is_julia1 = VERSION >= v"1.0"
 if is_julia1
     using Test
@@ -13,16 +13,15 @@ if is_julia1
 else
     using Base.Test
 end
-# import Base.is_empty
 
 use_MOI = false
 sets_to_test = Symbol[]
-push!(sets_to_test, :MIMO)
-push!(sets_to_test, :RANDSDP)
+# push!(sets_to_test, :MIMO)
+# push!(sets_to_test, :RANDSDP)
 push!(sets_to_test, :SDPLIB)
-push!(sets_to_test, :SENSORLOC)
+# push!(sets_to_test, :SENSORLOC)
 
-@static if use_MOI#Base.libblas_name == "libmkl_rt"
+@static if use_MOI
     using ProxSDP, MathOptInterface
     using MosekTools
     if is_julia1
@@ -32,9 +31,7 @@ push!(sets_to_test, :SENSORLOC)
     end
     include("moi_init.jl")
     # optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_verbose=true, timer_verbose = true))
-    # optimizer = ProxSDP.Solver(log_verbose=false, timer_verbose = false)
-    # optimizer = Mosek.Optimizer()
-    # @show optimizer = MathOptInterface.Bridges.full_bridge_optimizer(Mosek.Optimizer(), Float64)
+    optimizer = ProxSDP.Solver(log_verbose=true, timer_verbose = true, convergence_window=200) #, tol_primal = 1e-3, tol_dual = 1e-3)
 else
     solvers = Tuple{String, Function}[]
     using JuMP
@@ -70,8 +67,8 @@ function println2(FILE, solver::String, class::String, ref::String, sol)
 end
 
 RANDSDP_TEST_SET = 1:1
-SENSORLOC_TEST_SET = 50:50:300
-MIMO_TEST_SET = [100, 500, 1000, 2000, 3000, 4000, 5000]
+SENSORLOC_TEST_SET = 50:50:200
+MIMO_TEST_SET = [100, 1000, 2000]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
     "gpp124-1.dat-s",
@@ -109,48 +106,6 @@ MAXCUT_TEST_SET = [
     "maxG55.dat-s"  ,
     "maxG60.dat-s"  ,
 ]
-if true
-    RANDSDP_TEST_SET = 1:1
-    SENSORLOC_TEST_SET = 50:50:200#300
-    MIMO_TEST_SET = [100, 500, 1000, 2000]#, 3000, 4000, 5000]
-    GPP_TEST_SET = [
-        "gpp124-1.dat-s",
-        "gpp124-1.dat-s",
-        "gpp124-2.dat-s",
-        "gpp124-3.dat-s",
-        "gpp124-4.dat-s",
-        "gpp250-1.dat-s",
-        "gpp250-2.dat-s",
-        "gpp250-3.dat-s",
-        "gpp250-4.dat-s",
-        "gpp500-1.dat-s",
-        "gpp500-2.dat-s",
-        "gpp500-3.dat-s",
-        "gpp500-4.dat-s",
-        # "equalG11.dat-s",
-        # "equalG51.dat-s",
-    ]
-    MAXCUT_TEST_SET = [
-        "mcp124-1.dat-s",
-        "mcp124-1.dat-s",
-        "mcp124-2.dat-s",
-        "mcp124-3.dat-s",
-        "mcp124-4.dat-s",
-        "mcp250-1.dat-s",
-        "mcp250-2.dat-s",
-        "mcp250-3.dat-s",
-        "mcp250-4.dat-s",
-        "mcp500-1.dat-s",
-        "mcp500-2.dat-s",
-        "mcp500-3.dat-s",
-        "mcp500-4.dat-s",
-        "maxG11.dat-s"  ,
-        "maxG51.dat-s"  ,
-        # "maxG32.dat-s"  ,
-        # "maxG55.dat-s"  ,
-        # "maxG60.dat-s"  ,
-    ]
-end
 
 include("base_randsdp.jl")
 include("moi_randsdp.jl")

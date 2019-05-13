@@ -1,11 +1,6 @@
 
 # import Base.LinAlg: BlasInt, ARPACKException
 import LinearAlgebra: BlasInt, ARPACKException
-using LinearAlgebra
-using TimerOutputs
-
-# Base.LinAlg.ARPACK
-using Arpack
 
 mutable struct ARPACKAlloc{T}
 
@@ -77,17 +72,20 @@ end
 
 function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer, iter::Int64) where T
 
-    tol = 0.0
-    v0=zeros(eltype(A),(0,))
-    #, v0::Vector{T} = zeros(T,(0,))
+    tol = 0.
+    v0 = zeros(eltype(A), (0,))
 
     n = LinearAlgebra.checksquare(A)
 
     # eigs
     arc.n = n
     arc.nev = nev
-    arc.ncv = max(20, 2*arc.nev+1)
-    arc.maxiter = Int(1e+4)
+
+    # Hyperparameters that matter
+    arc.ncv = max(20, 2 * arc.nev + 1)
+    arc.lworkl = arc.ncv * (arc.ncv + 8)
+    arc.maxiter = Int(1e+3)
+    arc.TOL = 1e-8 * ones(T, 1)
 
     arc.bmat = "I"
     arc.which = "LA"
@@ -100,10 +98,6 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.Amat = A
     arc.x = Vector{T}(undef, arc.n)
     arc.y = Vector{T}(undef, arc.n)
-
-    arc.lworkl = arc.ncv * (arc.ncv + 8)
-
-    # arc.TOL = 1e-15 * ones(T, 1)
 
     arc.v = Matrix{T}(undef, arc.n, arc.ncv)
     arc.workd = Vector{T}(undef, 3*arc.n)
@@ -143,7 +137,7 @@ end
 
 function _AUPD!(arc::ARPACKAlloc{T}, iter::Int64) where T
 
-    arc.TOL = max((1e-4 / iter), 1e-6) * ones(T, 1)
+    # arc.TOL .= max((1e-4 / iter), 1e-6) .* ones(T, 1)
     
     while true
         Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
@@ -199,7 +193,7 @@ function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, ite
     arc.iparam[3] = BlasInt(arc.maxiter) # maxiter
     arc.iparam[7] = BlasInt(1)    # mode
 
-    arc.info_e[1]   = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
+    arc.info_e[1] = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
     arc.sigmar[1] = 0.0#BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
 
@@ -241,7 +235,6 @@ function _EUPD!(arc)
     # return d[p], v[1:n, p]#,iparam[5],iparam[3],iparam[9],resid
     return nothing
 end
-
 
 function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64)::Nothing where T1
 
