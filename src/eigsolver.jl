@@ -84,8 +84,8 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     # Hyperparameters that matter
     arc.ncv = max(20, 2 * arc.nev + 1)
     arc.lworkl = arc.ncv * (arc.ncv + 8)
-    arc.maxiter = Int(1e+3)
-    arc.TOL = 1e-8 * ones(T, 1)
+    arc.maxiter = Int(1e+10)
+    arc.TOL = 1e-12 * ones(T, 1)
 
     arc.bmat = "I"
     arc.which = "LA"
@@ -127,7 +127,8 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.info_e = zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
     arc.d = Vector{T}(undef, arc.nev)
-    arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
+    # arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
+    arc.sigmar = Int64[0]
 
     arc.converged = false
     arc.arpackerror = false
@@ -195,7 +196,7 @@ function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, ite
 
     arc.info_e[1] = BlasInt(0)# zeros(BlasInt, 1)#Ref{BlasInt}(0)
 
-    arc.sigmar[1] = 0.0#BlasInt(0)# zeros(T,1)#Ref{T}(zero(T))
+    arc.sigmar = Int64[0]
 
     arc.converged = false
     arc.arpackerror = false

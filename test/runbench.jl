@@ -51,7 +51,7 @@ end
 println2(FILE, class::String, ref::String, sol::Nothing) = nothing
 
 RANDSDP_TEST_SET = 1:1
-SENSORLOC_TEST_SET = 50:50:200
+SENSORLOC_TEST_SET = 100:100:1000
 MIMO_TEST_SET = [100, 1000, 2000]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",

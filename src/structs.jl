@@ -50,10 +50,10 @@ mutable struct Options
         opt.time_limit = 360000. #100 hours
 
         # Default tolerances
-        opt.tol_primal = 1e-4
-        opt.tol_dual = 1e-4
-        opt.tol_psd = 1e-8
-        opt.tol_soc = 1e-8
+        opt.tol_primal = 1e-3
+        opt.tol_dual = 1e-3
+        opt.tol_psd = 1e-6
+        opt.tol_soc = 1e-6
 
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to inaccuracy]
         opt.min_beta = 1e-3
@@ -71,7 +71,7 @@ mutable struct Options
 
         # Linesearch parameters
         opt.max_linsearch_steps = 1000
-        opt.delta = .999
+        opt.delta = .9999
         opt.initial_theta = 1.
         opt.linsearch_decay = .95
 
