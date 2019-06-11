@@ -93,7 +93,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
         end
-
+      
         # Check convergence to a fixed-point
         p.rank_update += 1
         if primal_residual[k] < opt.tol_primal && dual_residual[k] < opt.tol_dual && k > opt.convergence_check
@@ -132,7 +132,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 end
                 p.rank_update, p.update_cont = 0, 0
             end
-
+        
         # Adaptive stepsizes
         elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
             p.beta *= (1. - p.adapt_level)

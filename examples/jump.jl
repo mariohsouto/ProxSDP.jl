@@ -1,7 +1,8 @@
+
 using ProxSDP, JuMP
 
 # Create a JuMP model using ProxSDP as the solver
-model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true))
+model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true, tol_primal = 1e-5, tol_dual = 1e-5))
 
 @variable(model, X[1:2,1:2], PSD)
 
