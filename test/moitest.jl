@@ -523,23 +523,24 @@ end
     end
 end
 
-@testset "SDPLIB Sizes" begin
-    datapath = joinpath(dirname(@__FILE__), "data")
-    include("base_sdplib.jl")
-    include("moi_sdplib.jl")
-    @testset "EQPART" begin
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
-    end
-    @testset "MAX CUT" begin
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)
-    end
-end
+# This problems are too large for Travis
+# @testset "SDPLIB Sizes" begin
+#     datapath = joinpath(dirname(@__FILE__), "data")
+#     include("base_sdplib.jl")
+#     include("moi_sdplib.jl")
+#     @testset "EQPART" begin
+#         moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"), test = true)
+#         moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"), test = true)
+#         moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
+#         moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
+#     end
+#     @testset "MAX CUT" begin
+#         moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"), test = true)
+#         moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
+#         moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
+#         moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)
+#     end
+# end
 
 @testset "Sensor Localization" begin
     include("base_sensorloc.jl")
@@ -550,11 +551,11 @@ end
 end
 
 @testset "Full eig" begin
-    MOIT.psdt0vtest(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-5, tol_dual = 1e-5)), MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false))
+    MOIT.psdt0vtest(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false))
 end
 
 @testset "Print" begin
-    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-5, tol_dual = 1e-5)), MOIT.TestConfig(atol=1e-3, rtol=1e-3))
+    MOIT.linear15test(MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4)), MOIT.TestConfig(atol=1e-3, rtol=1e-3))
 end
 
 @testset "Unsupported argument" begin
