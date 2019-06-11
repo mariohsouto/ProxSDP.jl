@@ -70,10 +70,10 @@ mutable struct Options
         opt.max_iter = Int(1e+5)
 
         # Linesearch parameters
-        opt.max_linsearch_steps = 1000
+        opt.max_linsearch_steps = 100
         opt.delta = .9999
         opt.initial_theta = 1.
-        opt.linsearch_decay = .95
+        opt.linsearch_decay = .9
 
         # Spectral decomposition parameters
         opt.full_eig_decomp = false

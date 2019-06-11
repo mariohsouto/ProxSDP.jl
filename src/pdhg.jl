@@ -120,9 +120,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < .8 * comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && comb_residual[k - p.window] < comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
-            if p.update_cont > 20
+            if p.update_cont > 50
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if p.min_eig[idx] > opt.tol_psd

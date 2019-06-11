@@ -25,7 +25,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
         elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
             try
                 @timeit "eigs" begin 
-                    λ, ϕ = eigs(a.m[idx], nev=p.target_rank[idx], which=:LR, tol=opt.tol_psd , maxiter=10000)
+                    λ, ϕ = eigs(a.m[idx], nev=p.target_rank[idx], which=:LR, tol=opt.tol_psd , maxiter=1000)
                     fill!(a.m[idx].data, 0.)
                     p.min_eig[idx] = minimum(λ)
                     for i in 1:p.target_rank[idx]
