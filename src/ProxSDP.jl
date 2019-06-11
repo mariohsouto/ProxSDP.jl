@@ -9,7 +9,6 @@ module ProxSDP
     using LinearAlgebra
 
     include("MOI_wrapper.jl")
-    include("eigsolver.jl")
     include("structs.jl")
     include("util.jl")
     include("printing.jl")    

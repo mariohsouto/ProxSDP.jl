@@ -1,4 +1,3 @@
-using Arpack
 
 function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
 
