@@ -9,15 +9,15 @@ end
 function print_parameters(opt::Options, conic_sets::ConicSets)
     println(" Solver parameters:")
     if length(conic_sets.socone) >= 1 && length(conic_sets.sdpcone) >= 1
-        println("  tol_primal $(opt.tol_primal) tol_dual $(opt.tol_dual) tol_soc $(opt.tol_soc) tol_psd $(opt.tol_psd) ")
+        println("  tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) tol_soc = $(opt.tol_soc) tol_psd = $(opt.tol_psd) ")
     elseif length(conic_sets.socone) >= 1
-        println("  tol_primal $(opt.tol_primal) tol_dual $(opt.tol_dual) tol_soc $(opt.tol_soc)")
+        println("  tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) tol_soc = $(opt.tol_soc)")
     elseif length(conic_sets.sdpcone) >= 1
-        println("  tol_primal $(opt.tol_primal) tol_dual $(opt.tol_dual) tol_psd $(opt.tol_psd) ")
+        println("  tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) tol_psd = $(opt.tol_psd) ")
     else
-        println("  tol_primal $(opt.tol_primal) tol_dual $(opt.tol_dual) ")
+        println("  tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) ")
     end
-    println("  max_iter $(opt.max_iter) max_beta $(opt.max_beta) min_beta $(opt.min_beta)")
+    println("  max_iter = $(opt.max_iter) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
 
     return nothing
 end
