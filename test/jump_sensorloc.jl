@@ -1,24 +1,16 @@
 
-function jump_sensorloc(solver, seed, n, verbose)
+function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
-    if Base.libblas_name == "libmkl_rt"
-        model = Model()
-    else
-        model = Model(solver=solver) 
-    end
+    model = Model(with_optimizer(solver))
 
     # Build SDP problem
-    if Base.libblas_name == "libmkl_rt"
-        @variable(model, X[1:n+2, 1:n+2], PSD)
-    else
-        @variable(model, X[1:n+2, 1:n+2], SDP)
-    end
+    @variable(model, X[1:n+2, 1:n+2], PSD)
 
     # Constraint with distances from anchors to sensors
-    for k in 1:m
-        for j in 1:n
+    for j in 1:n
+        for k in 1:m
             e = zeros(n, 1)
             e[j] = -1.0
             v = vcat(a[k], e)
@@ -55,24 +47,15 @@ function jump_sensorloc(solver, seed, n, verbose)
     # Feasibility objective function
     # L = eye(n+1)
     # @objective(model, Min, sum(L[i, j] * X[i, j] for i in 1:n+1, j in 1:n+1))
-    @objective(model, Min, sum(0.0 * X[i, j] for i in 1:n+1, j in 1:n+1))
-
-    if Base.libblas_name == "libmkl_rt"
-        JuMP.attach(model, solver)
-    end
-
+    @objective(model, Min, sum(0.0 * X[i, j] for j in 1:n+1, i in 1:n+1))
     
-    @time teste = JuMP.solve(model)
+    teste = @time optimize!(model)
 
-    if Base.libblas_name == "libmkl_rt"
-        XX = getvalue2.(X)
-    else
-        XX = getvalue.(X)
-    end
+    XX = value.(X)
 
     verbose && sensorloc_eval(n, m, x_true, XX)
 
-    return nothing
+    objval = objective_value(model)
+    stime = MOI.get(model, MOI.SolveTime())
+    return (objval,stime)
 end
-
-getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])
