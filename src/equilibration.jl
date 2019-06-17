@@ -1,7 +1,7 @@
 
 using LinearAlgebra
 
-function equilibrate!(M, Mt, aff, α=1.)
+function pock_equilibrate!(M, Mt, aff, α=1.)
 
     all_cols = 1:aff.n
     all_rows = 1:aff.m + aff.p
@@ -150,7 +150,7 @@ function __equilibrate!(M, Mt, aff, max_iters=100, l=100., ϵ1=1e-4, ϵ2=1e-4)
     return E, D, Einv, Dinv
 end
 
-function _equilibrate!_(M, Mt, aff, max_iters=10000, lb=-100., ub=100.)
+function equilibrate!(M, Mt, aff, max_iters=100000, lb=-10., ub=10.)
 
     α = (aff.n / (aff.m + aff.p)) ^ .25
     β = ((aff.m + aff.p) / aff.n ) ^ .25

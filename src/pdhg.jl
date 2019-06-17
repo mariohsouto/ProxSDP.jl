@@ -37,9 +37,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         equilibrate = true
         if equilibrate
             D, Dinv, E, Einv = equilibrate!(affine_sets.A, affine_sets.A', affine_sets)
-            affine_sets.A = D * affine_sets.A * E
-            affine_sets.b = D * affine_sets.b
-            affine_sets.c = E * affine_sets.c
+            # affine_sets.A = D * affine_sets.A * E
+            # affine_sets.b = D * affine_sets.b
+            # affine_sets.c = E * affine_sets.c
         end
         
         # Scale the off-diagonal entries associated with p.s.d. matrices by √2
@@ -59,13 +59,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Stepsize parameters and linesearch parameters
         if minimum(size(M)) >= 2
-            @show spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
+            @show spectral_norm = Arpack.svds(D * M * E, nsv = 1)[1].S[1] 
         else
-            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S)
+            spectral_norm = maximum(LinearAlgebra.svd(Matrix(D * M * E)).S)
         end
 
         # Normalize the linear system by the spectral norm of M
-        spectral_norm_scaling = true
+        spectral_norm_scaling = false
         if spectral_norm_scaling
             M /= spectral_norm
             Mt /= spectral_norm
@@ -76,6 +76,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             p.primal_step = 1. / spectral_norm
         end
+
+        p.primal_step = 1.
 
         # Build struct for storing matrices
         mat = Matrices(M, Mt, affine_sets.c)
@@ -92,10 +94,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.iter = k
 
         # Primal step
-        @timeit "primal" primal_step!(pair, a, conic_sets, mat, opt, p)
+        @timeit "primal" primal_step!(pair, a, conic_sets, mat, opt, p, E)
 
         # Linesearch (dual step)
-        @timeit "linesearch" linesearch!(pair, a, affine_sets, mat, opt, p)
+        @timeit "linesearch" linesearch!(pair, a, affine_sets, mat, opt, p, D)
 
         # Compute residuals and update old iterates
         if equilibrate
@@ -216,8 +218,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     @show dual_obj = - dot(rhs_orig, pair.y)
 
     if equilibrate
-        pair.x = E * pair.x
-        pair.y = D * pair.y
+        # pair.x = E * pair.x
+        pair.y = Dinv * pair.y
     end
 
     @show prim_obj = dot(c_orig, pair.x)
@@ -259,7 +261,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     return CPResult(p.stop_reason, pair.x, pair.y, -vcat(equa_error, slack_ineq, -ctr_primal), equa_feasibility, ineq_feasibility, prim_obj, dual_obj, gap, time_)
 end
 
-function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
+function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params, D)
     cont = 0
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
     
@@ -268,13 +270,13 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         p.theta = p.primal_step / p.primal_step_old
 
         @timeit "linesearch 1" begin
-            a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1. + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
+            a.y_half .= pair.y .+ (p.beta * p.primal_step) .* D * ((1. + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
         end
 
         @timeit "linesearch 2" begin
             copyto!(a.y_temp, a.y_half)
             box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)
-            a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
+            a.y_temp .-= (p.beta * p.primal_step) .* D * a.y_half
         end
 
         @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
@@ -304,9 +306,9 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     return nothing
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params)
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, E)
 
-    pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
+    pair.x .-= p.primal_step .* E * (a.Mty .+ mat.c)
 
     # Projection onto the p.s.d. cone
     if length(cones.sdpcone) >= 1
