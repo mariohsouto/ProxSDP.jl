@@ -16,10 +16,10 @@ end
 
 use_MOI = false
 sets_to_test = Symbol[]
-# push!(sets_to_test, :MIMO)
-# push!(sets_to_test, :RANDSDP)
+push!(sets_to_test, :MIMO)
+push!(sets_to_test, :RANDSDP)
+push!(sets_to_test, :SENSORLOC)
 push!(sets_to_test, :SDPLIB)
-# push!(sets_to_test, :SENSORLOC)
 
 @static if use_MOI
     using ProxSDP, MathOptInterface
@@ -36,13 +36,13 @@ else
     solvers = Tuple{String, Function}[]
     using JuMP
     using ProxSDP
-    push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(log_verbose=false, timer_verbose = false)))
+    # push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(log_verbose=true, timer_verbose = false, time_limit = 900.0, log_freq = 1_000)))
     using MosekTools
-    push!(solvers, ("MOSEK", () -> Mosek.Optimizer()))
+    # push!(solvers, ("MOSEK", () -> Mosek.Optimizer(MSK_DPAR_OPTIMIZER_MAX_TIME = 900.0)))
     # using CSDP
-    # optimizer = CSDPSolver(objtol=1e-4, maxiter=100000)
-    # using SCS
-    # optimizer = SCSSolver(eps=1e-4, verbose=true)
+    # push!(solvers, ("CSDP", () -> CSDP.Optimizer(objtol=1e-4, maxiter=100000))) #
+    using SCS
+    push!(solvers, ("SCS", () -> SCS.Optimizer())) # eps = 1e-4
 end
 
 function ProxSDP.get_solution(opt)
@@ -66,9 +66,30 @@ function println2(FILE, solver::String, class::String, ref::String, sol)
     flush(FILE)
 end
 
-RANDSDP_TEST_SET = 1:1
-SENSORLOC_TEST_SET = 100:100:1000
-MIMO_TEST_SET = [100, 1000, 2000]
+RANDSDP_TEST_SET = [
+    1,
+]
+SENSORLOC_TEST_SET = [#100:100:300#1000
+    100,
+    200,
+    300,
+    400, # proxsdp stops here, mosek too
+    500,
+    600,
+    # 700,
+    # 800,
+    # 900,
+    # 1000,
+]
+MIMO_TEST_SET = [
+    100,
+    500, # mosek stops here
+    1000, # 700s on scs
+    # 1500, # SCS stops here
+    # 2000,
+    # 2500,
+    # 3000
+    ]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
     "gpp124-1.dat-s",
@@ -102,9 +123,9 @@ MAXCUT_TEST_SET = [
     "mcp500-4.dat-s",
     "maxG11.dat-s"  ,
     "maxG51.dat-s"  ,
-    "maxG32.dat-s"  ,
-    "maxG55.dat-s"  ,
-    "maxG60.dat-s"  ,
+   "maxG32.dat-s"  , # proxsdp
+   "maxG55.dat-s"  , # proxsdp
+   "maxG60.dat-s"  , # proxsdp
 ]
 
 include("base_randsdp.jl")
