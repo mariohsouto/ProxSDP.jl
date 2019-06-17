@@ -1,6 +1,6 @@
 
-function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params, aff)
-    
+function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::CircularVector{Float64}, dual_residual::CircularVector{Float64}, comb_residual::CircularVector{Float64}, mat::Matrices, p::Params, aff::AffineSets)
+
     # Primal residual
     # Px_old
     a.Mty_old .= pair.x_old .- p.primal_step .* a.Mty_old
@@ -8,6 +8,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     pair.x_old .= pair.x .- p.primal_step .* a.Mty
     # Px - Px_old
     pair.x_old .-= a.Mty_old 
+
     primal_residual[p.iter] = sqrt(aff.n) * norm(pair.x_old, Inf) / max(p.norm_rhs, norm(a.Mty_old, Inf), 1.)
 
     # Dual residual
@@ -17,6 +18,7 @@ function compute_residual!(pair::PrimalDual, a::AuxiliaryData, primal_residual::
     pair.y_old .= pair.y .- p.dual_step .* a.Mx
     # Py - Py_old
     pair.y_old .-= a.Mx_old
+
     dual_residual[p.iter] = sqrt(aff.m + aff.p) * norm(pair.y_old, Inf) / max(p.norm_c, norm(a.Mx_old, Inf), 1.)
 
     # Compute combined residual

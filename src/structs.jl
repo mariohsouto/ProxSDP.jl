@@ -50,8 +50,8 @@ mutable struct Options
         opt.time_limit = 360000. #100 hours
 
         # Default tolerances
-        opt.tol_primal = 1e-3
-        opt.tol_dual = 1e-3
+        opt.tol_primal = 1e-4
+        opt.tol_dual = 1e-4
         opt.tol_psd = 1e-6
         opt.tol_soc = 1e-6
 

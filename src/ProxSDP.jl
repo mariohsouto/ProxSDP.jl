@@ -13,6 +13,7 @@ module ProxSDP
     include("util.jl")
     include("printing.jl")    
     include("scaling.jl")
+    include("equilibration.jl")
     include("pdhg.jl")
     include("residuals.jl")
     include("prox_operators.jl")
