@@ -89,9 +89,28 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
 
+        bla = copy(pair.x)
+        cont = 1
+        @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+            if i != j
+                bla[cont] = pair.x[cont] / sqrt(2.)
+            end
+            cont += 1
+        end
+        equa_error = A_orig * bla - b_orig
+        equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
+        prim_obj = abs(dot(c_orig, bla))
+        dual_obj = abs(dot(rhs_orig, pair.y))
+        dual_gap = (prim_obj - dual_obj) / (1. + prim_obj + dual_obj)
+
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
+        end
+
+        if dual_gap <= opt.tol_primal && equa_feasibility <= opt.tol_primal && convergedrank(p, conic_sets, opt)
+            p.stop_reason = 1
+            break
         end
       
         # Check convergence to a fixed-point
@@ -103,6 +122,22 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 if opt.log_verbose
                     print_progress(primal_residual[k], dual_residual[k], p)
                 end
+
+                bla = copy(pair.x)
+                cont = 1
+                @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+                    if i != j
+                        bla[cont] = pair.x[cont] / sqrt(2.)
+                    end
+                    cont += 1
+                end
+                equa_error = A_orig * bla - b_orig
+                equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
+                prim_obj = dot(c_orig, bla)
+                dual_obj = - dot(rhs_orig, pair.y)
+                @show equa_feasibility
+                @show (prim_obj - dual_obj) / (1. + prim_obj + dual_obj)
+
                 break
 
             elseif p.rank_update > p.window
