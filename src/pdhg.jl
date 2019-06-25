@@ -99,17 +99,26 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         equa_error = A_orig * bla - b_orig
         equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
-        prim_obj = abs(dot(c_orig, bla))
-        dual_obj = abs(dot(rhs_orig, pair.y))
-        dual_gap = (prim_obj - dual_obj) / (1. + prim_obj + dual_obj)
+        prim_obj = dot(c_orig, bla)
+        dual_obj = - dot(rhs_orig, pair.y)
+        dual_gap = abs(prim_obj - dual_obj) / (1. + abs(prim_obj) + abs(dual_obj))
+
+        prim_obj_2 = dot(c_orig, pair.x)
+        dual_obj_2 = - dot(affine_sets.b, pair.y)
+        dual_gap_2 = abs(prim_obj_2 - dual_obj_2) / (1. + abs(prim_obj_2) + abs(dual_obj_2))
 
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(primal_residual[k], dual_residual[k], p)
+            @show (equa_feasibility, dual_gap, dual_gap_2)
         end
 
         if dual_gap <= opt.tol_primal && equa_feasibility <= opt.tol_primal && convergedrank(p, conic_sets, opt)
             p.stop_reason = 1
+            best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
+            if opt.log_verbose
+                print_progress(primal_residual[k], dual_residual[k], p)
+            end
             break
         end
       
@@ -132,11 +141,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     cont += 1
                 end
                 equa_error = A_orig * bla - b_orig
-                equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
+                @show equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
                 prim_obj = dot(c_orig, bla)
                 dual_obj = - dot(rhs_orig, pair.y)
-                @show equa_feasibility
-                @show (prim_obj - dual_obj) / (1. + prim_obj + dual_obj)
+                @show dual_gap = abs(prim_obj - dual_obj) / (1. + abs(prim_obj) + abs(dual_obj))
 
                 break
 
