@@ -86,9 +86,9 @@ MAXCUT_TEST_SET = [
     "mcp500-4.dat-s",
     "maxG11.dat-s"  ,
     "maxG51.dat-s"  ,
-    "maxG32.dat-s"  ,
-    "maxG55.dat-s"  ,
-    "maxG60.dat-s"  ,
+    # "maxG32.dat-s"  ,
+    # "maxG55.dat-s"  ,
+    # "maxG60.dat-s"  ,
 ]
 
 if use_MOI
