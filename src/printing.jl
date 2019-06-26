@@ -135,7 +135,7 @@ function print_progress(residuals::Residuals, p::Params)
     return nothing
 end
 
-function print_result(stop_reason::Int, time_::Float64, residuals::Residuals)
+function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, max_rank::Int)
     println("---------------------------------------------------------------------------------------")
     println("    Solver status:")
     if stop_reason == 1
@@ -152,6 +152,7 @@ function print_result(stop_reason::Int, time_::Float64, residuals::Residuals)
     println("    Primal feasibility:")
     println("       ||A(X) - b|| / (1 + ||b||) = $(round(residuals.equa_feasibility; digits = 6))    [linear equalities] ")
     println("       ||max(G(X) - h, 0)|| / (1 + ||h||) = $(round(residuals.ineq_feasibility; digits = 6))    [linear inequalities]")
+    println("    Rank of p.s.d. variable is $max_rank.")
     println("=======================================================================================")
     
     return nothing

@@ -200,7 +200,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Print result
     if opt.log_verbose
-        print_result(p.stop_reason, time_, residuals)
+        print_result(p.stop_reason, time_, residuals, maximum(p.current_rank))
     end
 
     # Post processing
