@@ -35,7 +35,7 @@ function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryD
     pair.x_old .= pair.x .- p.primal_step .* a.Mty
     # Px - Px_old
     pair.x_old .-= a.Mty_old 
-    residuals.primal_residual[p.iter] = sqrt(aff.n) * norm(pair.x_old, Inf) / max(p.norm_b, p.norm_h, 1.)
+    residuals.primal_residual[p.iter] = sqrt(aff.n) * norm(pair.x_old, Inf) / max(norm(a.Mty_old, Inf), p.norm_b, p.norm_h, 1.)
 
     # Dual residual
     # Py_old
@@ -44,7 +44,7 @@ function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryD
     pair.y_old .= pair.y .- p.dual_step .* a.Mx
     # Py - Py_old
     pair.y_old .-= a.Mx_old
-    residuals.dual_residual[p.iter] = sqrt(aff.m + aff.p) * norm(pair.y_old, Inf) / max(p.norm_c, 1.)
+    residuals.dual_residual[p.iter] = sqrt(aff.m + aff.p) * norm(pair.y_old, Inf) / max(norm(a.Mx_old, Inf), p.norm_c, 1.)
 
     # Compute combined residual
     residuals.comb_residual[p.iter] = max(residuals.primal_residual[p.iter], residuals.dual_residual[p.iter])
