@@ -227,7 +227,17 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         append!(ctr_primal, pair.x[sdp.vec_i])
     end
 
-    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(equa_error, slack_ineq, -ctr_primal), equa_feasibility, ineq_feasibility, prim_obj, dual_obj, gap, time_)
+    return CPResult(p.stop_reason,
+                    pair.x,
+                    pair.y,
+                    -vcat(equa_error, slack_ineq, -ctr_primal),
+                    equa_feasibility,
+                    ineq_feasibility,
+                    prim_obj,
+                    dual_obj,
+                    gap, 
+                    time_,
+                    sum(p.current_rank))
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)

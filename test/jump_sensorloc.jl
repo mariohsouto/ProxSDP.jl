@@ -17,7 +17,6 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
             # V = v * v'
             # @constraint(model, sum(V .* X) == d_bar[k, j]^2)
             @constraint(model, X[1,1]*a[k][1]*a[k][1] + X[2,2]*a[k][2]*a[k][2] 
-                                 - 2 * X[1,2]*a[k][1]*a[k][2] 
                                  - 2 * X[1, j+2] * a[k][1]
                                  - 2 * X[2, j+2] * a[k][2]
                                  + X[j+2, j+2]
@@ -64,5 +63,10 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     objval = objective_value(model)
     stime = MOI.get(model, MOI.SolveTime())
-    return (objval,stime)
+
+    # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
+    # @show fieldnames(tp)
+    @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    return (objval, stime, rank)
+    # return (objval, stime)
 end

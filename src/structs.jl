@@ -152,6 +152,7 @@ struct CPResult
     dual_objval::Float64
     gap::Float64
     time::Float64
+    final_rank::Int
 end
 
 mutable struct PrimalDual

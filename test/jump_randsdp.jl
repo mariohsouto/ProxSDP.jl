@@ -16,5 +16,10 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
     
     objval = objective_value(model)
     stime = MOI.get(model, MOI.SolveTime())
-    return (objval,stime)
+
+    # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
+    # @show fieldnames(tp)
+    @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    return (objval, stime, rank)
+    # return (objval, stime)
 end
