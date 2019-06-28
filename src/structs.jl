@@ -161,8 +161,27 @@ mutable struct PrimalDual
     y::Vector{Float64}
     y_old::Vector{Float64}
 
-    PrimalDual(aff) = new(
+    PrimalDual(aff::AffineSets) = new(
         zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
+    )
+end
+
+mutable struct Residuals
+    dual_gap::Float64
+    prim_obj::Float64
+    dual_obj::Float64
+    equa_feasibility::Float64 
+    ineq_feasibility::Float64
+    feasibility::Float64
+    primal_residual::CircularVector{Float64}
+    dual_residual::CircularVector{Float64}
+    comb_residual::CircularVector{Float64}
+
+    Residuals(window::Int) = new(
+        .0, .0, .0, .0, .0, .0,
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window)
     )
 end
 
@@ -214,7 +233,8 @@ mutable struct Params
     window::Int
     time0::Float64
     norm_c::Float64
-    norm_rhs::Float64
+    norm_b::Float64
+    norm_h::Float64
     sqrt2::Float64
 
     Params() = new()

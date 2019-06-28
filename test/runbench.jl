@@ -114,24 +114,24 @@ GPP_TEST_SET = [
     "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
-    # "mcp124-1.dat-s",
-    # "mcp124-1.dat-s",
-    # "mcp124-2.dat-s",
-    # "mcp124-3.dat-s",
-    # "mcp124-4.dat-s",
-    # "mcp250-1.dat-s",
-    # "mcp250-2.dat-s",
-    # "mcp250-3.dat-s",
-    # "mcp250-4.dat-s",
-    # "mcp500-1.dat-s",
-    # "mcp500-2.dat-s",
-    # "mcp500-3.dat-s",
-    # "mcp500-4.dat-s",
-    # "maxG11.dat-s"  , # SCS > 1000 s
-    # "maxG51.dat-s"  ,
-    # "maxG32.dat-s"  , # proxsdp
-    # "maxG55.dat-s"  , # proxsdp
-    # "maxG60.dat-s"  , # proxsdp
+    "mcp124-1.dat-s",
+    "mcp124-1.dat-s",
+    "mcp124-2.dat-s",
+    "mcp124-3.dat-s",
+    "mcp124-4.dat-s",
+    "mcp250-1.dat-s",
+    "mcp250-2.dat-s",
+    "mcp250-3.dat-s",
+    "mcp250-4.dat-s",
+    "mcp500-1.dat-s",
+    "mcp500-2.dat-s",
+    "mcp500-3.dat-s",
+    "mcp500-4.dat-s",
+    "maxG11.dat-s"  ,
+    "maxG51.dat-s"  ,
+    # "maxG32.dat-s"  ,
+    # "maxG55.dat-s"  ,
+    # "maxG60.dat-s"  ,
 ]
 
 include("base_randsdp.jl")
