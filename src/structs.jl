@@ -50,19 +50,19 @@ mutable struct Options
         opt.time_limit = 360000. #100 hours
 
         # Default tolerances
-        opt.tol_primal = 1e-4
-        opt.tol_dual = 1e-4
-        opt.tol_psd = 1e-6
-        opt.tol_soc = 1e-6
+        opt.tol_primal = 1e-3
+        opt.tol_dual = 1e-3
+        opt.tol_psd = 1e-8
+        opt.tol_soc = 1e-8
 
-        # Bounds on beta (dual_step / primal_step) [larger bounds may lead to inaccuracy]
-        opt.min_beta = 1e-3
-        opt.max_beta = 1e+3
+        # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
+        opt.min_beta = 1e-2
+        opt.max_beta = 1e+2
         opt.initial_beta = 1.
 
-        # Adaptive primal-dual steps parameters [adapt_decay too close to 1. may lead to inaccuracy]
+        # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]
         opt.initial_adapt_level = .9
-        opt.adapt_decay = .8
+        opt.adapt_decay = .7
 
         # PDHG parameters
         opt.convergence_window = 200
@@ -70,7 +70,7 @@ mutable struct Options
         opt.max_iter = Int(1e+5)
 
         # Linesearch parameters
-        opt.max_linsearch_steps = 100
+        opt.max_linsearch_steps = 200
         opt.delta = .9999
         opt.initial_theta = 1.
         opt.linsearch_decay = .9
@@ -160,8 +160,27 @@ mutable struct PrimalDual
     y::Vector{Float64}
     y_old::Vector{Float64}
 
-    PrimalDual(aff) = new(
+    PrimalDual(aff::AffineSets) = new(
         zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
+    )
+end
+
+mutable struct Residuals
+    dual_gap::Float64
+    prim_obj::Float64
+    dual_obj::Float64
+    equa_feasibility::Float64 
+    ineq_feasibility::Float64
+    feasibility::Float64
+    primal_residual::CircularVector{Float64}
+    dual_residual::CircularVector{Float64}
+    comb_residual::CircularVector{Float64}
+
+    Residuals(window::Int) = new(
+        .0, .0, .0, .0, .0, .0,
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window)
     )
 end
 
@@ -213,7 +232,8 @@ mutable struct Params
     window::Int
     time0::Float64
     norm_c::Float64
-    norm_rhs::Float64
+    norm_b::Float64
+    norm_h::Float64
     sqrt2::Float64
 
     Params() = new()

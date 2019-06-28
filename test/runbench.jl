@@ -68,7 +68,7 @@ GPP_TEST_SET = [
     "gpp500-3.dat-s",
     "gpp500-4.dat-s",
     "equalG11.dat-s",
-    "equalG51.dat-s",
+    # "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
     "mcp124-1.dat-s",
@@ -86,9 +86,9 @@ MAXCUT_TEST_SET = [
     "mcp500-4.dat-s",
     "maxG11.dat-s"  ,
     "maxG51.dat-s"  ,
-    "maxG32.dat-s"  ,
-    "maxG55.dat-s"  ,
-    "maxG60.dat-s"  ,
+    # "maxG32.dat-s"  ,
+    # "maxG55.dat-s"  ,
+    # "maxG60.dat-s"  ,
 ]
 
 if use_MOI

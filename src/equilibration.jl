@@ -2,6 +2,7 @@
 using LinearAlgebra
 
 function pock_equilibrate!(M, Mt, aff, α=1.)
+    #
 
     all_cols = 1:aff.n
     all_rows = 1:aff.m + aff.p
@@ -150,11 +151,11 @@ function __equilibrate!(M, Mt, aff, max_iters=100, l=100., ϵ1=1e-4, ϵ2=1e-4)
     return E, D, Einv, Dinv
 end
 
-function equilibrate!(M, Mt, aff, max_iters=100000, lb=-10., ub=10.)
+function equilibrate!(M, Mt, aff, max_iters=10000, lb=-10., ub=10.)
 
     α = (aff.n / (aff.m + aff.p)) ^ .25
     β = ((aff.m + aff.p) / aff.n ) ^ .25
-    γ = 1e-1
+    γ = .1
 
     u, v   = zeros(aff.m + aff.p), zeros(aff.n)
     u_, v_ = zeros(aff.m + aff.p), zeros(aff.n)
@@ -184,10 +185,11 @@ function equilibrate!(M, Mt, aff, max_iters=100000, lb=-10., ub=10.)
         v_grad = exp.(2 * v) .* in_buf .^ 2 .- β ^ 2 .+ γ * v
 
         # Project onto box 
-        u = box_project(u - step_size * u_grad, 0., ub)
-        v = box_project(v - step_size * v_grad, lb, ub)
+        u = box_project(u - step_size * u_grad, lb, ub)
+        v = box_project(v - step_size * v_grad, 1., ub)
 
-        u .= sum(u) / aff.n
+        # u .= sum(u) / aff.n
+        v .= sum(v) / aff.n
         
         # Update averages.
         u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
@@ -197,18 +199,12 @@ function equilibrate!(M, Mt, aff, max_iters=100000, lb=-10., ub=10.)
     u_ .= exp.(u)
     v_ .= exp.(v)
 
-    D    = Diagonal(u_)
-    Dinv = Diagonal(1. ./ u_)
-    E    = Diagonal(v_)
-    Einv = Diagonal(1. ./ v_)
+    E    = Diagonal(u_)
+    Einv = Diagonal(1. ./ u_)
+    D    = Diagonal(v_)
+    Dinv = Diagonal(1. ./ v_)
 
-    # M_ = D * M * E
-
-    # r1 = maximum([norm(M_[i, :]) for i in rows]) / minimum([norm(M_[i, :]) for i in rows])
-    # r2 = maximum([norm(M_[:, j]) for j in cols]) / minimum([norm(M_[:, j]) for j in cols])
-    # @show (r1, r2)
-
-    return D, Dinv, E, Einv
+    return E, Einv, D, Dinv
 end
 
 function box_project(y, lb, ub)
