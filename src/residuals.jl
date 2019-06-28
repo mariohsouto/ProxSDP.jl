@@ -1,5 +1,5 @@
 
-function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params, E, D, A_orig, b_orig, c_orig)
+function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params)
 
     # Inplace primal feasibility error
     a.Mx_old[1:aff.p] .-= aff.b
@@ -7,10 +7,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     a.Mx_old[aff.p+1:end] .-= aff.h
     a.Mx_old[aff.p+1:end] .= max.(a.Mx_old[aff.p+1:end], 0.)
     residuals.ineq_feasibility = norm(a.Mx_old[aff.p+1:end], 2) / (1. + p.norm_h)
-
-    # residuals.equa_feasibility = norm(A_orig * D * pair.x - b_orig) / (1. + p.norm_b)
-    # residuals.ineq_feasibility = 0.
-    # residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
+    residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
 
     # Recover previous a.Mx
     copyto!(a.Mx_old, a.Mx)
@@ -25,8 +22,6 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     if aff.m > 0
         residuals.dual_obj -= dot(aff.h, pair.y[aff.p+1:end])
     end
-    # residuals.dual_obj -= dot(b_orig, E * pair.y)
-    # residuals.prim_obj = dot(c_orig, D * pair.x)
     residuals.dual_gap = abs(residuals.prim_obj - residuals.dual_obj) / (1. + abs(residuals.prim_obj) + abs(residuals.dual_obj))
 
     return nothing

@@ -1,6 +1,61 @@
 
 using LinearAlgebra
 
+function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
+
+    α = (aff.n / (aff.m + aff.p)) ^ .25
+    β = ((aff.m + aff.p) / aff.n ) ^ .25
+    γ = .001
+
+    u, v   = zeros(aff.m + aff.p), zeros(aff.n)
+    u_, v_ = zeros(aff.m + aff.p), zeros(aff.n)
+
+    in_buf  = zeros(aff.n)
+    out_buf = zeros(aff.m + aff.p)
+
+    E = Diagonal(u)
+    D = Diagonal(v)
+
+    M_ = copy(M)
+
+    for iter in 1:max_iters
+        E[diagind(E)] .= exp.(u)
+        D[diagind(D)] .= exp.(v)
+        M_ .= E * M * D
+
+        # u grad estimate
+        row_norms = [sum(M_[i, :].^2) for i in 1:aff.m + aff.p]
+        u_grad = row_norms .- α ^ 2 .+ γ * u
+
+        # v grad estimate
+        col_norms = [sum(M_[:, j].^2) for j in 1:aff.n]
+        v_grad = col_norms .- β ^ 2 .+ γ * v
+
+        # Project onto box 
+        step_size = 2. / (γ * (iter + 1.))
+        u = box_project(u - step_size * u_grad, lb, ub)
+
+        v .= sum(v - step_size * v_grad) / aff.n
+        v = box_project(v, 0., ub)
+        # v = box_project(v - step_size * v_grad, 1e-4, ub)
+        # v .= sum(v) / aff.n
+        
+        # Update averages.
+        u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
+        v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
+    end
+
+    u_ .= exp.(u_)
+    v_ .= exp.(v_)
+
+    E = Diagonal(u_)
+    D = Diagonal(v_)
+
+    @show (sum(v_) / aff.n, v_[1])
+
+    return E, D
+end
+
 function pock_equilibrate!(M, Mt, aff, α=1.)
     #
 
@@ -151,25 +206,17 @@ function __equilibrate!(M, Mt, aff, max_iters=100, l=100., ϵ1=1e-4, ϵ2=1e-4)
     return E, D, Einv, Dinv
 end
 
-function equilibrate!(M, Mt, aff, max_iters=10000, lb=-10., ub=10.)
+function _____equilibrate!(M, Mt, aff, max_iters=1000, lb=-10., ub=10.)
 
     α = (aff.n / (aff.m + aff.p)) ^ .25
     β = ((aff.m + aff.p) / aff.n ) ^ .25
-    γ = .1
+    γ = .01
 
     u, v   = zeros(aff.m + aff.p), zeros(aff.n)
     u_, v_ = zeros(aff.m + aff.p), zeros(aff.n)
 
     in_buf  = zeros(aff.n)
     out_buf = zeros(aff.m + aff.p)
-
-    # Columns of M that are entirely filled with zeros
-    cols = [j for j in 1:aff.n if !iszero(M[:, j])]
-    rows = [i for i in 1:aff.m + aff.p if !iszero(M[i, :])]
-
-    # r1 = maximum([norm(M[i, :]) for i in rows]) / minimum([norm(M[i, :]) for i in rows])
-    # r2 = maximum([norm(M[:, j]) for j in cols]) / minimum([norm(M[:, j]) for j in cols])
-    # @show (r1, r2)
 
     for iter in 1:max_iters
         step_size = 2. / (γ * (iter + 1.))
@@ -187,8 +234,6 @@ function equilibrate!(M, Mt, aff, max_iters=10000, lb=-10., ub=10.)
         # Project onto box 
         u = box_project(u - step_size * u_grad, lb, ub)
         v = box_project(v - step_size * v_grad, 1., ub)
-
-        # u .= sum(u) / aff.n
         v .= sum(v) / aff.n
         
         # Update averages.
@@ -196,15 +241,13 @@ function equilibrate!(M, Mt, aff, max_iters=10000, lb=-10., ub=10.)
         v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
     end
 
-    u_ .= exp.(u)
-    v_ .= exp.(v)
+    u_ .= exp.(u_)
+    v_ .= exp.(v_)
 
-    E    = Diagonal(u_)
-    Einv = Diagonal(1. ./ u_)
-    D    = Diagonal(v_)
-    Dinv = Diagonal(1. ./ v_)
+    E = Diagonal(u_)
+    D = Diagonal(v_)
 
-    return E, Einv, D, Dinv
+    return E, D
 end
 
 function box_project(y, lb, ub)

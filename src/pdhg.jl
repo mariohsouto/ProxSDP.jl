@@ -35,18 +35,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         rhs_orig = vcat(b_orig, h_orig)
 
         @show spectral_norm = Arpack.svds(affine_sets.A, nsv = 1)[1].S[1] 
-        
-        # Scale the off-diagonal entries associated with p.s.d. matrices by √2
-        norm_scaling(affine_sets, conic_sets)
 
         # Diagonal preconditioning
         equilibrate = true
         if equilibrate
-            E, Einv, D, Dinv = equilibrate!(affine_sets.A, affine_sets.A', affine_sets)
-            affine_sets.A = E * affine_sets.A * D
+            E, D = equilibrate!(affine_sets.A, affine_sets)
+            affine_sets.A = E * A_orig * D
             affine_sets.b = E * affine_sets.b
             affine_sets.c = D * affine_sets.c
         end
+        
+        # Scale the off-diagonal entries associated with p.s.d. matrices by √2
+        norm_scaling(affine_sets, conic_sets)
 
         # Initialization
         pair = PrimalDual(affine_sets)
@@ -73,9 +73,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             affine_sets.b /= sqrt(spectral_norm)
             affine_sets.h /= sqrt(spectral_norm)
             affine_sets.c /= sqrt(spectral_norm)
-            p.primal_step = 1.
+            p.primal_step = 99.
         else
-            p.primal_step = 1. / spectral_norm
+            p.primal_step = 99. / spectral_norm
         end
 
         # Build struct for storing matrices
@@ -102,7 +102,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets)
 
         # Compute optimality gap and feasibility error
-        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p, E, D, A_orig, b_orig, c_orig)
+        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p)
 
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
@@ -187,14 +187,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     @show prim_obj = dot(c_orig, pair.x)
     @show dual_obj = - dot(rhs_orig, pair.y)
 
-    if equilibrate
-        pair.x = D * pair.x
-        pair.y = E * pair.y
-    end
-
-    @show prim_obj = dot(c_orig, pair.x)
-    @show dual_obj = - dot(rhs_orig, pair.y)
-
     # Remove scaling
     cont = 1
     @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
@@ -208,6 +200,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         pair.y ./= sqrt(spectral_norm)
         M *= spectral_norm
         Mt *= spectral_norm
+    end
+
+    @show prim_obj = dot(c_orig, pair.x)
+    @show dual_obj = - dot(rhs_orig, pair.y)
+
+    if equilibrate
+        pair.x = D * pair.x
+        pair.y = E * pair.y
     end
 
     @show prim_obj = dot(c_orig, pair.x)
