@@ -101,7 +101,7 @@ function print_progress(residuals::Residuals, p::Params)
     s_k *= " |"
     s_s = @sprintf("%.4f", residuals.dual_gap)
     s_s *= " |"
-    s_o = @sprintf("%.4f", residuals.prim_obj)
+    s_o = @sprintf("%.3f", residuals.prim_obj)
     s_o *= " |"
     s_f = @sprintf("%.4f", residuals.feasibility)
     s_f *= " |"

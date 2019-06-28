@@ -152,16 +152,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         end
 
-        # Adaptive reduce rank [warning: heuristic]
-        if opt.reduce_rank
-            if p.rank_update > p.window && residuals.comb_residual[k - p.window] >= residuals.comb_residual[k]
-                for (idx, sdp) in enumerate(conic_sets.sdpcone)
-                    p.target_rank[idx] = min(p.target_rank[idx], sdp.sq_side, max(trunc(Int, p.target_rank[idx] / 2.), p.current_rank[idx] + 3))
-                end
-                p.rank_update = 0
-            end
-        end
-
         # time_limit stop condition
         if time() - p.time0 > opt.time_limit
             if opt.log_verbose

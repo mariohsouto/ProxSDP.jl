@@ -111,7 +111,7 @@ GPP_TEST_SET = [
     "gpp500-3.dat-s",
     "gpp500-4.dat-s",
     "equalG11.dat-s",
-    "equalG51.dat-s",
+    # "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
     "mcp124-1.dat-s",
