@@ -5,13 +5,13 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
 
     α = (aff.n / (aff.m + aff.p)) ^ .25
     β = ((aff.m + aff.p) / aff.n ) ^ .25
-    γ = .001
+    γ = .1
 
-    u, v   = zeros(aff.m + aff.p), zeros(aff.n)
-    u_, v_ = zeros(aff.m + aff.p), zeros(aff.n)
-
-    in_buf  = zeros(aff.n)
-    out_buf = zeros(aff.m + aff.p)
+    u, v           = zeros(aff.m + aff.p), zeros(aff.n)
+    u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
+    u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
+    row_norms  = zeros(aff.n)
+    col_norms = zeros(aff.m + aff.p)
 
     E = Diagonal(u)
     D = Diagonal(v)
@@ -19,233 +19,30 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
     M_ = copy(M)
 
     for iter in 1:max_iters
-        E[diagind(E)] .= exp.(u)
-        D[diagind(D)] .= exp.(v)
-        M_ .= E * M * D
+        @timeit "update diag E" E[diagind(E)] .= exp.(u)
+        @timeit "update diag D" D[diagind(D)] .= exp.(v)
+        @timeit "M_" M_ .= E * M * D
 
-        # u grad estimate
-        row_norms = [sum(M_[i, :].^2) for i in 1:aff.m + aff.p]
-        u_grad = row_norms .- α ^ 2 .+ γ * u
-
-        # v grad estimate
-        col_norms = [sum(M_[:, j].^2) for j in 1:aff.n]
-        v_grad = col_norms .- β ^ 2 .+ γ * v
-
-        # Project onto box 
-        step_size = 2. / (γ * (iter + 1.))
-        u = box_project(u - step_size * u_grad, lb, ub)
-
-        v .= sum(v - step_size * v_grad) / aff.n
-        v = box_project(v, 0., ub)
-        # v = box_project(v - step_size * v_grad, 1e-4, ub)
-        # v .= sum(v) / aff.n
-        
-        # Update averages.
-        u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
-        v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
-    end
-
-    u_ .= exp.(u_)
-    v_ .= exp.(v_)
-
-    E = Diagonal(u_)
-    D = Diagonal(v_)
-
-    @show (sum(v_) / aff.n, v_[1])
-
-    return E, D
-end
-
-function pock_equilibrate!(M, Mt, aff, α=1.)
-    #
-
-    all_cols = 1:aff.n
-    all_rows = 1:aff.m + aff.p
-
-    Σ    = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    Σinv = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    T    = Matrix{Float64}(I, aff.n, aff.n)
-    Tinv = Matrix{Float64}(I, aff.n, aff.n)
-
-    # Columns of M that are entirely filled with zeros
-    cols = [j for j in 1:aff.n if !iszero(M[:, j])]
-    rows = [i for i in 1:aff.m + aff.p if !iszero(M[i, :])]
-
-    for j in cols
-        T[j, j] = 1. / sum(abs(M[i, j])^(2 - α) for i in all_rows)
-        if isnan(T[j, j]) || isinf(T[j, j])
-            T[j, j] = 1.
-        end
-        Tinv[j, j] = 1. / T[j, j]
-        if isnan(Tinv[j, j]) || isinf(Tinv[j, j])
-            Tinv[j, j] = 1.
-        end
-    end
-
-    for i in rows
-        Σ[i, i] = 1. / sum(abs(M[i, j])^α for j in all_cols)
-        if isnan(Σ[i, i]) || isinf(Σ[i, i])
-            Σ[i, i] = 1.
-        end
-        Σinv[i, i] = 1. / Σinv[i, i]
-        if isnan(Σinv[i, i]) || isinf(Σinv[i, i])
-            Σinv[i, i] = 1.
-        end
-    end
-
-    sum_sigma = sum(diag(Σ)) / (aff.m + aff.p)
-    sum_inv_sigma = sum(diag(Σinv)) / (aff.m + aff.p)
-    for i in rows
-        Σ[i, i] = sum_sigma
-        Σinv[i, i] = sum_sigma
-    end
-
-    return Σ, Σinv, T, Tinv
-end
-
-function _equilibrate!(M, Mt, aff, max_iters=100000, l=100., ϵ1=1e-4, ϵ2=1e-4)
-
-    D    = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    Dinv = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    E    = Matrix{Float64}(I, aff.n, aff.n)
-    Einv = Matrix{Float64}(I, aff.n, aff.n)
-
-    D_    = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    E_    = Matrix{Float64}(I, aff.n, aff.n)
-
-    iter, r1, r2 = 0, 1., 1.
-
-    # Columns of M that are entirely filled with zeros
-    cols = [j for j in 1:aff.n if !iszero(M[:, j])]
-    rows = [i for i in 1:aff.m + aff.p if !iszero(M[i, :])]
-
-    while r1 > ϵ1 && r2 > ϵ2 && iter < max_iters
-        iter += 1
-
-        @show size(D)
-        @show size(M)
-        @show size(E)
-        D = M * E
-        for i in rows
-            D[i, i] = 1. / D[i, i]
-            if isnan(D[i, i]) || isinf(D[i, i])
-                D[i, i] = 1.
-            end
-        end
-
-        E = Mt * D
-        for j in cols
-            E[j, j] = 1. / E[j, j]
-            if isnan(E[j, j]) || isinf(E[j, j])
-                E[j, j] = 1.
-            end
-        end
-        @show size(D)
-        @show size(M)
-        @show size(E)
-        M_ = D * M * E
-
-        # Compute residuals
-        r1 = maximum([norm(M_[i, :]) for i in rows]) / minimum([norm(M_[i, :]) for i in rows])
-        r2 = maximum([norm(M_[:, j]) for j in cols]) / minimum([norm(M_[:, j]) for j in cols])
-        @show (r1, r2)
-    end
-
-    for i in 1:aff.m + aff.p
-        Dinv[i, i] = 1. / D[i, i]
-    end
-    for j in 1:aff.n
-        Einv[j, j] = 1. / Einv[j, j]
-    end
-
-    return E, D, Einv, Dinv
-end
-
-function __equilibrate!(M, Mt, aff, max_iters=100, l=100., ϵ1=1e-4, ϵ2=1e-4)
-
-    D    = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    Dinv = Matrix{Float64}(I, aff.m + aff.p, aff.m + aff.p)
-    E    = Matrix{Float64}(I, aff.n, aff.n)
-    Einv = Matrix{Float64}(I, aff.n, aff.n)
-
-    iter, r1, r2 = 0, 1., 1.
-
-    # Columns of M that are entirely filled with zeros
-    cols = [j for j in 1:aff.n if !iszero(M[:, j])]
-    rows = [i for i in 1:aff.m + aff.p if !iszero(M[i, :])]
-
-    while r1 > ϵ1 && r2 > ϵ2 && iter < max_iters
-        iter += 1
-        for i in rows
-            D[i, i] = D[i, i] * norm(M[i, :], 2)^(-.5)
-            if isnan(D[i, i]) || isinf(D[i, i])
-                D[i, i] = 1.
-            end
-        end
-        for j in cols
-            E[j, j] = E[j, j] * ((aff.m + aff.p) / aff.n)^.5 * norm(M[:, j], 2)^(-.5)
-            if isnan(E[j, j]) || isinf(E[j, j])
-                E[j, j] = 1.
-            end
-        end
-        M = D * M * E
-
-        # Compute residuals
-        r1 = maximum([norm(M[i, :]) for i in rows]) / minimum([norm(M[i, :]) for i in rows])
-        r2 = maximum([norm(M[:, j]) for j in cols]) / minimum([norm(M[:, j]) for j in cols])
-        @show (r1, r2)
-    end
-
-    for i in 1:aff.m + aff.p
-        Dinv[i, i] = 1. / D[i, i]
-    end
-    for j in 1:aff.n
-        Einv[j, j] = 1. / Einv[j, j]
-    end
-
-    return E, D, Einv, Dinv
-end
-
-function _____equilibrate!(M, Mt, aff, max_iters=1000, lb=-10., ub=10.)
-
-    α = (aff.n / (aff.m + aff.p)) ^ .25
-    β = ((aff.m + aff.p) / aff.n ) ^ .25
-    γ = .01
-
-    u, v   = zeros(aff.m + aff.p), zeros(aff.n)
-    u_, v_ = zeros(aff.m + aff.p), zeros(aff.n)
-
-    in_buf  = zeros(aff.n)
-    out_buf = zeros(aff.m + aff.p)
-
-    for iter in 1:max_iters
         step_size = 2. / (γ * (iter + 1.))
 
-        # u grad estimate
-        s = rand([-1., +1.], aff.n)
-        out_buf .= M * (exp.(v) .* s)
-        u_grad = exp.(2 * u) .* out_buf .^ 2 .- α ^ 2 .+ γ * u
+        # u gradient step
+        @timeit "row norms" row_norms = [sum(M_[i, :].^2) for i in 1:aff.m + aff.p]
+        @timeit "u grad " u_grad .= row_norms .- α ^ 2 .+ γ * u
+        @timeit "u proj " u = box_project(u - step_size * u_grad, lb, ub)
 
         # v grad estimate
-        w = rand([-1., +1.], aff.m + aff.p)
-        in_buf .= Mt * (exp.(u) .* w)
-        v_grad = exp.(2 * v) .* in_buf .^ 2 .- β ^ 2 .+ γ * v
-
-        # Project onto box 
-        u = box_project(u - step_size * u_grad, lb, ub)
-        v = box_project(v - step_size * v_grad, 1., ub)
-        v .= sum(v) / aff.n
+        @timeit "col norms" col_norms = [sum(M_[:, j].^2) for j in 1:aff.n]
+        @timeit "v grad " v_grad .= col_norms .- β ^ 2 .+ γ * v
+        @timeit "v proj 1" v .= sum(v - step_size * v_grad) / aff.n
+        @timeit "v proj 2" v = box_project(v, 0., ub)
         
         # Update averages.
-        u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
-        v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
+        @timeit "u update" u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
+        @timeit "v update" v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
     end
 
-    u_ .= exp.(u_)
-    v_ .= exp.(v_)
-
-    E = Diagonal(u_)
-    D = Diagonal(v_)
+    @timeit "update diag E" E[diagind(E)] .= exp.(u_)
+    @timeit "update diag D" D[diagind(D)] .= exp.(v_)
 
     return E, D
 end

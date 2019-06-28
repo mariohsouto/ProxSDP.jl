@@ -37,12 +37,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @show spectral_norm = Arpack.svds(affine_sets.A, nsv = 1)[1].S[1] 
 
         # Diagonal preconditioning
-        equilibrate = true
-        if equilibrate
-            E, D = equilibrate!(affine_sets.A, affine_sets)
-            affine_sets.A = E * A_orig * D
-            affine_sets.b = E * affine_sets.b
-            affine_sets.c = D * affine_sets.c
+        @timeit "equilibrate" begin
+            equilibrate = true
+            if equilibrate
+                @timeit "equilibrate inner" E, D = equilibrate!(affine_sets.A, affine_sets)
+                # E = Matrix{Float64}(I, affine_sets.m + affine_sets.p, affine_sets.m + affine_sets.p)
+                # D = Matrix{Float64}(I, affine_sets.n, affine_sets.n)
+                @timeit "equilibrate scaling" begin
+                    affine_sets.A = E * A_orig * D
+                    affine_sets.b = E * affine_sets.b
+                    affine_sets.c = D * affine_sets.c
+                end
+            end
         end
         
         # Scale the off-diagonal entries associated with p.s.d. matrices by √2
@@ -73,9 +79,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             affine_sets.b /= sqrt(spectral_norm)
             affine_sets.h /= sqrt(spectral_norm)
             affine_sets.c /= sqrt(spectral_norm)
-            p.primal_step = 99.
+            p.primal_step = 1.
         else
-            p.primal_step = 99. / spectral_norm
+            p.primal_step = 1. / spectral_norm
         end
 
         # Build struct for storing matrices
