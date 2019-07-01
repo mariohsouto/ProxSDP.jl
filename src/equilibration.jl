@@ -10,11 +10,17 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
     u, v           = zeros(aff.m + aff.p), zeros(aff.n)
     u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
     u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
-    row_norms  = zeros(aff.n)
-    col_norms = zeros(aff.m + aff.p)
+    row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
 
     E = Diagonal(u)
     D = Diagonal(v)
+
+    (I, J, V) = findnz(M)
+    cols4row, rows4col = Dict(i => [] for i in 1:aff.m + aff.p), Dict(j => [] for j in 1:aff.n)
+    for idx in 1:length(V)
+        append!(cols4row[I[idx]], J[idx])
+        append!(rows4col[J[idx]], I[idx])
+    end
 
     M_ = copy(M)
 
@@ -26,12 +32,28 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
         step_size = 2. / (γ * (iter + 1.))
 
         # u gradient step
-        @timeit "row norms" row_norms = [sum(M_[i, :].^2) for i in 1:aff.m + aff.p]
+        @timeit "row norms" begin
+            for (i, cols) in cols4row
+                row_norm2 = 0.
+                for j in cols
+                    row_norm2 += M_[i, j]^2
+                end
+                row_norms[i] = row_norm2
+            end
+        end
         @timeit "u grad " u_grad .= row_norms .- α ^ 2 .+ γ * u
         @timeit "u proj " u = box_project(u - step_size * u_grad, lb, ub)
 
         # v grad estimate
-        @timeit "col norms" col_norms = [sum(M_[:, j].^2) for j in 1:aff.n]
+        @timeit "col norms" begin
+            for (j, rows) in rows4col
+                col_norm2 = 0.
+                for i in rows
+                    col_norm2 += M_[i, j]^2
+                end
+                col_norms[j] = col_norm2
+            end
+        end
         @timeit "v grad " v_grad .= col_norms .- β ^ 2 .+ γ * v
         @timeit "v proj 1" v .= sum(v - step_size * v_grad) / aff.n
         @timeit "v proj 2" v = box_project(v, 0., ub)

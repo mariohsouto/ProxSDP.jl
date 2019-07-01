@@ -190,10 +190,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
     end
 
-    @show prim_obj = dot(c_orig, pair.x)
-    @show dual_obj = - dot(rhs_orig, pair.y)
-
-    # Remove scaling
+    # Remove diag scaling
     cont = 1
     @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
         if i != j
@@ -208,16 +205,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         Mt *= spectral_norm
     end
 
-    @show prim_obj = dot(c_orig, pair.x)
-    @show dual_obj = - dot(rhs_orig, pair.y)
-
+    # Remove equilibrating
     if equilibrate
         pair.x = D * pair.x
         pair.y = E * pair.y
     end
-
-    @show prim_obj = dot(c_orig, pair.x)
-    @show dual_obj = - dot(rhs_orig, pair.y)
 
     # Compute results
     time_ = time() - p.time0
