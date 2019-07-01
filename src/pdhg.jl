@@ -34,8 +34,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
         rhs_orig = vcat(b_orig, h_orig)
 
-        @show spectral_norm = Arpack.svds(affine_sets.A, nsv = 1)[1].S[1] 
-
         # Diagonal preconditioning
         @timeit "equilibrate" begin
             equilibrate = true
@@ -66,7 +64,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Stepsize parameters and linesearch parameters
         if minimum(size(M)) >= 2
-            @show spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
+            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
             spectral_norm = maximum(LinearAlgebra.svd(M).S)
         end

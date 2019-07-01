@@ -6,16 +6,15 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
     α = (aff.n / (aff.m + aff.p)) ^ .25
     β = ((aff.m + aff.p) / aff.n ) ^ .25
     α2, β2 = α^2, β^2
-
     γ = .1
 
     u, v           = zeros(aff.m + aff.p), zeros(aff.n)
     u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
     u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
     row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
-
     E = Diagonal(u)
     D = Diagonal(v)
+    M_ = copy(M)
 
     (I, J, V) = findnz(M)
     cols4row, rows4col = Dict(i => [] for i in 1:aff.m + aff.p), Dict(j => [] for j in 1:aff.n)
@@ -23,8 +22,6 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
         append!(cols4row[I[idx]], J[idx])
         append!(rows4col[J[idx]], I[idx])
     end
-
-    M_ = copy(M)
 
     for iter in 1:max_iters
         @timeit "update diag E" E[diagind(E)] .= exp.(u)
