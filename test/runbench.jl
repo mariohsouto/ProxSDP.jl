@@ -51,8 +51,8 @@ end
 println2(FILE, class::String, ref::String, sol::Nothing) = nothing
 
 RANDSDP_TEST_SET = 1:1
-SENSORLOC_TEST_SET = 100:100:1000
-MIMO_TEST_SET = [100, 1000, 2000]
+SENSORLOC_TEST_SET = 50:50:200
+MIMO_TEST_SET = [50, 100, 150, 200]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
     "gpp124-1.dat-s",
@@ -67,7 +67,7 @@ GPP_TEST_SET = [
     "gpp500-2.dat-s",
     "gpp500-3.dat-s",
     "gpp500-4.dat-s",
-    # "equalG11.dat-s",
+    "equalG11.dat-s",
     # "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
@@ -84,7 +84,7 @@ MAXCUT_TEST_SET = [
     "mcp500-2.dat-s",
     "mcp500-3.dat-s",
     "mcp500-4.dat-s",
-    # "maxG11.dat-s"  ,
+    "maxG11.dat-s"  ,
     # "maxG51.dat-s"  ,
     # "maxG32.dat-s"  ,
     # "maxG55.dat-s"  ,

@@ -38,12 +38,17 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @timeit "equilibrate" begin
             equilibrate = true
             if equilibrate
-                @timeit "equilibrate inner" E, D = equilibrate!(affine_sets.A, affine_sets)
-                # E = Matrix{Float64}(I, affine_sets.m + affine_sets.p, affine_sets.m + affine_sets.p)
-                # D = Matrix{Float64}(I, affine_sets.n, affine_sets.n)
+                M = vcat(affine_sets.A, affine_sets.G)
+                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets)
+                # E = Diagonal(ones(affine_sets.m + affine_sets.p))
+                # D = Diagonal(ones(affine_sets.n))
                 @timeit "equilibrate scaling" begin
-                    affine_sets.A = E * A_orig * D
-                    affine_sets.b = E * affine_sets.b
+                    M = E * M * D
+                    affine_sets.A = M[1:affine_sets.p, :]
+                    affine_sets.G = M[affine_sets.p + 1:end, :]
+                    rhs = E * rhs_orig
+                    affine_sets.b = rhs[1:affine_sets.p]
+                    affine_sets.h = rhs[affine_sets.p + 1:end]
                     affine_sets.c = D * affine_sets.c
                 end
             end

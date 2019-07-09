@@ -32,6 +32,7 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
         end
 
         step_size = 2. / (γ * (iter + 1.))
+        # step_size = 2. / (γ + 1)
 
         # u gradient step
         @timeit "row norms" begin
@@ -69,7 +70,7 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
             v_grad .= col_norms
             v_grad .-= β2
             # Equilibration column error (D)
-            col_error = norm(u_grad, Inf)
+            col_error = norm(v_grad, Inf)
             v_grad += γ * v
         end
         @timeit "v proj" begin
@@ -79,10 +80,12 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
         end
         
         # Update averages.
-        @timeit "u update" u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
-        @timeit "v update" v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
-
-        # @show max(row_error, col_error)
+        @timeit "u update" begin
+            u_ .= 2 * u / (iter + 2) + iter * u_ / (iter + 2)
+        end
+        @timeit "v update" begin
+            v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
+        end
     end
 
     @timeit "update diag E" E[diagind(E)] .= exp.(u_)
