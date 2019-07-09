@@ -32,6 +32,29 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
+        rhs_orig = vcat(b_orig, h_orig)
+
+        # Diagonal preconditioning
+        @timeit "equilibrate" begin
+            equilibrate = true
+            if equilibrate
+                M = vcat(affine_sets.A, affine_sets.G)
+                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets)
+                # E = Diagonal(ones(affine_sets.m + affine_sets.p))
+                # D = Diagonal(ones(affine_sets.n))
+                @timeit "equilibrate scaling" begin
+                    M = E * M * D
+                    affine_sets.A = M[1:affine_sets.p, :]
+                    affine_sets.G = M[affine_sets.p + 1:end, :]
+                    rhs = E * rhs_orig
+                    affine_sets.b = rhs[1:affine_sets.p]
+                    affine_sets.h = rhs[affine_sets.p + 1:end]
+                    affine_sets.c = D * affine_sets.c
+                end
+            end
+        end
+        
+        # Scale the off-diagonal entries associated with p.s.d. matrices by √2
         norm_scaling(affine_sets, conic_sets)
 
         # Initialization
@@ -48,7 +71,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         if minimum(size(M)) >= 2
             spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
-            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S)
+            spectral_norm = maximum(LinearAlgebra.svd(M).S)
         end
 
         # Normalize the linear system by the spectral norm of M
@@ -170,7 +193,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
     end
 
-    # Remove scaling
+    # Remove diag scaling
     cont = 1
     @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
         if i != j
@@ -183,6 +206,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         pair.y ./= sqrt(spectral_norm)
         M *= spectral_norm
         Mt *= spectral_norm
+    end
+
+    # Remove equilibrating
+    if equilibrate
+        pair.x = D * pair.x
+        pair.y = E * pair.y
     end
 
     # Compute results
@@ -228,6 +257,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         @timeit "linesearch 1" begin
             a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1. + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
         end
+
         @timeit "linesearch 2" begin
             copyto!(a.y_temp, a.y_half)
             box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)

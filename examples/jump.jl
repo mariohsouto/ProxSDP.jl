@@ -1,4 +1,5 @@
-
+path = joinpath(dirname(@__FILE__), "..", "..")
+push!(Base.LOAD_PATH, path)
 using ProxSDP, JuMP
 
 # Create a JuMP model using ProxSDP as the solver

@@ -14,6 +14,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
 
     # Primal-dual gap
     residuals.prim_obj = dot(aff.c, pair.x)
+    
     residuals.dual_obj = 0.
     if aff.p > 0
         residuals.dual_obj -= dot(aff.b, pair.y[1:aff.p])

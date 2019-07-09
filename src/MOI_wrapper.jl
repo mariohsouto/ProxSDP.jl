@@ -1,3 +1,4 @@
+
 const MOI = MathOptInterface
 const CI = MOI.ConstraintIndex
 const VI = MOI.VariableIndex
@@ -563,6 +564,8 @@ function MOI.optimize!(optimizer::Optimizer)
     end
 
     sol = @timeit "Main" chambolle_pock(aff, con, options)
+
+    # sol = @enter chambolle_pock(aff, con, options)
 
     #= 
         Unload solution
