@@ -16,24 +16,15 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
     D = Diagonal(v)
     M_ = copy(M)
 
-    # (I, J, V) = findnz(M)
-    # cols4row, rows4col = Dict(i => [] for i in 1:aff.m + aff.p), Dict(j => [] for j in 1:aff.n)
-    # for idx in 1:length(V)
-    #     append!(cols4row[I[idx]], J[idx])
-    #     append!(rows4col[J[idx]], I[idx])
-    # end
-
     rows_M_ = rowvals(M_)
 
     for iter in 1:max_iters
-        # @timeit "update diag E" E[diagind(E)] .= exp.(u)
-        # @timeit "update diag D" D[diagind(D)] .= exp.(v)
         @timeit "update diags" begin
             for i in eachindex(u)
-                E[i,i] = exp(u[i])
+                E[i, i] = exp(u[i])
             end
             for j in eachindex(v)
-                D[j,j] = exp(v[j])
+                D[j, j] = exp(v[j])
             end
         end
         @timeit "M_" begin 
@@ -42,18 +33,10 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
         end
 
         step_size = 2. / (γ * (iter + 1.))
-        # step_size = 2. / (γ + 1)
 
         # u gradient step
         @timeit "row norms" begin
             fill!(row_norms, 0.0)
-            # for (i, cols) in cols4row
-            #     row_norm2 = 0.
-            #     for j in cols
-            #         row_norm2 += M_[i, j]^2
-            #     end
-            #     row_norms[i] = row_norm2
-            # end
             for col in 1:aff.n
                 for line in nzrange(M_, col)
                     row_norms[rows_M_[line]] += abs2(M_[rows_M_[line], col])
@@ -61,12 +44,6 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
             end
         end
         @timeit "u grad" begin
-            # u_grad .= row_norms
-            # u_grad .-= α2
-            # # Equilibration row error (E)
-            # # row_error = norm(u_grad, Inf)
-            # u_grad .+= γ .* u
-
             @. u_grad = row_norms - α2 + γ * u
         end
         @timeit "u proj " begin
@@ -77,13 +54,6 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
         # v grad estimate
         @timeit "col norms" begin
             fill!(col_norms, 0.0)
-            # for (j, rows) in rows4col
-            #     col_norm2 = 0.
-            #     for i in rows
-            #         col_norm2 += M_[i, j]^2
-            #     end
-            #     col_norms[j] = col_norm2
-            # end
             for col in 1:aff.n
                 for line in nzrange(M_, col)
                     col_norms[col] += abs2(M_[rows_M_[line], col])
@@ -91,12 +61,6 @@ function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
             end
         end
         @timeit "v grad" begin
-            # v_grad .= col_norms
-            # v_grad .-= β2
-            # # Equilibration column error (D)
-            # # col_error = norm(v_grad, Inf)
-            # v_grad .+= γ .* v
-
             @. v_grad = col_norms - β2 + γ * v
         end
         @timeit "v proj" begin
