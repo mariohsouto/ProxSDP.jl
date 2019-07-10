@@ -7,8 +7,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.window = opt.convergence_window       
     p.beta = opt.initial_beta
     p.time0 = time()
-    p.norm_rhs = norm(vcat(affine_sets.b, affine_sets.h), Inf)
-    p.norm_c = norm(affine_sets.c, Inf)
+    p.norm_b = norm(affine_sets.b, 2)
+    p.norm_h = norm(affine_sets.h, 2)
+    p.norm_c = norm(affine_sets.c, 2)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
     p.target_rank = 2 * ones(length(conic_sets.sdpcone))
     p.current_rank = 2 * ones(length(conic_sets.sdpcone))
@@ -31,16 +32,36 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
-        rhs_orig = vcat(affine_sets.b, affine_sets.h)
+        rhs_orig = vcat(b_orig, h_orig)
+
+        # Diagonal preconditioning
+        @timeit "equilibrate" begin
+            equilibrate = true
+            if equilibrate
+                M = vcat(affine_sets.A, affine_sets.G)
+                # @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets)
+                E = Diagonal(ones(affine_sets.m + affine_sets.p))
+                D = Diagonal(ones(affine_sets.n))
+                @timeit "equilibrate scaling" begin
+                    M = E * M * D
+                    affine_sets.A = M[1:affine_sets.p, :]
+                    affine_sets.G = M[affine_sets.p + 1:end, :]
+                    rhs = E * rhs_orig
+                    affine_sets.b = rhs[1:affine_sets.p]
+                    affine_sets.h = rhs[affine_sets.p + 1:end]
+                    affine_sets.c = D * affine_sets.c
+                end
+            end
+        end
+        
+        # Scale the off-diagonal entries associated with p.s.d. matrices by √2
         norm_scaling(affine_sets, conic_sets)
 
         # Initialization
         pair = PrimalDual(affine_sets)
         a = AuxiliaryData(affine_sets, conic_sets)
         map_socs!(pair.x, conic_sets, a)
-        primal_residual = CircularVector{Float64}(2*p.window)
-        dual_residual = CircularVector{Float64}(2*p.window)
-        comb_residual = CircularVector{Float64}(2*p.window)
+        residuals = Residuals(p.window)
 
         # Diagonal scaling
         M = vcat(affine_sets.A, affine_sets.G)
@@ -50,7 +71,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         if minimum(size(M)) >= 2
             spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
-            spectral_norm = maximum(LinearAlgebra.svd(Matrix(M)).S)
+            spectral_norm = maximum(LinearAlgebra.svd(M).S)
         end
 
         # Normalize the linear system by the spectral norm of M
@@ -84,25 +105,28 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @timeit "primal" primal_step!(pair, a, conic_sets, mat, opt, p)
 
         # Linesearch (dual step)
-        linesearch!(pair, a, affine_sets, mat, opt, p)
+        @timeit "linesearch" linesearch!(pair, a, affine_sets, mat, opt, p)
 
         # Compute residuals and update old iterates
-        @timeit "residual" compute_residual!(pair, a, primal_residual, dual_residual, comb_residual, mat, p, affine_sets)
+        @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets)
+
+        # Compute optimality gap and feasibility error
+        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p)
 
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
-            print_progress(primal_residual[k], dual_residual[k], p)
+            print_progress(residuals, p)
         end
       
-        # Check convergence to a fixed-point
+        # Check convergence
         p.rank_update += 1
-        if primal_residual[k] < opt.tol_primal && dual_residual[k] < opt.tol_dual && k > opt.convergence_check
+        if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
                 p.stop_reason = 1 # Optimal
-                best_prim_residual, best_dual_residual = primal_residual[k], dual_residual[k]
                 if opt.log_verbose
-                    print_progress(primal_residual[k], dual_residual[k], p)
+                    print_progress(residuals, p)
                 end
+
                 break
 
             elseif p.rank_update > p.window
@@ -120,7 +144,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
 
         # Check divergence
-        elseif k > p.window && comb_residual[k - p.window] < comb_residual[k] && p.rank_update > p.window
+        elseif k > p.window && residuals.comb_residual[k - p.window] < residuals.comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 50
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
@@ -134,7 +158,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         
         # Adaptive stepsizes
-        elseif primal_residual[k] > opt.tol_primal && dual_residual[k] < opt.tol_dual && k > p.window
+        elseif residuals.primal_residual[k] > opt.tol_primal && residuals.dual_residual[k] < opt.tol_dual && k > p.window
             p.beta *= (1. - p.adapt_level)
             if p.beta <= opt.min_beta
                 p.beta = opt.min_beta
@@ -142,7 +166,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.adapt_level *= opt.adapt_decay
             end
             
-        elseif primal_residual[k] < opt.tol_primal && dual_residual[k] > opt.tol_dual && k > p.window
+        elseif residuals.primal_residual[k] < opt.tol_primal && residuals.dual_residual[k] > opt.tol_dual && k > p.window
             p.beta /= (1. - p.adapt_level)
             if p.beta >= opt.max_beta
                 p.beta = opt.max_beta
@@ -151,20 +175,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         end
 
-        # Adaptive reduce rank [warning: heuristic]
-        if opt.reduce_rank
-            if p.rank_update > p.window && comb_residual[k - p.window] >= comb_residual[k]
-                for (idx, sdp) in enumerate(conic_sets.sdpcone)
-                    p.target_rank[idx] = min(p.target_rank[idx], sdp.sq_side, max(trunc(Int, p.target_rank[idx] / 2.), p.current_rank[idx] + 3))
-                end
-                p.rank_update = 0
-            end
-        end
-
         # time_limit stop condition
         if time() - p.time0 > opt.time_limit
             if opt.log_verbose
-                print_progress(primal_residual[k], dual_residual[k], p)
+                print_progress(residuals, p)
             end
             p.stop_reason = 2 # Time limit
             break
@@ -173,13 +187,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # max_iter stop condition
         if opt.max_iter == p.iter
             if opt.log_verbose
-                print_progress(primal_residual[k], dual_residual[k], p)
+                print_progress(residuals, p)
             end
             p.stop_reason = 3 # Iteration limit
         end
     end
 
-    # Remove scaling
+    # Remove diag scaling
     cont = 1
     @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
         if i != j
@@ -194,27 +208,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         Mt *= spectral_norm
     end
 
+    # Remove equilibrating
+    if equilibrate
+        pair.x = D * pair.x
+        pair.y = E * pair.y
+    end
+
     # Compute results
     time_ = time() - p.time0
-    prim_obj = dot(c_orig, pair.x)
-    dual_obj = - dot(rhs_orig, pair.y)
-
-    # Equality feasibility error
-    equa_error = A_orig * pair.x - b_orig
-    equa_feasibility = norm(equa_error, 2) / (1. + norm(b_orig, 2))
-    
-    # Inequality feasibility error
-    slack_ineq = G_orig * pair.x - h_orig
-    ineq_error = max.(slack_ineq, 0.)
-    ineq_feasibility = norm(ineq_error, 2) / (1. + norm(h_orig, 2))
-
-    # Duality gap
-    res_dual = prim_obj - dual_obj
-    gap = abs(prim_obj - dual_obj) / abs(prim_obj) * 100
 
     # Print result
     if opt.log_verbose
-        print_result(p.stop_reason, time_, prim_obj, dual_obj, gap, equa_feasibility, ineq_feasibility)
+        print_result(p.stop_reason, time_, residuals, maximum(p.current_rank))
     end
 
     # Post processing
@@ -227,7 +232,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         append!(ctr_primal, pair.x[sdp.vec_i])
     end
 
-    return CPResult(p.stop_reason, pair.x, pair.y, -vcat(equa_error, slack_ineq, -ctr_primal), equa_feasibility, ineq_feasibility, prim_obj, dual_obj, gap, time_)
+    return CPResult(p.stop_reason,
+                    pair.x,
+                    pair.y,
+                    -vcat(a.Mx[1:affine_sets.p], a.Mx[affine_sets.p+1:end],-ctr_primal),
+                    residuals.equa_feasibility,
+                    residuals.ineq_feasibility,
+                    residuals.prim_obj,
+                    residuals.dual_obj,
+                    residuals.dual_gap,
+                    time_,
+                    sum(p.current_rank)
+    )
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
@@ -241,6 +257,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
         @timeit "linesearch 1" begin
             a.y_half .= pair.y .+ (p.beta * p.primal_step) .* ((1. + p.theta) .* a.Mx .- p.theta .* a.Mx_old)
         end
+
         @timeit "linesearch 2" begin
             copyto!(a.y_temp, a.y_half)
             box_projection!(a.y_half, affine_sets, p.beta * p.primal_step)

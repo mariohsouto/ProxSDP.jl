@@ -1,3 +1,4 @@
+
 const MOI = MathOptInterface
 const CI = MOI.ConstraintIndex
 const VI = MOI.VariableIndex
@@ -28,9 +29,10 @@ mutable struct MOISolution
     dual_objval::Float64
     gap::Float64
     time::Float64
+    final_rank::Int
 end
 MOISolution() = MOISolution(0, # SCS_UNFINISHED
-                      Float64[], Float64[], Float64[], NaN, NaN, NaN, NaN, NaN, NaN)
+                      Float64[], Float64[], Float64[], NaN, NaN, NaN, NaN, NaN, NaN, 0)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is passed to SCS
@@ -114,6 +116,8 @@ function MOI.empty!(optimizer::Optimizer)
     optimizer.data = nothing # It should already be nothing except if an error is thrown inside copy_to
     optimizer.sol.ret_val = 0
 end
+
+MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.time
 
 MOIU.needs_allocate_load(instance::Optimizer) = true
 
@@ -561,6 +565,8 @@ function MOI.optimize!(optimizer::Optimizer)
 
     sol = @timeit "Main" chambolle_pock(aff, con, options)
 
+    # sol = @enter chambolle_pock(aff, con, options)
+
     #= 
         Unload solution
     =#
@@ -593,7 +599,8 @@ function MOI.optimize!(optimizer::Optimizer)
                                 (optimizer.maxsense ? -1 : 1) * objval+objconstant,
                                 sol.dual_objval,
                                 sol.gap,
-                                sol.time)
+                                sol.time,
+                                sol.final_rank)
 end
 
 function get_indices_cone(A, rows, n_vars, first_ind_local)

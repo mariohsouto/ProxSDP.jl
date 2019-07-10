@@ -1,23 +1,13 @@
 
-function jump_sdplib(solver, path, verbose = false)
-    tic()
+function jump_sdplib(solver, path; verbose = false, test = false)
 
     println("running: $(path)")
 
     n, m, F, c = sdplib_data(path)
 
     # Build model
-    if Base.libblas_name == "libmkl_rt"
-        model = Model()
-    else
-        model = Model(solver=solver) 
-    end
-
-    if Base.libblas_name == "libmkl_rt"
-        @variable(model, X[1:n, 1:n], PSD)
-    else
-        @variable(model, X[1:n, 1:n], SDP)
-    end
+    model = Model(with_optimizer(solver))
+    @variable(model, X[1:n, 1:n], PSD)
 
     # Objective function
     @objective(model, Min, sum(F[0][idx...] * X[idx...] for idx in zip(findnz(F[0])[1:end-1]...)))
@@ -26,22 +16,20 @@ function jump_sdplib(solver, path, verbose = false)
     for k = 1:m
         @constraint(model, sum(F[k][idx...] * X[idx...] for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
     end
-
-    if Base.libblas_name == "libmkl_rt"
-        JuMP.attach(model, solver)
-    end
     
-    @time teste = JuMP.solve(model)
+    teste = @time optimize!(model)
 
-    if Base.libblas_name == "libmkl_rt"
-        XX = getvalue2.(X)
-    else
-        XX = getvalue.(X)
-    end
+    XX = value.(X)
 
     verbose && sdplib_eval(F,c,n,m,XX)
 
-    return nothing
-end
+    objval = objective_value(model)
+    stime = MOI.get(model, MOI.SolveTime())
 
-getvalue2(var::JuMP.Variable) = (m=var.m;m.solverinstance.primal[m.solverinstance.varmap[m.variabletosolvervariable[var.instanceindex]]])
+
+    # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
+    # @show fieldnames(tp)
+    @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    return (objval, stime, rank)
+    # return (objval, stime)
+end
