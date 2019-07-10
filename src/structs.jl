@@ -52,7 +52,7 @@ mutable struct Options
         # Default tolerances
         opt.tol_primal = 1e-3
         opt.tol_dual = 1e-3
-        opt.tol_psd = 1e-8
+        opt.tol_psd = 1e-14
         opt.tol_soc = 1e-8
 
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
