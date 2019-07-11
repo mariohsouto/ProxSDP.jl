@@ -13,14 +13,14 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     copyto!(a.Mx_old, a.Mx)
 
     # Primal-dual gap
-    residuals.prim_obj = dot(aff.c, pair.x)
-    
+    residuals.prim_obj = - dot(aff.c, pair.x)
+
     residuals.dual_obj = 0.
     if aff.p > 0
-        residuals.dual_obj -= dot(aff.b, @view pair.y[1:aff.p])
+        residuals.dual_obj += dot(aff.b, @view pair.y[1:aff.p])
     end
     if aff.m > 0
-        residuals.dual_obj -= dot(aff.h, @view pair.y[aff.p+1:end])
+        residuals.dual_obj += dot(aff.h, @view pair.y[aff.p+1:end])
     end
     residuals.dual_gap = abs(residuals.prim_obj - residuals.dual_obj) / (1. + abs(residuals.prim_obj) + abs(residuals.dual_obj))
 
@@ -28,7 +28,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
 end
 
 function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, p::Params, aff::AffineSets)
-    
+
     # Primal residual
     # Px_old
     a.Mty_old .= pair.x_old .- p.primal_step .* a.Mty_old
@@ -62,7 +62,6 @@ end
 function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
         if soc_gap(a.soc_v[idx], a.soc_s[idx]) >= opt.tol_soc
-            
             return false
         end
     end

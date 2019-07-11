@@ -39,6 +39,10 @@ mutable struct Options
     min_size_krylov_eigs::Int
     reduce_rank::Bool
     rank_slack::Int
+    equilibration::Bool
+    equilibration_iters::Int
+    equilibration_lb::Float64
+    equilibration_ub::Float64
 
     function Options()
         opt = new()
@@ -83,6 +87,12 @@ mutable struct Options
         # Reduce rank [warning: heuristics]
         opt.reduce_rank = false
         opt.rank_slack = 3
+
+        # equilibration parameters
+        opt.equilibration = true
+        opt.equilibration_iters = 100
+        opt.equilibration_lb = -10.0
+        opt.equilibration_ub = +10.0
 
         return opt
     end
