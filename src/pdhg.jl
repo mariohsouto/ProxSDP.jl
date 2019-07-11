@@ -29,17 +29,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     @timeit "Init" begin
 
         # Scale objective function
+        @timeit "normscale alloc" begin
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
         rhs_orig = vcat(b_orig, h_orig)
+        end
 
         # Diagonal preconditioning
         @timeit "equilibrate" begin
-            equilibrate = true
-            if equilibrate
+            if opt.equilibration
                 M = vcat(affine_sets.A, affine_sets.G)
-                # @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets)
+                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
                 E = Diagonal(ones(affine_sets.m + affine_sets.p))
                 D = Diagonal(ones(affine_sets.n))
                 @timeit "equilibrate scaling" begin
@@ -55,7 +56,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         
         # Scale the off-diagonal entries associated with p.s.d. matrices by √2
-        norm_scaling(affine_sets, conic_sets)
+        @timeit "normscale" norm_scaling(affine_sets, conic_sets)
 
         # Initialization
         pair = PrimalDual(affine_sets)
@@ -68,7 +69,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         Mt = M'
 
         # Stepsize parameters and linesearch parameters
-        if minimum(size(M)) >= 2
+        @timeit "svd" if minimum(size(M)) >= 2
             spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
             spectral_norm = maximum(LinearAlgebra.svd(M).S)
@@ -209,7 +210,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     # Remove equilibrating
-    if equilibrate
+    if opt.equilibration
         pair.x = D * pair.x
         pair.y = E * pair.y
     end

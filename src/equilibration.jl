@@ -1,31 +1,31 @@
 
 using LinearAlgebra
 
-function equilibrate!(M, aff, max_iters=100, lb=-10., ub=10.)
+function equilibrate!(M, aff, opt)
+    max_iters=opt.equilibration_iters
+    lb = opt.equilibration_lb
+    ub = opt.equilibration_ub
+    @timeit "eq init" begin
+        α = (aff.n / (aff.m + aff.p)) ^ .25
+        β = ((aff.m + aff.p) / aff.n ) ^ .25
+        α2, β2 = α^2, β^2
+        γ = .1
 
-    α = (aff.n / (aff.m + aff.p)) ^ .25
-    β = ((aff.m + aff.p) / aff.n ) ^ .25
-    α2, β2 = α^2, β^2
-    γ = .1
+        u, v           = zeros(aff.m + aff.p), zeros(aff.n)
+        u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
+        u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
+        row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
+        E = Diagonal(u)
+        D = Diagonal(v)
+        M_ = copy(M)
 
-    u, v           = zeros(aff.m + aff.p), zeros(aff.n)
-    u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
-    u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
-    row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
-    E = Diagonal(u)
-    D = Diagonal(v)
-    M_ = copy(M)
-
-    rows_M_ = rowvals(M_)
+        rows_M_ = rowvals(M_)
+    end
 
     for iter in 1:max_iters
         @timeit "update diags" begin
-            for i in eachindex(u)
-                E[i, i] = exp(u[i])
-            end
-            for j in eachindex(v)
-                D[j, j] = exp(v[j])
-            end
+            E.diag .= exp.(u)
+            D.diag .= exp.(v)
         end
         @timeit "M_" begin 
             mul!(M_, M, D)

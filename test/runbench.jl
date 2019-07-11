@@ -18,8 +18,8 @@ use_MOI = false
 sets_to_test = Symbol[]
 # push!(sets_to_test, :RANDSDP)
 # push!(sets_to_test, :SENSORLOC)
-push!(sets_to_test, :SDPLIB)
-# push!(sets_to_test, :MIMO)
+# push!(sets_to_test, :SDPLIB)
+push!(sets_to_test, :MIMO)
 
 
 @static if use_MOI
@@ -88,21 +88,21 @@ SENSORLOC_TEST_SET = [#100:100:300#1000
 ]
 MIMO_TEST_SET = [
     100,
-    500, # mosek stops here
+    # 500, # mosek stops here
     1000, # 700s on scs
-    1500, # SCS stops here (?)
-    2000,
-    2500,
-    3000,
-    3500,
-    4000,
-    4500,
-    5000,
-    6000,
-    7000,
-    8000,
-    9000,
-    10_000,
+    # 1500, # SCS stops here (?)
+    # 2000,
+    # 2500,
+    # 3000,
+    # 3500,
+    # 4000,
+    # 4500,
+    # 5000,
+    # 6000,
+    # 7000,
+    # 8000,
+    # 9000,
+    # 10_000,
     ]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
