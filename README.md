@@ -33,5 +33,6 @@ The first version of the paper can be found [here](https://arxiv.org/abs/1810.05
 
 ### ROAD MAP
 
-- Add support for exponential and power cones;
-- Add infeasibility certificate.
+- Support for exponential and power cones;
+- Infeasibility certificate;
+- Warm start.
