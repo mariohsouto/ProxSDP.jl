@@ -70,7 +70,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @timeit "svd" if minimum(size(M)) >= 2
             spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
         else
-            spectral_norm = maximum(LinearAlgebra.svd(M).S)
+            F = LinearAlgebra.svd!(Matrix(M))
+            spectral_norm = maximum(F.S)
         end
 
         # Normalize the linear system by the spectral norm of M

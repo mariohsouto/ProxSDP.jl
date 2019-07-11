@@ -1,5 +1,5 @@
 path = joinpath(dirname(@__FILE__), "..", "..")
-# push!(Base.LOAD_PATH, path)
+push!(Base.LOAD_PATH, path)
 datapath = joinpath(dirname(@__FILE__), "data")
 
 is_julia1 = VERSION >= v"1.0"
