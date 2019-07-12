@@ -214,12 +214,20 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         pair.y = E * pair.y
     end
 
+    # Equality feasibility error
+    equa_error = A_orig * pair.x - b_orig
+    # Inequality feasibility error
+    slack_ineq = G_orig * pair.x - h_orig
+
     # Compute results
     time_ = time() - p.time0
 
     # Print result
     if opt.log_verbose
-        print_result(p.stop_reason, time_, residuals, maximum(p.current_rank))
+        print_result(p.stop_reason,
+                     time_,
+                     residuals,
+                     length(p.current_rank) > 0 ? maximum(p.current_rank) : 0)
     end
 
     # Post processing
@@ -235,7 +243,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     return CPResult(p.stop_reason,
                     pair.x,
                     pair.y,
-                    -vcat(a.Mx[1:affine_sets.p], a.Mx[affine_sets.p+1:end],-ctr_primal),
+                    -vcat(equa_error, slack_ineq, -ctr_primal),
                     residuals.equa_feasibility,
                     residuals.ineq_feasibility,
                     residuals.prim_obj,
