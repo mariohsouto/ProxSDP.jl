@@ -18,9 +18,35 @@
 * Semidefinite relaxations of nonconvex problems, e.g. [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf), [binary MIMO](https://arxiv.org/pdf/cs/0606083.pdf), [optimal power flow](http://authorstest.library.caltech.edu/141/1/TPS_OPF_2_tech.pdf), [sensor localization](https://web.stanford.edu/~boyd/papers/pdf/sensor_selection.pdf);
 * Nuclear norm minimization problems, e.g. [matrix completion](https://statweb.stanford.edu/~candes/papers/MatrixCompletion.pdf);
 
+## Installation
+
+You can install `ProxSDP.jl` through the [Julia package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/index.html):
+```julia
+] add ProxSDP
+```
+
+## Using ProxSDP with JuMP
+
+```julia
+# Load packages
+using ProxSDP, JuMP
+
+# Build Max-Cut SDP relaxation via JuMP
+model = Model(with_optimizer(ProxSDP.Optimizer))
+@variable(model, X[1:num_vertex, 1:num_vertex], PSD)
+@objective(model, Max, 0.25 * dot(W, X))
+@constraint(model, diag(X) .== 1)
+
+# Solve optimization problem with ProxSDP
+JuMP.optimize!(model)
+
+# Retrieve solution
+Xsol = JuMP.value.(X)
+```
+
 ### Referencing
 
-The first version of the paper can be found [here](https://arxiv.org/abs/1810.05231).
+The preprint version of the paper can be found [here](https://arxiv.org/abs/1810.05231).
 
 ```
 @article{souto2018exploiting,
