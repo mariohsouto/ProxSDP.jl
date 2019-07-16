@@ -20,7 +20,7 @@
 
 ## Installation
 
-You can install `ProxSDP` through the [Julia package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/index.html):
+You can install **ProxSDP** through the [Julia package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/index.html):
 ```julia
 ] add ProxSDP
 ```
