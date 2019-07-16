@@ -11,7 +11,7 @@
 [docs-img]: https://img.shields.io/badge/docs-latest-blue.svg
 [docs-url]: https://mariohsouto.github.io/ProxSDP.jl/latest/
 
-**ProxSDP** is an open source semidefinite programming ([SDP](https://en.wikipedia.org/wiki/Semidefinite_programming)) solver based on the paper ["Exploiting Low-Rank Structure in Semidefinite Programming by Approximate Operator Splitting"](https://arxiv.org/abs/1810.05231). The main advantage of ProxSDP over other state-of-the-art solvers is the ability of exploit the **low-rank** structure inherent to several SDP problems.
+**ProxSDP** is an open-source semidefinite programming ([SDP](https://en.wikipedia.org/wiki/Semidefinite_programming)) solver based on the paper ["Exploiting Low-Rank Structure in Semidefinite Programming by Approximate Operator Splitting"](https://arxiv.org/abs/1810.05231). The main advantage of ProxSDP over other state-of-the-art solvers is the ability to exploit the **low-rank** structure inherent to several SDP problems.
 
 ### Overview of problems ProxSDP can solve
 
@@ -20,12 +20,20 @@
 
 ## Installation
 
-You can install `ProxSDP.jl` through the [Julia package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/index.html):
+You can install `ProxSDP` through the [Julia package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/index.html):
 ```julia
 ] add ProxSDP
 ```
 
 ## Using ProxSDP with JuMP
+
+For example, the semidefinite programming relaxation of the [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf) problem
+```
+    max   0.25 * W•X
+    s.t.  diag(X) == 1,
+          X ≽ 0,
+```
+can be solved by the following code using `ProxSDP` and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
 
 ```julia
 # Load packages
