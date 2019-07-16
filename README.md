@@ -52,7 +52,7 @@ JuMP.optimize!(model)
 Xsol = JuMP.value.(X)
 ```
 
-### Referencing
+## Citing this package
 
 The preprint version of the paper can be found [here](https://arxiv.org/abs/1810.05231).
 
@@ -65,7 +65,7 @@ The preprint version of the paper can be found [here](https://arxiv.org/abs/1810
 }
 ```
 
-### ROAD MAP
+## ROAD MAP
 
 - Support for exponential and power cones;
 - Infeasibility certificate;
