@@ -33,7 +33,7 @@ For example, the semidefinite programming relaxation of the [max-cut](http://www
     s.t.  diag(X) == 1,
           X ≽ 0,
 ```
-can be solved by the following code using `ProxSDP` and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
+can be solved by the following code using **ProxSDP** and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
 
 ```julia
 # Load packages
