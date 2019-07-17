@@ -706,9 +706,10 @@ ivec(X) = Matrix(Symmetric(ivech(X),:U))
 # 1 - MOI.OPTIMAL
 # 2 - MOI.TIME_LIMIT
 # 3 - MOI.ITERATION_LIMIT
+# 4 - MOI.INFEASIBLE_OR_UNBOUNDED
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
-    @assert 0 <= s <= 3
+    @assert 0 <= s <= 4
     if s == 0
         return MOI.OPTIMIZE_NOT_CALLED
     elseif s == 1
@@ -717,6 +718,8 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
         return MOI.TIME_LIMIT
     elseif s == 3
         return MOI.ITERATION_LIMIT
+    elseif s == 4
+        return MOI.INFEASIBLE_OR_UNBOUNDED
     end
 end
 
