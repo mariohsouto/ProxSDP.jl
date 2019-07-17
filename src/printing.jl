@@ -144,6 +144,8 @@ function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, ma
         println("       ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, time_limit reached")
     elseif stop_reason == 3
         println("       ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
+    elseif stop_reason == 4
+        println("       Problem is infeasible or unbounded")
     end
     println("       Primal objective = $(round(residuals.prim_obj; digits = 5))")
     println("       Dual objective = $(round(residuals.dual_obj; digits = 5))")
