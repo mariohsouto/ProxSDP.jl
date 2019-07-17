@@ -15,6 +15,7 @@
 
 ### Overview of problems ProxSDP can solve
 
+* General conic convex optimization problems with the presence of the [positive semidefinite cone](https://web.stanford.edu/~boyd/papers/pdf/semidef_prog.pdf), [second-order cone](https://web.stanford.edu/~boyd/papers/pdf/socp.pdf) and [positive orthant](https://www.math.ucla.edu/~tom/LP.pdf);
 * Semidefinite relaxation of nonconvex problems, e.g. [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf), [binary MIMO](https://arxiv.org/pdf/cs/0606083.pdf), [optimal power flow](http://authorstest.library.caltech.edu/141/1/TPS_OPF_2_tech.pdf), [sensor localization](https://web.stanford.edu/~boyd/papers/pdf/sensor_selection.pdf), [sum-of-squares](https://en.wikipedia.org/wiki/Sum-of-squares_optimization);
 * Control theory problems with [LMI](https://en.wikipedia.org/wiki/Linear_matrix_inequality) constraints;
 * Nuclear norm minimization problems, e.g. [matrix completion](https://statweb.stanford.edu/~candes/papers/MatrixCompletion.pdf);
