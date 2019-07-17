@@ -15,7 +15,8 @@
 
 ### Overview of problems ProxSDP can solve
 
-* Semidefinite relaxations of nonconvex problems, e.g. [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf), [binary MIMO](https://arxiv.org/pdf/cs/0606083.pdf), [optimal power flow](http://authorstest.library.caltech.edu/141/1/TPS_OPF_2_tech.pdf), [sensor localization](https://web.stanford.edu/~boyd/papers/pdf/sensor_selection.pdf);
+* Semidefinite relaxation of nonconvex problems, e.g. [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf), [binary MIMO](https://arxiv.org/pdf/cs/0606083.pdf), [optimal power flow](http://authorstest.library.caltech.edu/141/1/TPS_OPF_2_tech.pdf), [sensor localization](https://web.stanford.edu/~boyd/papers/pdf/sensor_selection.pdf), [sum-of-squares](https://en.wikipedia.org/wiki/Sum-of-squares_optimization);
+* Control theory problems with [LMI](https://en.wikipedia.org/wiki/Linear_matrix_inequality) constraints;
 * Nuclear norm minimization problems, e.g. [matrix completion](https://statweb.stanford.edu/~candes/papers/MatrixCompletion.pdf);
 
 ## Installation
@@ -34,7 +35,6 @@ For example, the semidefinite programming relaxation of the [max-cut](http://www
           X ≽ 0,
 ```
 can be solved by the following code using **ProxSDP** and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
-
 ```julia
 # Load packages
 using ProxSDP, JuMP
