@@ -743,7 +743,13 @@ function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
     end
 end
 
-MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
+function MOI.get(optimizer::Optimizer, ::MOI.ResultCount)
+    if MOI.get(optimizer, MOI.TerminationStatus()) == MOI.INFEASIBLE_OR_UNBOUNDED
+        return 0
+    else
+        return 1
+    end
+end
 
 #=
     Solution

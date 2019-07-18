@@ -20,8 +20,8 @@ const optimizer_unsupportedarg = MOIU.CachingOptimizer(ProxSDPModelData{Float64}
 const optimizer_maxiter = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(max_iter = 1, log_verbose = true))
 const optimizer_timelimit = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = true))
 
-const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3)
-const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
+const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
+const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
@@ -40,8 +40,7 @@ end
 @testset "MOI Continuous Linear" begin
     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
         # infeasible/unbounded
-        "linear8a", "linear8b", "linear8c",
-        "linear12",
+        # "linear8a", "linear8b", "linear8c", "linear12",
         # linear10 is poorly conditioned
         "linear10",
         # linear9 is requires precision
@@ -64,7 +63,8 @@ end
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
-        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        # "lin3", "lin4",
+         "soc3", "rotatedsoc2", "psdt2"
         ]
     )
 end
@@ -80,7 +80,8 @@ end
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
-        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        # "lin3", "lin4",
+         "soc3", "rotatedsoc2", "psdt2"
         ]
     )
 end
@@ -92,7 +93,8 @@ end
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
-        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        # "lin3", "lin4", 
+        "soc3", "rotatedsoc2", "psdt2"
         ]
     )
 end
