@@ -43,6 +43,9 @@ mutable struct Options
     equilibration_iters::Int
     equilibration_lb::Float64
     equilibration_ub::Float64
+    equilibration_limit::Float64
+    equilibration_force::Bool
+    approx_norm::Bool
 
     function Options()
         opt = new()
@@ -93,6 +96,11 @@ mutable struct Options
         opt.equilibration_iters = 100
         opt.equilibration_lb = -10.0
         opt.equilibration_ub = +10.0
+        opt.equilibration_force = false
+        opt.equilibration_limit = 0.8
+
+        # spectral norm
+        opt.approx_norm = false
 
         return opt
     end

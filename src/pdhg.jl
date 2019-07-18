@@ -38,8 +38,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Diagonal preconditioning
         @timeit "equilibrate" begin
+            M = vcat(affine_sets.A, affine_sets.G)
+            UB = maximum(M)
+            LB = minimum(M)
+            if opt.equilibration && LB/UB <= opt.equilibration_limit
+                opt.equilibration = false
+            end
+            if opt.equilibration_force
+                opt.equilibration = true
+            end
             if opt.equilibration
-                M = vcat(affine_sets.A, affine_sets.G)
                 @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
                 @timeit "equilibrate scaling" begin
                     M = E * M * D
@@ -67,11 +75,21 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         Mt = M'
 
         # Stepsize parameters and linesearch parameters
-        @timeit "svd" if minimum(size(M)) >= 2
-            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
+        spectral_norm = 0.0
+        if !opt.approx_norm
+            @timeit "svd" if minimum(size(M)) >= 2
+                try
+                    spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1]
+                catch
+                    println("WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
+                    spectral_norm = norm(M)
+                end
+            else
+                F = LinearAlgebra.svd!(Matrix(M))
+                spectral_norm = maximum(F.S)
+            end
         else
-            F = LinearAlgebra.svd!(Matrix(M))
-            spectral_norm = maximum(F.S)
+            spectral_norm = norm(M)
         end
 
         # Normalize the linear system by the spectral norm of M
