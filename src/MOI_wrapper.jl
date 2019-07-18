@@ -719,7 +719,7 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     elseif s == 3
         return MOI.ITERATION_LIMIT
     elseif s == 4
-        return MOI.INFEASIBLE
+        return MOI.INFEASIBLE_OR_UNBOUNDED
     end
 end
 
