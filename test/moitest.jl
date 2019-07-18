@@ -40,7 +40,8 @@ end
 @testset "MOI Continuous Linear" begin
     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
         # infeasible/unbounded
-        "linear8a", "linear8b", "linear8c", "linear12", 
+        "linear8a", "linear8b", "linear8c",
+        "linear12",
         # linear10 is poorly conditioned
         "linear10",
         # linear9 is requires precision

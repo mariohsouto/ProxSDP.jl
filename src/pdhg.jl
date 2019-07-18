@@ -165,7 +165,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         elseif k > p.window && residuals.comb_residual[k - p.window] < residuals.comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 50
+                full_rank_flag = true
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
+                    if p.target_rank[idx] < sdp.sq_side
+                        full_rank_flag = false
+                    end
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if p.min_eig[idx] > opt.tol_psd
                             p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
@@ -173,6 +177,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     end
                 end
                 p.rank_update, p.update_cont = 0, 0
+                if full_rank_flag == true
+                    p.stop_reason = 4 # Infeasible
+                    break
+                end
             end
         
         # Adaptive stepsizes
