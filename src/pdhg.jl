@@ -29,17 +29,26 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     @timeit "Init" begin
 
         # Scale objective function
+        @timeit "normscale alloc" begin
         c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
         A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
         G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
         rhs_orig = vcat(b_orig, h_orig)
+        end
 
         # Diagonal preconditioning
         @timeit "equilibrate" begin
-            equilibrate = true
-            if equilibrate
-                M = vcat(affine_sets.A, affine_sets.G)
-                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets)
+            M = vcat(affine_sets.A, affine_sets.G)
+            UB = maximum(M)
+            LB = minimum(M)
+            if opt.equilibration && LB/UB <= opt.equilibration_limit
+                opt.equilibration = false
+            end
+            if opt.equilibration_force
+                opt.equilibration = true
+            end
+            if opt.equilibration
+                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
                 @timeit "equilibrate scaling" begin
                     M = E * M * D
                     affine_sets.A = M[1:affine_sets.p, :]
@@ -53,7 +62,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
         
         # Scale the off-diagonal entries associated with p.s.d. matrices by √2
-        norm_scaling(affine_sets, conic_sets)
+        @timeit "normscale" norm_scaling(affine_sets, conic_sets)
 
         # Initialization
         pair = PrimalDual(affine_sets)
@@ -66,11 +75,21 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         Mt = M'
 
         # Stepsize parameters and linesearch parameters
-        if minimum(size(M)) >= 2
-            spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1] 
+        spectral_norm = 0.0
+        if !opt.approx_norm
+            @timeit "svd" if minimum(size(M)) >= 2
+                try
+                    spectral_norm = Arpack.svds(M, nsv = 1)[1].S[1]
+                catch
+                    println("WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
+                    spectral_norm = norm(M)
+                end
+            else
+                F = LinearAlgebra.svd!(Matrix(M))
+                spectral_norm = maximum(F.S)
+            end
         else
-            F = LinearAlgebra.svd!(Matrix(M))
-            spectral_norm = maximum(F.S)
+            spectral_norm = norm(M)
         end
 
         # Normalize the linear system by the spectral norm of M
@@ -146,7 +165,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         elseif k > p.window && residuals.comb_residual[k - p.window] < residuals.comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
             if p.update_cont > 50
+                full_rank_flag = true
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
+                    if p.target_rank[idx] < sdp.sq_side
+                        full_rank_flag = false
+                    end
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if p.min_eig[idx] > opt.tol_psd
                             p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
@@ -154,6 +177,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     end
                 end
                 p.rank_update, p.update_cont = 0, 0
+                if full_rank_flag == true
+                    p.stop_reason = 4 # Infeasible
+                    break
+                end
             end
         
         # Adaptive stepsizes
@@ -208,17 +235,25 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     # Remove equilibrating
-    if equilibrate
+    if opt.equilibration
         pair.x = D * pair.x
         pair.y = E * pair.y
     end
+
+    # Equality feasibility error
+    equa_error = A_orig * pair.x - b_orig
+    # Inequality feasibility error
+    slack_ineq = G_orig * pair.x - h_orig
 
     # Compute results
     time_ = time() - p.time0
 
     # Print result
     if opt.log_verbose
-        print_result(p.stop_reason, time_, residuals, maximum(p.current_rank))
+        print_result(p.stop_reason,
+                     time_,
+                     residuals,
+                     length(p.current_rank) > 0 ? maximum(p.current_rank) : 0)
     end
 
     # Post processing
@@ -234,7 +269,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     return CPResult(p.stop_reason,
                     pair.x,
                     pair.y,
-                    -vcat(a.Mx[1:affine_sets.p], a.Mx[affine_sets.p+1:end],-ctr_primal),
+                    -vcat(equa_error, slack_ineq, -ctr_primal),
                     residuals.equa_feasibility,
                     residuals.ineq_feasibility,
                     residuals.prim_obj,

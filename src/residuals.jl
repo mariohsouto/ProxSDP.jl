@@ -2,25 +2,25 @@
 function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params)
 
     # Inplace primal feasibility error
-    a.Mx_old[1:aff.p] .-= aff.b
-    residuals.equa_feasibility = norm(a.Mx_old[1:aff.p], 2) / (1. + p.norm_b)
-    a.Mx_old[aff.p+1:end] .-= aff.h
-    a.Mx_old[aff.p+1:end] .= max.(a.Mx_old[aff.p+1:end], 0.)
-    residuals.ineq_feasibility = norm(a.Mx_old[aff.p+1:end], 2) / (1. + p.norm_h)
+    a.Mx_old_eq .-= aff.b
+    residuals.equa_feasibility = norm(a.Mx_old_eq, 2) / (1. + p.norm_b)
+    a.Mx_old_in .-= aff.h
+    a.Mx_old_in .= max.(a.Mx_old_in, 0.)
+    residuals.ineq_feasibility = norm(a.Mx_old_in, 2) / (1. + p.norm_h)
     residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
 
     # Recover previous a.Mx
     copyto!(a.Mx_old, a.Mx)
 
     # Primal-dual gap
-    residuals.prim_obj = - dot(aff.c, pair.x)
-    
+    residuals.prim_obj = dot(aff.c, pair.x)
+
     residuals.dual_obj = 0.
     if aff.p > 0
-        residuals.dual_obj += dot(aff.b, pair.y[1:aff.p])
+        residuals.dual_obj -= dot(aff.b, @view pair.y[1:aff.p])
     end
     if aff.m > 0
-        residuals.dual_obj += dot(aff.h, pair.y[aff.p+1:end])
+        residuals.dual_obj -= dot(aff.h, @view pair.y[aff.p+1:end])
     end
     residuals.dual_gap = abs(residuals.prim_obj - residuals.dual_obj) / (1. + abs(residuals.prim_obj) + abs(residuals.dual_obj))
 
@@ -28,7 +28,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
 end
 
 function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, p::Params, aff::AffineSets)
-    
+
     # Primal residual
     # Px_old
     a.Mty_old .= pair.x_old .- p.primal_step .* a.Mty_old
@@ -62,7 +62,6 @@ end
 function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, opt::Options, p::Params)
     for (idx, soc) in enumerate(cones.socone)
         if soc_gap(a.soc_v[idx], a.soc_s[idx]) >= opt.tol_soc
-            
             return false
         end
     end

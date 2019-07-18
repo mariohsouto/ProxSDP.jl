@@ -39,6 +39,13 @@ mutable struct Options
     min_size_krylov_eigs::Int
     reduce_rank::Bool
     rank_slack::Int
+    equilibration::Bool
+    equilibration_iters::Int
+    equilibration_lb::Float64
+    equilibration_ub::Float64
+    equilibration_limit::Float64
+    equilibration_force::Bool
+    approx_norm::Bool
 
     function Options()
         opt = new()
@@ -83,6 +90,17 @@ mutable struct Options
         # Reduce rank [warning: heuristics]
         opt.reduce_rank = false
         opt.rank_slack = 3
+
+        # equilibration parameters
+        opt.equilibration = true
+        opt.equilibration_iters = 100
+        opt.equilibration_lb = -10.0
+        opt.equilibration_ub = +10.0
+        opt.equilibration_force = false
+        opt.equilibration_limit = 0.8
+
+        # spectral norm
+        opt.approx_norm = false
 
         return opt
     end
@@ -190,19 +208,29 @@ const ViewScalar = SubArray#{Float64, 1, Vector{Float64}, Tuple{Int}, true}
 
 mutable struct AuxiliaryData
     m::Vector{Symmetric{Float64,Matrix{Float64}}}
+
     Mty::Vector{Float64}
     Mty_old::Vector{Float64}
+
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
+    Mx_old_eq::SubArray
+    Mx_old_in::SubArray
+
     y_half::Vector{Float64}
     y_temp::Vector{Float64}
+
     soc_v::Vector{ViewVector}
     soc_s::Vector{ViewScalar}
 
     function AuxiliaryData(aff::AffineSets, cones::ConicSets) 
-        new([Symmetric(zeros(sdp.sq_side, sdp.sq_side), :L) for sdp in cones.sdpcone], 
-        zeros(aff.n), zeros(aff.n), zeros(aff.p+aff.m), zeros(aff.p+aff.m), 
-        zeros(aff.p+aff.m), zeros(aff.p+aff.m), ViewVector[], ViewScalar[]
+        Mx_old = zeros(aff.p+aff.m)
+        new(
+            [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :L) for sdp in cones.sdpcone], 
+            zeros(aff.n), zeros(aff.n),
+            zeros(aff.p+aff.m), Mx_old, view(Mx_old, 1:aff.p), view(Mx_old, aff.p+1:aff.p+aff.m), 
+            zeros(aff.p+aff.m), zeros(aff.p+aff.m),
+            ViewVector[], ViewScalar[]
     )
     end
 end

@@ -11,6 +11,8 @@ MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MO
 
 const optimizer = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6))
 const optimizer_lin = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6))
+const optimizer_con = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
+const optimizer_con2 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_soc = 1e-3, tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false, max_iter = 1_000_000))
 const optimizer_lin_hd = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6))
 const optimizer3 = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-6, tol_dual = 1e-6))
 const optimizer_log = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-6, tol_dual = 1e-6))
@@ -18,8 +20,8 @@ const optimizer_unsupportedarg = MOIU.CachingOptimizer(ProxSDPModelData{Float64}
 const optimizer_maxiter = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(max_iter = 1, log_verbose = true))
 const optimizer_timelimit = MOIU.CachingOptimizer(ProxSDPModelData{Float64}(), ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = true))
 
-const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3)
-const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false)
+const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
+const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
@@ -35,23 +37,23 @@ end
     )
 end
 
-# @testset "MOI Continuous Linear" begin
-#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
-#         # infeasible/unbounded
-#         "linear8a", "linear8b", "linear8c", "linear12", 
-#         # linear10 is poorly conditioned
-#         "linear10",
-#         # linear9 is requires precision
-#         "linear9",
-#         # primalstart not accepted
-#         "partial_start"
-#         ]
-#     )
-#     # MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer_lin_hd), config)
-# end
+@testset "MOI Continuous Linear" begin
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer_lin), config, [
+        # infeasible/unbounded
+        # "linear8a", "linear8b", "linear8c", "linear12",
+        # linear10 is poorly conditioned
+        "linear10",
+        # linear9 is requires precision
+        "linear9",
+        # primalstart not accepted
+        "partial_start"
+        ]
+    )
+    # MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer_lin_hd), config)
+end
 
 @testset "MOI Continuous Conic" begin
-    MOIT.contconictest(optimizer_lin, config_conic, [
+    MOIT.contconictest(optimizer_con, config_conic, [
         # bridge
         "rootdet","geomean",
         # affine in cone
@@ -61,13 +63,14 @@ end
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
-        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        # "lin3", "lin4",
+         "soc3", "rotatedsoc2", "psdt2"
         ]
     )
 end
 
 @testset "MOI Continuous Conic with VectorSlack" begin
-    MOIT.contconictest(MOIB.VectorSlack{Float64}(optimizer_lin_hd), config_conic, [
+    MOIT.contconictest(MOIB.VectorSlack{Float64}(optimizer_con2), config_conic, [
         # bridge
         "rootdet","geomean",
         # affine in cone
@@ -77,7 +80,8 @@ end
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
-        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        # "lin3", "lin4",
+         "soc3", "rotatedsoc2", "psdt2"
         ]
     )
 end
@@ -89,7 +93,8 @@ end
         # exp cone
         "logdet", "exp",
         # infeasible/unbounded
-        "lin3", "lin4", "soc3", "rotatedsoc2", "psdt2"
+        # "lin3", "lin4", 
+        "soc3", "rotatedsoc2", "psdt2"
         ]
     )
 end

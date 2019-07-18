@@ -16,10 +16,10 @@ end
 
 use_MOI = false
 sets_to_test = Symbol[]
-# push!(sets_to_test, :RANDSDP)
-# push!(sets_to_test, :SENSORLOC)
+push!(sets_to_test, :RANDSDP)
+push!(sets_to_test, :SENSORLOC)
 push!(sets_to_test, :SDPLIB)
-# push!(sets_to_test, :MIMO)
+push!(sets_to_test, :MIMO)
 
 
 @static if use_MOI
@@ -89,20 +89,20 @@ SENSORLOC_TEST_SET = [#100:100:300#1000
 MIMO_TEST_SET = [
     100,
     500, # mosek stops here
-    1000, # 700s on scs
-    1500, # SCS stops here (?)
-    2000,
-    2500,
-    3000,
-    3500,
-    4000,
-    4500,
-    5000,
-    6000,
-    7000,
-    8000,
-    9000,
-    10_000,
+    # 1000, # 700s on scs
+    # 1500, # SCS stops here (?)
+    # 2000,
+    # 2500,
+    # 3000,
+    # 3500,
+    # 4000,
+    # 4500,
+    # 5000,
+    # 6000,
+    # 7000,
+    # 8000,
+    # 9000,
+    # 10_000,
     ]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
@@ -114,10 +114,10 @@ GPP_TEST_SET = [
     "gpp250-2.dat-s",
     "gpp250-3.dat-s",
     "gpp250-4.dat-s",
-    "gpp500-1.dat-s", # SCS > 1000 s
-    "gpp500-2.dat-s", # SCS > 1000 s
-    "gpp500-3.dat-s",
-    "gpp500-4.dat-s",
+    # "gpp500-1.dat-s", # SCS > 1000 s
+    # "gpp500-2.dat-s", # SCS > 1000 s
+    # "gpp500-3.dat-s",
+    # "gpp500-4.dat-s",
     # "equalG11.dat-s",
     # "equalG51.dat-s",
 ]
@@ -131,10 +131,10 @@ MAXCUT_TEST_SET = [
     "mcp250-2.dat-s",
     "mcp250-3.dat-s",
     "mcp250-4.dat-s",
-    "mcp500-1.dat-s",
-    "mcp500-2.dat-s",
-    "mcp500-3.dat-s",
-    "mcp500-4.dat-s",
+    # "mcp500-1.dat-s",
+    # "mcp500-2.dat-s",
+    # "mcp500-3.dat-s",
+    # "mcp500-4.dat-s",
     # "maxG11.dat-s"  ,
     # "maxG51.dat-s"  ,
     # "maxG32.dat-s"  ,
