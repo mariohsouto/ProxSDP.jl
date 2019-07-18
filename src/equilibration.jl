@@ -5,6 +5,7 @@ function equilibrate!(M, aff, opt)
     max_iters=opt.equilibration_iters
     lb = opt.equilibration_lb
     ub = opt.equilibration_ub
+
     @timeit "eq init" begin
         α = (aff.n / (aff.m + aff.p)) ^ .25
         β = ((aff.m + aff.p) / aff.n ) ^ .25
