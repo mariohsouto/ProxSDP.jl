@@ -1,4 +1,5 @@
-# ProxSDP
+![ProxSDP logo](https://github.com/mariohsouto/ProxSDP_aux/blob/master/logo_proxSDP_%20sem%20fundo.png "JuMP logo")
+---
 
 | **Build Status** |
 |:-----------------:|
