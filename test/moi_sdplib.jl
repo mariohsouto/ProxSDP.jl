@@ -57,5 +57,9 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
     verbose && sdplib_eval(F,c,n,m,Xsq_s)
 
     rank = -1
-    return (objval, stime, rank)
+    status = 0
+    if MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
 end

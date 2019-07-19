@@ -56,5 +56,9 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
     verbose && randsdp_eval(A,b,C,n,m,Xsq_s)
 
     rank = -1
-    return (objval, stime, rank)
+    status = 0
+    if MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
 end

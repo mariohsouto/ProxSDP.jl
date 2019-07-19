@@ -24,6 +24,9 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
         @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
     catch
     end
-    return (objval, stime, rank)
-    # return (objval, stime)
+    status = 0
+    if JuMP.termination_status(model) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
 end

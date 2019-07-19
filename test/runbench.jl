@@ -67,7 +67,7 @@ function println2(FILE, class::String, ref::String, sol)
 end
 function println2(FILE, solver::String, class::String, ref::String, sol)
     # println(FILE, "$solver, $class, $ref, $(sol[2]), $(sol[1])")
-    println(FILE, "$solver, $class, $ref, $(sol[2]), $(sol[1]), $(sol[3])")
+    println(FILE, "$solver, $class, $ref, $(sol[2]), $(sol[1]), $(sol[3]), $(sol[4])")
     flush(FILE)
 end
 

@@ -77,5 +77,9 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false, scalar = fa
     verbose && mimo_eval(s, H, y, L, Xsq_s)
 
     rank = -1
-    return (objval, stime, rank)
+    status = 0
+    if MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
 end

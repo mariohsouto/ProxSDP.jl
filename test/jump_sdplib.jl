@@ -36,6 +36,10 @@ function jump_sdplib(solver, path; verbose = false, test = false)
         @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
     catch
     end
-    return (objval, stime, rank)
+    status = 0
+    if JuMP.termination_status(model) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
     # return (objval, stime)
 end
