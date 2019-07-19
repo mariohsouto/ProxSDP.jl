@@ -41,6 +41,14 @@ can be solved by the following code using **ProxSDP** and [JuMP](https://github.
 # Load packages
 using ProxSDP, JuMP
 
+# Number of vertices
+n = 4
+# Graph weights
+W = [18.0  -5.0  -7.0  -6.0
+     -5.0   6.0   0.0  -1.0
+     -7.0   0.0   8.0  -1.0
+     -6.0  -1.0  -1.0   8.0]
+
 # Build Max-Cut SDP relaxation via JuMP
 model = Model(with_optimizer(ProxSDP.Optimizer))
 @variable(model, X[1:n, 1:n], PSD)
