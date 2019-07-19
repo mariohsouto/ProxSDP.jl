@@ -4,7 +4,7 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
     m = 10n
     s, H, y, L = mimo_data(seed, m, n)
 
-    nvars = ProxSDP.sympackedlen(n + 1)
+    nvars = sympackedlen(n + 1)
 
     model = Model(with_optimizer(solver))
     @variable(model, X[1:n+1, 1:n+1], PSD)
@@ -14,7 +14,7 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
     end
     @objective(model, Min, sum(L[i, j] * X[i, j] for j in 1:n+1, i in 1:n+1))
     @constraint(model, ctr[i in 1:n+1], X[i, i] == 1.0)
-    
+
     teste = @time optimize!(model)
 
     XX = value.(X)
@@ -32,7 +32,11 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
 
     # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
     # @show fieldnames(tp)
-    @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    rank = -1
+    try
+        @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    catch
+    end
     return (objval, stime, rank)
     # return (objval, stime)
 end

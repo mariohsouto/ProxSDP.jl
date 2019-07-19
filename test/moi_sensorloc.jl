@@ -10,23 +10,25 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
     # Decision variable
-    nvars = ProxSDP.sympackedlen(n + 2) 
+    nvars = sympackedlen(n + 2) 
     X = MOI.add_variables(optimizer, nvars)
     Xsq = Matrix{MOI.VariableIndex}(undef, n + 2, n + 2)
-    ProxSDP.ivech!(Xsq, X)
+    ivech!(Xsq, X)
     Xsq = Matrix(Symmetric(Xsq, :U))
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n + 2))
 
     # Constraint with distances from anchors to sensors
-    for k in 1:m
-        for j in 1:n
-            e = zeros(n, 1)
-            e[j] = -1.0
-            v = vcat(a[k], e)
-            V = v * v'
-            ctr_aff = vec([MOI.ScalarAffineTerm(V[i, j_], Xsq[i, j_]) for i in 1:n + 2, j_ in 1:n + 2])
-            MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_aff, 0.0), MOI.EqualTo(d_bar[k, j]^2))
+    for j in 1:n
+        for k in 1:m
+            MOI.add_constraint(optimizer,
+                MOI.ScalarAffineFunction([
+                        MOI.ScalarAffineTerm(a[k][1]*a[k][1], Xsq[1,1]),
+                        MOI.ScalarAffineTerm(a[k][2]*a[k][2], Xsq[2,2]),
+                        MOI.ScalarAffineTerm(-2 * a[k][1], Xsq[1, j+2]),
+                        MOI.ScalarAffineTerm(-2 * a[k][2], Xsq[2, j+2]),
+                        MOI.ScalarAffineTerm(1.0, Xsq[j+2, j+2]),
+                    ], 0.0), MOI.EqualTo(d_bar[k, j]^2))
         end
     end
 
@@ -37,23 +39,29 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
             count_all += 1
             if rand() > 0.9
                 count += 1
-                e = zeros(n, 1)
-                e[i] = 1.0
-                e[j] = -1.0
-                v = vcat(zeros(2, 1), e)
-                V = v * v'
-                ctr_aff = vec([MOI.ScalarAffineTerm(V[i, j], Xsq[i, j]) for i in 1:n + 2, j in 1:n + 2])
-                MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_aff, 0.0), MOI.EqualTo(d[i, j]^2))
+                MOI.add_constraint(optimizer, 
+                    MOI.ScalarAffineFunction([
+                        MOI.ScalarAffineTerm(1.0, Xsq[i+2,i+2] ),
+                        MOI.ScalarAffineTerm(1.0, Xsq[j+2,j+2] ),
+                        MOI.ScalarAffineTerm(-2.0, Xsq[i+2,j+2]),
+                    ], 0.0), MOI.EqualTo(d[i, j]^2))
             end
         end
     end
     if verbose
         @show count_all, count
     end
-    MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 1]), MOI.EqualTo(1.0))
-    MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 2]), MOI.EqualTo(0.0))
-    MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 1]), MOI.EqualTo(0.0))
-    MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 2]), MOI.EqualTo(1.0))
+    if false
+        MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 1]), MOI.EqualTo(1.0))
+        MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 2]), MOI.EqualTo(0.0))
+        MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 1]), MOI.EqualTo(0.0))
+        MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 2]), MOI.EqualTo(1.0))
+    else
+        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[1, 1])], 0.0), MOI.EqualTo(1.0))
+        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[1, 2])], 0.0), MOI.EqualTo(0.0))
+        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[2, 1])], 0.0), MOI.EqualTo(0.0))
+        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[2, 2])], 0.0), MOI.EqualTo(1.0))
+    end
 
     objf_t = [MOI.ScalarAffineTerm(0.0, Xsq[1, 1])]
     if false
@@ -65,11 +73,19 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
 
     MOI.optimize!(optimizer)
 
-    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+    objval = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    stime = -1.0
+    try
+        stime = MOI.get(optimizer, MOI.SolveTime())
+    catch
+        println("could not query time")
+    end
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
     verbose && sensorloc_eval(n, m, x_true, Xsq_s)
 
-    return ProxSDP.get_solution(optimizer)
+    rank = -1
+    return (objval, stime, rank)
 end

@@ -7,12 +7,12 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
     A, b, C = randsdp_data(seed, m, n)
 
-    nvars = ProxSDP.sympackedlen(n)
+    nvars = sympackedlen(n)
 
     X = MOI.add_variables(optimizer, nvars)
 
     Xsq = Matrix{MOI.VariableIndex}(undef,n,n)
-    ProxSDP.ivech!(Xsq, X)
+    ivech!(Xsq, X)
     Xsq = Matrix(Symmetric(Xsq,:U))
 
     for k in 1:m
@@ -30,7 +30,14 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
     MOI.optimize!(optimizer)
 
-    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+    objval = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    stime = -1.0
+    try
+        stime = MOI.get(optimizer, MOI.SolveTime())
+    catch
+        println("could not query time")
+    end
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
@@ -41,12 +48,13 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
     # rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
     # @show rank
     if test
-        @test tr(C * Xsq_s) - obj < atol
+        @test tr(C * Xsq_s) - objval < atol
         for i in 1:m
             @test abs(tr(A[i] * Xsq_s)-b[i])/(1+abs(b[i])) < atol
         end
     end
     verbose && randsdp_eval(A,b,C,n,m,Xsq_s)
 
-    return ProxSDP.get_solution(optimizer)
+    rank = -1
+    return (objval, stime, rank)
 end

@@ -10,11 +10,13 @@ function jump_sdplib(solver, path; verbose = false, test = false)
     @variable(model, X[1:n, 1:n], PSD)
 
     # Objective function
-    @objective(model, Min, sum(F[0][idx...] * X[idx...] for idx in zip(findnz(F[0])[1:end-1]...)))
+    @objective(model, Min, sum(F[0][idx...] * X[idx...] 
+        for idx in zip(findnz(F[0])[1:end-1]...)))
 
     # Linear equality constraints
     for k = 1:m
-        @constraint(model, sum(F[k][idx...] * X[idx...] for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
+        @constraint(model, sum(F[k][idx...] * X[idx...]
+            for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
     end
     
     teste = @time optimize!(model)

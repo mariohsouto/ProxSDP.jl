@@ -10,34 +10,40 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
 
     n, m, F, c = sdplib_data(path)
 
-    nvars = ProxSDP.sympackedlen(n)
+    nvars = sympackedlen(n)
 
     X = MOI.add_variables(optimizer, nvars)
-    Xsq = Matrix{MOI.VariableIndex}(undef, n,n)
-    ProxSDP.ivech!(Xsq, X)
-    Xsq = Matrix(Symmetric(Xsq,:U))
-
-    for k in 1:m
-        I,J,V=findnz(F[k])
-        ctr_k = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
-            MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
-    end
-
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n))
 
-    I,J,V=findnz(F[0])
-    objf_t = [MOI.ScalarAffineTerm(V[ind], Xsq[I[ind],J[ind]]) for ind in eachindex(I)]
+    Xsq = Matrix{MOI.VariableIndex}(undef, n,n)
+    ivech!(Xsq, X)
+    Xsq = Matrix(Symmetric(Xsq,:U))
+
+    # Objective function
+    objf_t = [MOI.ScalarAffineTerm(F[0][idx...], Xsq[idx...])
+        for idx in zip(findnz(F[0])[1:end-1]...)]
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
     MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
-    # for i in 1:nvars
-    #     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[i]), MOI.LessThan(1.0))
-    #     MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[i]), MOI.GreaterThan(-1.0))
-    # end
+    # Linear equality constraints
+    for k in 1:m
+        ctr_k = [MOI.ScalarAffineTerm(F[k][idx...], Xsq[idx...]) 
+            for idx in zip(findnz(F[k])[1:end-1]...)]
+        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
+    end
 
     MOI.optimize!(optimizer)
-    obj = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    objval = MOI.get(optimizer, MOI.ObjectiveValue())
+
+    stime = -1.0
+    try
+        stime = MOI.get(optimizer, MOI.SolveTime())
+    catch
+        println("could not query time")
+    end
+
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
     minus_rank = length([eig for eig in eigen(Xsq_s).values if eig < -1e-4])
     if test
@@ -50,5 +56,6 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
 
     verbose && sdplib_eval(F,c,n,m,Xsq_s)
 
-    return ProxSDP.get_solution(optimizer)
+    rank = -1
+    return (objval, stime, rank)
 end
