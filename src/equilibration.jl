@@ -1,5 +1,6 @@
 
 using LinearAlgebra
+import Statistics
 
 function equilibrate!(M::SparseMatrixCSC{Float64,Int64}, aff::AffineSets, opt::Options, cones::ConicSets)
 
@@ -10,8 +11,8 @@ function equilibrate!(M::SparseMatrixCSC{Float64,Int64}, aff::AffineSets, opt::O
 
         @show α = (aff.n / (aff.m + aff.p)) ^ .25
         @show β = ((aff.m + aff.p) / aff.n ) ^ .25
-        α2, β2 = α^2, β^2
-        γ = 1e-14
+        @show α2, β2 = α^2, β^2
+        γ = .1
 
         u, v           = zeros(aff.m + aff.p), zeros(aff.n)
         u_next, v_next = zeros(aff.m + aff.p), zeros(aff.n)
@@ -24,9 +25,8 @@ function equilibrate!(M::SparseMatrixCSC{Float64,Int64}, aff::AffineSets, opt::O
         rows_M_ = rowvals(M_)
     end
 
-    max_iters = 300
-
-    lb, ub = -1000., 1000.
+    max_iters = 500
+    lb, ub = -100., 100.
 
     for iter in 1:max_iters
         @timeit "update diags" begin
@@ -49,9 +49,6 @@ function equilibrate!(M::SparseMatrixCSC{Float64,Int64}, aff::AffineSets, opt::O
                 end
             end
         end
-        @show (minimum(row_norms), maximum(row_norms))
-        @show (minimum(col_norms), maximum(col_norms))
-
         u .= log.(u)
         v .= log.(v)
 
@@ -64,12 +61,19 @@ function equilibrate!(M::SparseMatrixCSC{Float64,Int64}, aff::AffineSets, opt::O
         # Armijo linesearch
         line_search_iter = linesearch_equil!(u, v, u_next, v_next, u_grad, v_grad, α2, β2, γ, M, rows_M_, aff.n, cones, lb, ub)
         if line_search_iter > 100
+            @show iter
             break
+        end
+        if iter == max_iters
+            println("max iters!!!!")
         end
     end
 
-    @show (minimum(row_norms), maximum(row_norms))
-    @show (minimum(col_norms), maximum(col_norms))
+    @show (minimum(row_norms), maximum(row_norms), Statistics.mean(row_norms))
+    @show (minimum(col_norms), maximum(col_norms), Statistics.mean(col_norms))
+
+    @show (minimum(u), maximum(u), Statistics.mean(u))
+    @show (minimum(v), maximum(v), Statistics.mean(v))
 
     @timeit "update diags" begin 
         E.diag .= exp.(u)
@@ -117,16 +121,16 @@ function linesearch_equil!(u::Vector{Float64}, v::Vector{Float64}, u_next::Vecto
         end
 
         # Projection of v onto box [lb, ub]
-        box_project!(v_next, 0., 1.)
+        box_project!(v_next, lb, ub)
     end
 
     g_u = (u - u_next) / step_size
     g_v = (v - v_next) / step_size
     grad_norm2 = norm(g_u, 2)^2 + norm(g_v, 2)^2
-    aux_linesearch = - step_size *(dot(g_u, u_grad) + dot(g_v, v_grad) - .5 * grad_norm2)
+    aux_linesearch = - step_size * (dot(g_u, u_grad) + dot(g_v, v_grad) - .5 * grad_norm2)
 
     line_search_iter = 0
-    while evaluate_equil(u_next, v_next, α2, β2, γ, M, rows_M_, n) > evaluate_equil(u, v, α2, β2, γ, M, rows_M_, n) + aux_linesearch
+    while evaluate_equil(u_next, v_next, α2, β2, γ, M, rows_M_, n) > evaluate_equil(u, v, α2, β2, γ, M, rows_M_, n) #+ aux_linesearch
         line_search_iter += 1
         step_size *= .8
         u_next .= u - step_size * u_grad
@@ -142,7 +146,7 @@ function linesearch_equil!(u::Vector{Float64}, v::Vector{Float64}, u_next::Vecto
             end
 
             # Projection of v onto box [lb, ub]
-            box_project!(v_next, 0., ub)
+            box_project!(v_next, lb, ub)
         end
 
         g_u = (u - u_next) / step_size
@@ -151,6 +155,7 @@ function linesearch_equil!(u::Vector{Float64}, v::Vector{Float64}, u_next::Vecto
         aux_linesearch = - step_size * (dot(g_u, u_grad) + dot(g_v, v_grad) - .5 * grad_norm2)
 
         if line_search_iter > 100
+            @show line_search_iter
             break
         end
     end

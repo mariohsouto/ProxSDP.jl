@@ -63,8 +63,8 @@ mutable struct Options
         opt.tol_soc = 1e-6
 
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
-        opt.min_beta = 1e-2
-        opt.max_beta = 1e+2
+        opt.min_beta = 1e-3
+        opt.max_beta = 1e+3
         opt.initial_beta = 1.
 
         # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]

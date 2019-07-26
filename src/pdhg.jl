@@ -30,10 +30,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Scale objective function
         @timeit "normscale alloc" begin
-        c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
-        A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
-        G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
-        rhs_orig = vcat(b_orig, h_orig)
+            c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
+            A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+            G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
+            rhs_orig = vcat(b_orig, h_orig)
         end
 
         # Diagonal preconditioning
@@ -47,8 +47,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.equilibration_force
                 opt.equilibration = true
             end
-            # if opt.equilibration
-            if true
+            opt.equilibration = false
+            if opt.equilibration
                 @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt, conic_sets)
                 @timeit "equilibrate scaling" begin
                     M = E * M * D
@@ -92,9 +92,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             spectral_norm = norm(M)
         end
+        @show spectral_norm
 
         # Normalize the linear system by the spectral norm of M
-        spectral_norm_scaling = false
+        spectral_norm_scaling = true
         if spectral_norm_scaling
             M /= spectral_norm
             Mt /= spectral_norm
