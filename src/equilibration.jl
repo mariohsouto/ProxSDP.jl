@@ -2,7 +2,7 @@
 using LinearAlgebra
 
 function equilibrate!(M, aff, opt)
-    max_iters=opt.equilibration_iters
+    max_iters = opt.equilibration_iters
     lb = opt.equilibration_lb
     ub = opt.equilibration_ub
 
@@ -10,18 +10,19 @@ function equilibrate!(M, aff, opt)
         α = (aff.n / (aff.m + aff.p)) ^ .25
         β = ((aff.m + aff.p) / aff.n ) ^ .25
         α2, β2 = α^2, β^2
-        γ = .1
+        γ = 1e-1
 
         u, v           = zeros(aff.m + aff.p), zeros(aff.n)
-        u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
         u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
         row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
-        E = Diagonal(u)
-        D = Diagonal(v)
+        E = Diagonal(zeros(aff.m + aff.p))
+        D = Diagonal(zeros(aff.n))
         M_ = copy(M)
-
         rows_M_ = rowvals(M_)
     end
+
+    max_iters = 300
+    lb, ub = -100., 100.
 
     for iter in 1:max_iters
         @timeit "update diags" begin
@@ -58,18 +59,8 @@ function equilibrate!(M, aff, opt)
             @. v -= step_size * v_grad
             sum_v = sum(v)
             v .= sum_v / aff.n
-            box_project!(v, 0., ub)
+            box_project!(v, lb, ub)
         end
-        # Update averages.
-        @timeit "update" begin
-            @. u_ = 2 * u / (iter + 2) + iter * u_ / (iter + 2)
-            @. v_ = 2 * v / (iter + 2) + iter * v_ / (iter + 2)
-        end
-    end
-
-    @timeit "update diags" begin 
-        E.diag .= exp.(u_)
-        D.diag .= exp.(v_)
     end
 
     return E, D
@@ -77,5 +68,5 @@ end
 
 function box_project!(y, lb, ub)
     y .= min.(ub, max.(y, lb))
-    nothing
+    return nothing
 end

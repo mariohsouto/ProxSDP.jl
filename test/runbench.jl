@@ -16,10 +16,10 @@ end
 
 use_MOI = false
 sets_to_test = Symbol[]
-push!(sets_to_test, :RANDSDP)
-push!(sets_to_test, :SENSORLOC)
+# push!(sets_to_test, :RANDSDP)
+# push!(sets_to_test, :SENSORLOC)
 push!(sets_to_test, :SDPLIB)
-push!(sets_to_test, :MIMO)
+# push!(sets_to_test, :MIMO)
 
 
 @static if use_MOI
@@ -106,14 +106,14 @@ MIMO_TEST_SET = [
     ]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
-    "gpp124-1.dat-s",
-    "gpp124-2.dat-s",
-    "gpp124-3.dat-s",
-    "gpp124-4.dat-s",
-    "gpp250-1.dat-s",
-    "gpp250-2.dat-s",
-    "gpp250-3.dat-s",
-    "gpp250-4.dat-s",
+    # "gpp124-1.dat-s",
+    # "gpp124-2.dat-s",
+    # "gpp124-3.dat-s",
+    # "gpp124-4.dat-s",
+    # "gpp250-1.dat-s",
+    # "gpp250-2.dat-s",
+    # "gpp250-3.dat-s",
+    # "gpp250-4.dat-s",
     # "gpp500-1.dat-s", # SCS > 1000 s
     # "gpp500-2.dat-s", # SCS > 1000 s
     # "gpp500-3.dat-s",

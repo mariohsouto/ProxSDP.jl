@@ -93,7 +93,7 @@ mutable struct Options
 
         # equilibration parameters
         opt.equilibration = true
-        opt.equilibration_iters = 100
+        opt.equilibration_iters = 500
         opt.equilibration_lb = -10.0
         opt.equilibration_ub = +10.0
         opt.equilibration_force = false
