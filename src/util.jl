@@ -1,8 +1,4 @@
 
-function get_solution(opt::MOIU.CachingOptimizer{Optimizer,T}) where T
-    return opt.optimizer.sol
-end
-
 function map_socs!(v::Vector{Float64}, conic_sets::ConicSets, a::AuxiliaryData)
     cont = 0
     for (idx, sdp) in enumerate(conic_sets.sdpcone)
