@@ -10,11 +10,13 @@ function jump_sdplib(solver, path; verbose = false, test = false)
     @variable(model, X[1:n, 1:n], PSD)
 
     # Objective function
-    @objective(model, Min, sum(F[0][idx...] * X[idx...] for idx in zip(findnz(F[0])[1:end-1]...)))
+    @objective(model, Min, sum(F[0][idx...] * X[idx...] 
+        for idx in zip(findnz(F[0])[1:end-1]...)))
 
     # Linear equality constraints
     for k = 1:m
-        @constraint(model, sum(F[k][idx...] * X[idx...] for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
+        @constraint(model, sum(F[k][idx...] * X[idx...]
+            for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
     end
     
     teste = @time optimize!(model)
@@ -29,7 +31,15 @@ function jump_sdplib(solver, path; verbose = false, test = false)
 
     # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
     # @show fieldnames(tp)
-    @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
-    return (objval, stime, rank)
+    rank = -1
+    try
+        @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    catch
+    end
+    status = 0
+    if JuMP.termination_status(model) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
     # return (objval, stime)
 end

@@ -66,7 +66,15 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
     # @show fieldnames(tp)
-    @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
-    return (objval, stime, rank)
+    rank = -1
+    try
+        @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank
+    catch
+    end
+    status = 0
+    if JuMP.termination_status(model) == MOI.OPTIMAL
+        status = 1
+    end
+    return (objval, stime, rank, status)
     # return (objval, stime)
 end
