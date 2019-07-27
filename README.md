@@ -33,7 +33,7 @@ You can install **ProxSDP** through the [Julia package manager](https://docs.jul
 For example, the semidefinite programming relaxation of the [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf) problem
 ```
     max   0.25 * W•X
-    s.t.  diag(X) == 1,
+    s.t.  diag(X) = 1,
           X ≽ 0,
 ```
 can be solved by the following code using **ProxSDP** and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
