@@ -92,7 +92,7 @@ mutable struct Options
         opt.rank_slack = 3
 
         # equilibration parameters
-        opt.equilibration = true
+        opt.equilibration = false
         opt.equilibration_iters = 100
         opt.equilibration_lb = -10.0
         opt.equilibration_ub = +10.0
