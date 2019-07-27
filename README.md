@@ -78,5 +78,4 @@ The preprint version of the paper can be found [here](https://arxiv.org/abs/1810
 ## ROAD MAP
 
 - Support for exponential and power cones;
-- Infeasibility certificate;
 - Warm start.
