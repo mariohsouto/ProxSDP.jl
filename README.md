@@ -50,7 +50,7 @@ W = [18.0  -5.0  -7.0  -6.0
      -6.0  -1.0  -1.0   8.0]
 
 # Build Max-Cut SDP relaxation via JuMP
-model = Model(with_optimizer(ProxSDP.Optimizer))
+model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true))
 @variable(model, X[1:n, 1:n], PSD)
 @objective(model, Max, 0.25 * dot(W, X))
 @constraint(model, diag(X) .== 1)
