@@ -39,7 +39,7 @@ For example, the semidefinite programming relaxation of the [max-cut](http://www
 can be solved by the following code using **ProxSDP** and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
 ```julia
 # Load packages
-using ProxSDP, JuMP
+using ProxSDP, JuMP, LinearAlgebra
 
 # Number of vertices
 n = 4
