@@ -7,6 +7,9 @@ module ProxSDP
     using Printf
     using SparseArrays
     using LinearAlgebra
+    using IterativeSolvers
+    using PositiveFactorizations
+    using LowRankApprox
 
     include("MOI_wrapper.jl")
     include("structs.jl")
@@ -16,6 +19,7 @@ module ProxSDP
     include("equilibration.jl")
     include("pdhg.jl")
     include("residuals.jl")
+    include("eigsolver.jl")
     include("prox_operators.jl")
 
     MOIU.@model _ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
