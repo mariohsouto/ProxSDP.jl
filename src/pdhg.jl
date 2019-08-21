@@ -76,6 +76,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Stepsize parameters and linesearch parameters
         spectral_norm = 0.0
+        opt.approx_norm = true
         if !opt.approx_norm
             @timeit "svd" if minimum(size(M)) >= 2
                 try
@@ -104,6 +105,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             p.primal_step = 1. / spectral_norm
         end
+
+        @show p.primal_step
 
         # Build struct for storing matrices
         mat = Matrices(M, Mt, affine_sets.c)

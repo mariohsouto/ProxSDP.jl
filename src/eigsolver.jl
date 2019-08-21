@@ -84,22 +84,28 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.info_e = ones(BlasInt, 1) #Ref{BlasInt}(0)
     # Resid contains the initial residual vector
     Random.seed!(1234);
-    arc.resid = rand(arc.n)
+    # arc.resid = rand(arc.n)
+    arc.resid = ones(BlasInt, arc.n)
 
     # Build linear operator (?)
     matvecA!(y, x) = mul!(y, A, x)
     arc.A = matvecA!
     arc.Amat = A
-    arc.x = Vector{T}(undef, arc.n)
-    arc.y = Vector{T}(undef, arc.n)
+    # arc.x = Vector{T}(undef, arc.n)
+    # arc.y = Vector{T}(undef, arc.n)
+    arc.x = ones(arc.n)
+    arc.y = ones(arc.n)
 
     # Lanczos basis vectors (output)
-    arc.v = Matrix{T}(undef, arc.n, arc.ncv)
+    # arc.v = Matrix{T}(undef, arc.n, arc.ncv)
+    arc.v = ones(BlasInt, arc.n, arc.ncv)
 
     # Workspace
-    arc.workd = Vector{T}(undef, 3 * arc.n)
+    # arc.workd = Vector{T}(undef, 3 * arc.n)
+    arc.workd = ones(3 * arc.n)
     arc.lworkl = arc.ncv * (arc.ncv + 8)
-    arc.workl = Vector{T}(undef, arc.lworkl)
+    # arc.workl = Vector{T}(undef, arc.lworkl)
+    arc.workl = ones(arc.lworkl)
     arc.rwork = Vector{T}()
     arc.iparam = ones(BlasInt, 11)
     arc.iparam[1] = BlasInt(1)       # ishifts
@@ -113,8 +119,10 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     # Parameters for _EUPD! routine
     arc.zernm1 = 0:(arc.n-1)
     arc.howmny = "A"
-    arc.select = Vector{BlasInt}(undef, arc.ncv)
-    arc.d = Vector{T}(undef, arc.nev)
+    # arc.select = Vector{BlasInt}(undef, arc.ncv)
+    # arc.d = Vector{T}(undef, arc.nev)
+    arc.select = ones(arc.ncv)
+    arc.d = ones(arc.nev)
     arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
 
     # Flags created for ProxSDP use
