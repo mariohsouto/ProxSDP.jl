@@ -1,8 +1,7 @@
  
 
-function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
+function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64, polishing::Bool)
 
-    arc = [ARPACKAlloc(Float64, 1) for i in cones.sdpcone]
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
 
     # Build symmetric matrix(es) X
@@ -30,21 +29,20 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
         elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
 
             @timeit "eigs" begin 
-                eig!(arc[idx], a.m[idx], p.target_rank[idx], sdp.sq_side)
-                if hasconverged(arc[idx])
+                eig!(arc_list[idx], a.m[idx], p.target_rank[idx], iter, polishing, opt.warm_start_eig)
+                if hasconverged(arc_list[idx])
                     fill!(a.m[idx].data, 0.)
                     for i in 1:p.target_rank[idx]
-                        if unsafe_getvalues(arc[idx])[i] > 0. 
+                        if unsafe_getvalues(arc_list[idx])[i] > 0. 
                             p.current_rank[idx] += 1
-                            vec = unsafe_getvectors(arc[idx])[:, i]
-                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc[idx])[i], vec, vec, 1., a.m[idx].data)
+                            vec = unsafe_getvectors(arc_list[idx])[:, i]
+                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc_list[idx])[i], vec, vec, 1., a.m[idx].data)
                         end
-
                     end
                 end
             end
-            if hasconverged(arc[idx])
-                @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc[idx]))
+            if hasconverged(arc_list[idx])
+                @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc_list[idx]))
             else
                 @timeit "eigfact" full_eig!(a, idx, opt, p)
             end

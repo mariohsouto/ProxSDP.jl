@@ -7,9 +7,9 @@ module ProxSDP
     using Printf
     using SparseArrays
     using LinearAlgebra
-    using IterativeSolvers
-    using PositiveFactorizations
-    using LowRankApprox
+
+    import Random
+    import LinearAlgebra: BlasInt
 
     include("MOI_wrapper.jl")
     include("structs.jl")

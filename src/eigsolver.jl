@@ -1,7 +1,4 @@
 
-import LinearAlgebra: BlasInt
-import Random
-
 mutable struct ARPACKAlloc{T}
 
     n::Int
@@ -13,8 +10,6 @@ mutable struct ARPACKAlloc{T}
     mode::Int
     A::Function
     Amat::Symmetric{Float64,Matrix{Float64}}
-    x::Vector{T}
-    y::Vector{T}
     lworkl::Int
     TOL::Vector{T}
     v::Matrix{T}
@@ -34,6 +29,9 @@ mutable struct ARPACKAlloc{T}
     sigmar::Vector{T}
     converged::Bool
     arpackerror::Bool
+    x::Vector{T}
+    y::Vector{T}
+    tol::Float64
 
     function ARPACKAlloc{T}() where T
         new{T}()
@@ -50,16 +48,14 @@ function unsafe_getvectors(arc::ARPACKAlloc)
     return arc.v
 end
 
-function ARPACKAlloc(T::DataType, n::Integer=1, nev::Integer=1)
+function ARPACKAlloc(T::DataType, n::Int64)::ARPACKAlloc
     arc = ARPACKAlloc{T}()
-    # ARPACKAlloc_reset!(arc::ARPACKAlloc, Symmetric(Matrix{T}(I, n, n)), 1)
+    @timeit "init_arc" _init_arc!(arc::ARPACKAlloc, Symmetric(Matrix{T}(I, n, n)), 1, n)
     return arc
 end
 
-function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Integer) where T
+function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64) where T
 
-    # Don't need to be computed everytime
-    n = LinearAlgebra.checksquare(A)
     # Dimension of the eigenproblem
     arc.n = n
     # Number of eigenvalues of OP to be computed
@@ -72,44 +68,37 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     arc.mode = 1
 
     # How many Lanczos vectors are generated
-    arc.ncv = max(20, 2 * arc.nev + 1)
     # arc.ncv = arc.nev + 1
-    # Maximum number of iterations
-    arc.maxiter = Int(1e+4)
+    arc.ncv = max(20, 2 * arc.nev + 1)
     # Stopping criterion
-    arc.TOL = 1e-10 * ones(T, 1)
+    arc.tol = 1e-6
+    arc.TOL = arc.tol * ones(T, 1)
+    # Maximum number of iterations
+    arc.maxiter = Int(1e+3)
+
+    # Build linear operator
+    arc.Amat = A
+    arc.x = Vector{T}(undef, arc.n)
+    arc.y = Vector{T}(undef, arc.n)
+
+    # Lanczos basis vectors (output)
+    arc.v = Matrix{T}(undef, arc.n, arc.ncv)
 
     # If info != 0, RESID contains the initial residual vector
     arc.info = ones(BlasInt, 1)
-    arc.info_e = ones(BlasInt, 1) #Ref{BlasInt}(0)
+    arc.info_e = ones(BlasInt, 1)
     # Resid contains the initial residual vector
     Random.seed!(1234);
-    # arc.resid = rand(arc.n)
-    arc.resid = ones(BlasInt, arc.n)
-
-    # Build linear operator (?)
-    matvecA!(y, x) = mul!(y, A, x)
-    arc.A = matvecA!
-    arc.Amat = A
-    # arc.x = Vector{T}(undef, arc.n)
-    # arc.y = Vector{T}(undef, arc.n)
-    arc.x = ones(arc.n)
-    arc.y = ones(arc.n)
-
-    # Lanczos basis vectors (output)
-    # arc.v = Matrix{T}(undef, arc.n, arc.ncv)
-    arc.v = ones(BlasInt, arc.n, arc.ncv)
+    arc.resid = rand(arc.n)
 
     # Workspace
-    # arc.workd = Vector{T}(undef, 3 * arc.n)
-    arc.workd = ones(3 * arc.n)
+    arc.workd = Vector{T}(undef, 3 * arc.n)
     arc.lworkl = arc.ncv * (arc.ncv + 8)
-    # arc.workl = Vector{T}(undef, arc.lworkl)
-    arc.workl = ones(arc.lworkl)
+    arc.workl = Vector{T}(undef, arc.lworkl)
     arc.rwork = Vector{T}()
     arc.iparam = ones(BlasInt, 11)
-    arc.iparam[1] = BlasInt(1)       # ishifts
-    arc.iparam[3] = BlasInt(arc.maxiter) # maxiter
+    arc.iparam[1] = BlasInt(1)       
+    arc.iparam[3] = BlasInt(arc.maxiter)
     arc.iparam[4] = BlasInt(1)
     arc.iparam[7] = BlasInt(arc.mode)
     arc.ipntr = zeros(BlasInt, 11) 
@@ -119,11 +108,9 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     # Parameters for _EUPD! routine
     arc.zernm1 = 0:(arc.n-1)
     arc.howmny = "A"
-    # arc.select = Vector{BlasInt}(undef, arc.ncv)
-    # arc.d = Vector{T}(undef, arc.nev)
-    arc.select = ones(arc.ncv)
-    arc.d = ones(arc.nev)
-    arc.sigmar = zeros(T,1)#Ref{T}(zero(T))
+    arc.select = Vector{BlasInt}(undef, arc.ncv)
+    arc.d = Vector{T}(undef, arc.nev)
+    arc.sigmar = zeros(T, 1)
 
     # Flags created for ProxSDP use
     arc.converged = false
@@ -132,65 +119,76 @@ function ARPACKAlloc_reset!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     return nothing
 end
 
-function _INIT!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, n::Int64) where T1
+function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, iter::Int64, polishing::Bool) where T
 
-    # T = eltype(A)
+    if arc.nev < nev
+        # Number of eigenvalues of OP to be computed
+        arc.nev = nev
+        # How many Lanczos vectors are generated
+        # arc.ncv = arc.nev + 1
+        arc.ncv = max(20, 2 * arc.nev + 1)
+        # Lanczos basis vectors (output)
+        arc.v = Matrix{T}(undef, arc.n, arc.ncv)
+        # Workspace
+        arc.lworkl = arc.ncv * (arc.ncv + 8)
+        arc.workl = Vector{T}(undef, arc.lworkl)
+        # Parameters for _EUPD! routine
+        arc.select = Vector{BlasInt}(undef, arc.ncv)
+        arc.d = Vector{T}(undef, arc.nev)
+    end
 
-    # if eltype(arc.v) != T || n != arc.n || nev != arc.nev
-        return ARPACKAlloc_reset!(arc, A, nev)
-    # end
+    # Build linear operator
+    arc.Amat = A
 
-    # matvecA!(y, x) = mul!(y, A, x)
-    # arc.A = matvecA!
-    # arc.Amat = A
+    # If info != 0, RESID contains the initial residual vector
+    arc.info = ones(BlasInt, 1)
+    arc.info_e = ones(BlasInt, 1)
 
-    # arc.info[1] = BlasInt(1) # hotstart
-    # arc.info_e[1] = BlasInt(1)
-    # arc.sigmar[1] = 0.0
+    # Iparam
+    arc.iparam = ones(BlasInt, 11)
+    arc.iparam[1] = BlasInt(1)       
+    arc.iparam[3] = BlasInt(arc.maxiter)
+    arc.iparam[4] = BlasInt(1)
+    arc.iparam[7] = BlasInt(arc.mode)
+    arc.ipntr = zeros(BlasInt, 11) 
+    # IDO must be zero on the first call to dsaupd
+    arc.ido = zeros(BlasInt, 1)
 
-    # # IDO must be zero on the first call to dsaupd
-    # arc.ido[1] = BlasInt(0)
-    # arc.iparam[1] = BlasInt(1)       # ishifts
-    # arc.iparam[3] = BlasInt(arc.maxiter) # maxiter
-    # arc.iparam[7] = BlasInt(1)    # mode
+    # Stopping criterion
+    if polishing
+        arc.tol = 1e-12
+        arc.TOL = arc.tol * ones(T, 1)
+        arc.maxiter = Int(1e+4)
+    else
+        arc.tol = max(arc.tol / (iter / 10.), 1e-10)
+        arc.TOL = arc.tol * ones(T, 1)
+    end
 
-    # # Flags created for PrxSDP use
-    # arc.converged = false
-    # arc.arpackerror = false
-
-    # return nothing
+    return nothing
 end
 
-function _AUPD!(arc::ARPACKAlloc{T}) where T
+function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
     
     while true
         Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
-        # ????
-        # x = view(arc.workd, arc.ipntr[1] + arc.zernm1)
-        # y = view(arc.workd, arc.ipntr[2] + arc.zernm1)
-        # arc.A(y, x)
-
         if arc.ido[] == 1
-
-            # ????
             @inbounds @simd for i in 1:arc.n
                 arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
             end
-            # arc.A(arc.y, arc.x)
             mul!(arc.y, arc.Amat, arc.x)
             @inbounds @simd for i in 1:arc.n
                  arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
             end
-
+            
         elseif arc.ido[] == 99
+            # In this case, don't call _EUPD! (according to https://help.scilab.org/docs/5.3.3/en_US/dseupd.html)
             break
         else
-            # I'm still not sure about this last statement
             arc.converged = false
             arc.arpackerror = true
-            return nothing
+            break
         end
     end
 
@@ -205,7 +203,7 @@ function _AUPD!(arc::ARPACKAlloc{T}) where T
     return nothing
 end
 
-function _EUPD!(arc)
+function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
 
     # Check if _AUPD has converged properly
     if !arc.converged
@@ -238,16 +236,24 @@ function _EUPD!(arc)
     return nothing
 end
 
-function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, n::Int64)::Nothing where T1
+function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64, polishing::Bool, warm_start_eig::Bool)::Nothing where T1
+
+    # Warm start eig
+    if warm_start_eig && !polishing && iter > 10
+        arc.resid = arc.v[:, 1]
+    else
+        Random.seed!(1234);
+        arc.resid = rand(arc.n)
+    end
 
     # Initialize parameters and do memory allocation
-    @timeit "_INIT!" _INIT!(arc, A, nev, n)::Nothing
+    @timeit "update_arc" _update_arc!(arc, A, nev, iter, polishing)::Nothing
 
     # Top level reverse communication interface to solve real double precision symmetric problems.
-    @timeit "_AUPD!" _AUPD!(arc)::Nothing
+    @timeit "saupd" _saupd!(arc)::Nothing
 
-    # Post processing routine (eigenvector purification)
-    @timeit "_EUPD!" _EUPD!(arc)::Nothing
+    # Post processing routine (eigenvalues and eigenvectors purification)
+    @timeit "seupd" _seupd!(arc)::Nothing
 
     return nothing
 end

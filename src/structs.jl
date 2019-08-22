@@ -46,6 +46,7 @@ mutable struct Options
     equilibration_limit::Float64
     equilibration_force::Bool
     approx_norm::Bool
+    warm_start_eig::Bool
 
     function Options()
         opt = new()
@@ -86,6 +87,7 @@ mutable struct Options
         opt.full_eig_decomp = false
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
+        opt.warm_start_eig = true
 
         # Reduce rank [warning: heuristics]
         opt.reduce_rank = false
@@ -99,8 +101,8 @@ mutable struct Options
         opt.equilibration_force = false
         opt.equilibration_limit = 0.8
 
-        # spectral norm
-        opt.approx_norm = false
+        # spectral norm [using exact norm via svds may result in nondeterministic behavior]
+        opt.approx_norm = true
 
         return opt
     end
