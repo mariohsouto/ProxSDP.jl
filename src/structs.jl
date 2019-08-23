@@ -27,6 +27,7 @@ mutable struct Options
     initial_beta::Float64
     initial_adapt_level::Float64
     adapt_decay::Float64
+    adapt_window::Int64
     convergence_window::Int
     convergence_check::Int
     max_iter::Int
@@ -71,6 +72,7 @@ mutable struct Options
         # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]
         opt.initial_adapt_level = .9
         opt.adapt_decay = .7
+        opt.adapt_window = 20
 
         # PDHG parameters
         opt.convergence_window = 200

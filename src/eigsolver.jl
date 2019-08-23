@@ -119,7 +119,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     return nothing
 end
 
-function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, iter::Int64, polishing::Bool) where T
+function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, iter::Int64) where T
 
     if arc.nev < nev
         # Number of eigenvalues of OP to be computed
@@ -155,14 +155,8 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
     arc.ido = zeros(BlasInt, 1)
 
     # Stopping criterion
-    if polishing
-        arc.tol = 1e-12
-        arc.TOL = arc.tol * ones(T, 1)
-        arc.maxiter = Int(1e+4)
-    else
-        arc.tol = max(arc.tol / (iter / 10.), 1e-10)
-        arc.TOL = arc.tol * ones(T, 1)
-    end
+    arc.tol = max(arc.tol / (iter / 10.), 1e-10)
+    arc.TOL = arc.tol * ones(T, 1)
 
     return nothing
 end
@@ -236,18 +230,20 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
     return nothing
 end
 
-function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64, polishing::Bool, warm_start_eig::Bool)::Nothing where T1
+function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64, warm_start_eig::Bool)::Nothing where T1
 
     # Warm start eig
-    if warm_start_eig && !polishing && iter > 10
-        arc.resid = arc.v[:, 1]
-    else
-        Random.seed!(1234);
-        arc.resid = rand(arc.n)
+    @timeit "warm start eig" begin
+        if warm_start_eig && iter > 1
+            arc.resid .= @view arc.v[:, 1]
+        else
+            Random.seed!(1234);
+            arc.resid = rand(arc.n)
+        end
     end
 
     # Initialize parameters and do memory allocation
-    @timeit "update_arc" _update_arc!(arc, A, nev, iter, polishing)::Nothing
+    @timeit "update_arc" _update_arc!(arc, A, nev, iter)::Nothing
 
     # Top level reverse communication interface to solve real double precision symmetric problems.
     @timeit "saupd" _saupd!(arc)::Nothing

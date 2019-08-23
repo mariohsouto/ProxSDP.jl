@@ -15,6 +15,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.current_rank = 2 * ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
     arc_list = [ARPACKAlloc(Float64, sdp.sq_side) for (idx, sdp) in enumerate(conic_sets.sdpcone)]
+    ada_count = 0
 
     # Print header
     if opt.log_verbose
@@ -112,10 +113,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Initial primal and dual steps
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
-
-        # Polishing parameters
-        polishing = false
-        polishing_iter = 0
     end
 
     # Fixed-point loop
@@ -125,7 +122,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.iter = k
 
         # Primal step
-        @timeit "primal" primal_step!(pair, a, conic_sets, mat, opt, p, arc_list, p.iter, polishing)
+        @timeit "primal" primal_step!(pair, a, conic_sets, mat, opt, p, arc_list, p.iter)
 
         # Linesearch (dual step)
         @timeit "linesearch" linesearch!(pair, a, affine_sets, mat, opt, p)
@@ -145,21 +142,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.rank_update += 1
         if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
-                polishing_iter += 1
-                if polishing_iter > 10
-                    p.stop_reason = 1 # Optimal
-                    if opt.log_verbose
-                        print_progress(residuals, p)
-                    end
-
-                    break
-                else
-                    polishing = true
-                    p.primal_step = 1. / spectral_norm
-                    p.primal_step_old = p.primal_step
-                    p.beta = 1.
+                p.stop_reason = 1 # Optimal
+                if opt.log_verbose
+                    print_progress(residuals, p)
                 end
 
+                break
 
             elseif p.rank_update > p.window
                 p.update_cont += 1
@@ -198,16 +186,22 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         
         # Adaptive stepsizes
-        elseif !polishing
-            if residuals.primal_residual[k] > opt.tol_primal && residuals.dual_residual[k] < opt.tol_dual && k > p.window
+        elseif residuals.primal_residual[k] > opt.tol_primal && residuals.dual_residual[k] < opt.tol_dual && k > p.window
+            ada_count += 1
+            if ada_count > opt.adapt_window
+                ada_count = 0
                 p.beta *= (1. - p.adapt_level)
                 if p.beta <= opt.min_beta
                     p.beta = opt.min_beta
                 else
                     p.adapt_level *= opt.adapt_decay
                 end
+            end
                 
-            elseif residuals.primal_residual[k] < opt.tol_primal && residuals.dual_residual[k] > opt.tol_dual && k > p.window
+        elseif residuals.primal_residual[k] < opt.tol_primal && residuals.dual_residual[k] > opt.tol_dual && k > p.window
+            ada_count += 1
+            if ada_count > opt.adapt_window
+                ada_count = 0
                 p.beta /= (1. - p.adapt_level)
                 if p.beta >= opt.max_beta
                     p.beta = opt.max_beta
@@ -341,13 +335,13 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     return nothing
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, arc_list, iter::Int64, polishing::Bool)
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, arc_list, iter::Int64)
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
     # Projection onto the p.s.d. cone
     if length(cones.sdpcone) >= 1
-        @timeit "sdp proj" psd_projection!(pair.x, a, cones, opt, p, arc_list, iter, polishing)
+        @timeit "sdp proj" psd_projection!(pair.x, a, cones, opt, p, arc_list, iter)
     end
 
     # Projection onto the second order cone
