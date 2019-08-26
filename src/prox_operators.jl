@@ -1,7 +1,8 @@
+ 
 
-function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
+function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)
 
-    sqrt_2 = sqrt(2.)
+    p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
 
     # Build symmetric matrix(es) X
     @timeit "reshape1" begin
@@ -19,26 +20,33 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
     # Project onto the p.s.d. cone
     for (idx, sdp) in enumerate(cones.sdpcone)
         p.current_rank[idx] = 0
+
         if sdp.sq_side == 1
+
             a.m[idx][1] = max(0., a.m[idx][1])
             p.min_eig[idx] = a.m[idx][1]
+
         elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
-            try
-                @timeit "eigs" begin 
-                    λ, ϕ = eigs(a.m[idx], nev=p.target_rank[idx], which=:LR, tol=opt.tol_psd , maxiter=1000)
+
+            @timeit "eigs" begin 
+                eig!(arc_list[idx], a.m[idx], p.target_rank[idx], iter, opt.warm_start_eig)
+                if hasconverged(arc_list[idx])
                     fill!(a.m[idx].data, 0.)
-                    p.min_eig[idx] = minimum(λ)
                     for i in 1:p.target_rank[idx]
-                        if λ[i] > 0
-                            LinearAlgebra.BLAS.gemm!('N', 'T', λ[i], ϕ[:, i], ϕ[:, i], 1., a.m[idx].data)
+                        if unsafe_getvalues(arc_list[idx])[i] > 0. 
                             p.current_rank[idx] += 1
+                            vec = unsafe_getvectors(arc_list[idx])[:, i]
+                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc_list[idx])[i], vec, vec, 1., a.m[idx].data)
                         end
                     end
                 end
-            catch
-                p.min_eig[idx] = 0.
+            end
+            if hasconverged(arc_list[idx])
+                @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc_list[idx]))
+            else
                 @timeit "eigfact" full_eig!(a, idx, opt, p)
             end
+
         else
             p.min_eig[idx] = 0.
             @timeit "eigfact" full_eig!(a, idx, opt, p)

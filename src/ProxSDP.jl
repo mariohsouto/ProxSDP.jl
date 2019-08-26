@@ -8,6 +8,9 @@ module ProxSDP
     using SparseArrays
     using LinearAlgebra
 
+    import Random
+    import LinearAlgebra: BlasInt
+
     include("MOI_wrapper.jl")
     include("structs.jl")
     include("util.jl")
@@ -16,6 +19,7 @@ module ProxSDP
     include("equilibration.jl")
     include("pdhg.jl")
     include("residuals.jl")
+    include("eigsolver.jl")
     include("prox_operators.jl")
 
     MOIU.@model _ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
