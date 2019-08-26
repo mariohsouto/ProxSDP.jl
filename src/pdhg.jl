@@ -122,6 +122,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             @timeit "dual step" dual_step!(pair, a, affine_sets, mat, opt, p)
         end
 
+        @timeit "heavy ball" heavy_ball!(pair)
+
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets)
 
@@ -283,6 +285,19 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     time_,
                     sum(p.current_rank)
     )
+end
+
+function heavy_ball!(pair)::Nothing
+    mu = .8
+    mu_ = 1. - mu
+
+    pair.x .*= mu
+    pair.x .+= mu_ .* pair.x_old
+
+    pair.y .*= mu
+    pair.y .+= mu_ .* pair.y_old
+
+    return nothing
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
