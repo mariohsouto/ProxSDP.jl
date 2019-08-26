@@ -65,14 +65,14 @@ mutable struct Options
         opt.tol_soc = 1e-6
 
         # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
-        opt.min_beta = 1e-2
-        opt.max_beta = 1e+2
+        opt.min_beta = 1e-5
+        opt.max_beta = 1e+5
         opt.initial_beta = 1.
 
         # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]
         opt.initial_adapt_level = .9
-        opt.adapt_decay = .7
-        opt.adapt_window = 20
+        opt.adapt_decay = .9
+        opt.adapt_window = 50
 
         # PDHG parameters
         opt.convergence_window = 200
@@ -80,8 +80,8 @@ mutable struct Options
         opt.max_iter = Int(1e+5)
 
         # Linesearch parameters
-        opt.max_linsearch_steps = 200
-        opt.delta = .9999
+        opt.max_linsearch_steps = 2000
+        opt.delta = .999
         opt.initial_theta = 1.
         opt.linsearch_decay = .9
 
