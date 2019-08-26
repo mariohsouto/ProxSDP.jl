@@ -32,19 +32,21 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Scale objective function
         @timeit "normscale alloc" begin
-        c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
-        A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
-        G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
-        rhs_orig = vcat(b_orig, h_orig)
+            c_orig, var_ordering = preprocess!(affine_sets, conic_sets)
+            A_orig, b_orig = copy(affine_sets.A), copy(affine_sets.b)
+            G_orig, h_orig = copy(affine_sets.G), copy(affine_sets.h)
+            rhs_orig = vcat(b_orig, h_orig)
         end
 
         # Diagonal preconditioning
         @timeit "equilibrate" begin
-            M = vcat(affine_sets.A, affine_sets.G)
-            UB = maximum(M)
-            LB = minimum(M)
-            if opt.equilibration && LB/UB <= opt.equilibration_limit
-                opt.equilibration = false
+            if opt.equilibration
+                M = vcat(affine_sets.A, affine_sets.G) 
+                UB = maximum(M)
+                LB = minimum(M)
+                if LB/UB <= opt.equilibration_limit
+                    opt.equilibration = false
+                end
             end
             if opt.equilibration_force
                 opt.equilibration = true
@@ -77,12 +79,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         Mt = M'
 
         # Stepsize parameters and linesearch parameters
-        spectral_norm = 0.
         if !opt.approx_norm
             @timeit "svd" if minimum(size(M)) >= 2
                 try
                     spectral_norm = Arpack.svds(M, nsv=1)[1].S[1]
-                    @show "exact spectral norm"
                 catch
                     println("WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
                     spectral_norm = norm(M)
@@ -103,12 +103,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
 
-        @show spectral_norm
-        @show p.primal_step
-        @show norm(M)
-
         line_search_flag = true
-        @show (p.primal_step, p.dual_step, p.primal_step * p.dual_step, 1. / (spectral_norm^2.))
     end
 
     # Fixed-point loop
@@ -191,14 +186,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if ada_count > opt.adapt_window
                 ada_count = 0
                 if line_search_flag
-                    @show (p.primal_step, p.beta * p.primal_step, p.primal_step * p.beta * p.primal_step, 1. / (spectral_norm^2.))
                     p.beta *= (1. - p.adapt_level)
                     p.primal_step /= sqrt(1. - p.adapt_level)
-                    @show (p.primal_step, p.beta * p.primal_step, p.primal_step * p.beta * p.primal_step, 1. / (spectral_norm^2.))
                 else
                     p.primal_step /= (1. - p.adapt_level)
                     p.dual_step *= (1. - p.adapt_level)
-                    @show (p.primal_step, p.dual_step, p.primal_step * p.dual_step, 1. / (spectral_norm^2.))
                 end
 
                 p.adapt_level *= opt.adapt_decay
@@ -209,14 +201,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if ada_count > opt.adapt_window
                 ada_count = 0
                 if line_search_flag
-                    @show (p.primal_step, p.beta * p.primal_step, p.primal_step * p.beta * p.primal_step, 1. / (spectral_norm^2.))
                     p.beta /= (1. - p.adapt_level)
                     p.primal_step *= sqrt(1. - p.adapt_level)
-                    @show (p.primal_step, p.beta * p.primal_step, p.primal_step * p.beta * p.primal_step, 1. / (spectral_norm^2.))
                 else
                     p.primal_step *= (1. - p.adapt_level)
                     p.dual_step /= (1. - p.adapt_level)
-                    @show (p.primal_step, p.dual_step, p.primal_step * p.dual_step, 1. / (spectral_norm^2.))
                 end
                 
                 p.adapt_level *= opt.adapt_decay
@@ -296,7 +285,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     )
 end
 
-function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
+function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
     cont = 0
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
     
@@ -342,7 +331,7 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     return nothing
 end
 
-function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)
+function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
 
     @timeit "dual step 1" begin
         a.y_half .= pair.y .+ p.dual_step * (2. * a.Mx .- a.Mx_old)
@@ -362,7 +351,7 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets,
     return nothing
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, arc_list, iter::Int64)
+function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 

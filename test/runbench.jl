@@ -114,10 +114,10 @@ GPP_TEST_SET = [
     "gpp250-2.dat-s",
     "gpp250-3.dat-s",
     "gpp250-4.dat-s",
-    "gpp500-1.dat-s", # SCS > 1000 s
-    "gpp500-2.dat-s", # SCS > 1000 s
-    "gpp500-3.dat-s",
-    "gpp500-4.dat-s",
+    # "gpp500-1.dat-s", # SCS > 1000 s
+    # "gpp500-2.dat-s", # SCS > 1000 s
+    # "gpp500-3.dat-s",
+    # "gpp500-4.dat-s",
     # "equalG11.dat-s",
     # "equalG51.dat-s",
 ]
@@ -131,10 +131,10 @@ MAXCUT_TEST_SET = [
     "mcp250-2.dat-s",
     "mcp250-3.dat-s",
     "mcp250-4.dat-s",
-    "mcp500-1.dat-s",
-    "mcp500-2.dat-s",
-    "mcp500-3.dat-s",
-    "mcp500-4.dat-s",
+    # "mcp500-1.dat-s",
+    # "mcp500-2.dat-s",
+    # "mcp500-3.dat-s",
+    # "mcp500-4.dat-s",
     # "maxG11.dat-s"  ,
     # "maxG51.dat-s"  ,
     # "maxG32.dat-s"  ,

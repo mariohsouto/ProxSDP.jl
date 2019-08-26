@@ -71,7 +71,7 @@ mutable struct Options
 
         # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]
         opt.initial_adapt_level = .9
-        opt.adapt_decay = .9
+        opt.adapt_decay = .8
         opt.adapt_window = 50
 
         # PDHG parameters
