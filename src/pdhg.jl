@@ -102,8 +102,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.primal_step = 1. / spectral_norm
         p.primal_step_old = p.primal_step
         p.dual_step = p.primal_step
-
-        line_search_flag = true
     end
 
     # Fixed-point loop
@@ -116,13 +114,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @timeit "primal" primal_step!(pair, a, conic_sets, mat, opt, p, arc_list, p.iter)
 
         # Linesearch (dual step)
-        if line_search_flag
+        if opt.linesearch_flag
             @timeit "linesearch" linesearch!(pair, a, affine_sets, mat, opt, p)
         else
             @timeit "dual step" dual_step!(pair, a, affine_sets, mat, opt, p)
         end
 
-        @timeit "heavy ball" heavy_ball!(pair)
+        # Relaxation step
+        if opt.heavy_ball_flag
+            @timeit "heavy ball" heavy_ball!(pair, opt)
+        end
 
         # Compute residuals and update old iterates
         @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets)
@@ -187,7 +188,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             ada_count += 1
             if ada_count > opt.adapt_window
                 ada_count = 0
-                if line_search_flag
+                if opt.linesearch_flag
                     p.beta *= (1. - p.adapt_level)
                     p.primal_step /= sqrt(1. - p.adapt_level)
                 else
@@ -202,7 +203,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             ada_count += 1
             if ada_count > opt.adapt_window
                 ada_count = 0
-                if line_search_flag
+                if opt.linesearch_flag
                     p.beta /= (1. - p.adapt_level)
                     p.primal_step *= sqrt(1. - p.adapt_level)
                 else
@@ -287,15 +288,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     )
 end
 
-function heavy_ball!(pair)::Nothing
-    mu = .8
-    mu_ = 1. - mu
+function heavy_ball!(pair::PrimalDual, opt::Options)::Nothing
+    ρ = opt.relaxation_ratio
 
-    pair.x .*= mu
-    pair.x .+= mu_ .* pair.x_old
+    pair.x .*= ρ
+    pair.x .+= (1. - ρ) .* pair.x_old
 
-    pair.y .*= mu
-    pair.y .+= mu_ .* pair.y_old
+    pair.y .*= ρ
+    pair.y .+= (1. - ρ) .* pair.y_old
 
     return nothing
 end

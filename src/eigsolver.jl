@@ -232,13 +232,10 @@ end
 
 function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64, warm_start_eig::Bool)::Nothing where T1
 
-    # # Warm start eig
-    # if warm_start_eig && iter > 10
-    #     arc.resid .= @view arc.v[:, 1]
-    # else
-    #     Random.seed!(1234);
-    #     arc.resid = rand(arc.n)
-    # end
+    # Warm start eig
+    if warm_start_eig && iter > 10
+        arc.resid .= @view arc.v[:, 1]
+    end
 
     # Initialize parameters and do memory allocation
     @timeit "update_arc" _update_arc!(arc, A, nev, iter)::Nothing

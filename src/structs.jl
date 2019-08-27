@@ -34,6 +34,7 @@ mutable struct Options
     max_linsearch_steps::Int
     delta::Float64
     initial_theta::Float64
+    linesearch_flag::Bool
     linsearch_decay::Float64
     full_eig_decomp::Bool
     max_target_rank_krylov_eigs::Int
@@ -48,14 +49,16 @@ mutable struct Options
     equilibration_force::Bool
     approx_norm::Bool
     warm_start_eig::Bool
+    heavy_ball_flag::Bool
+    relaxation_ratio::Float64
 
     function Options()
         opt = new()
 
         # Printing options
         opt.log_verbose = false
-        opt.log_freq = 100
-        opt.timer_verbose = false
+        opt.log_freq = 1000
+        opt.timer_verbose = true
         opt.time_limit = 360000. #100 hours
 
         # Default tolerances
@@ -80,6 +83,7 @@ mutable struct Options
         opt.max_iter = Int(1e+5)
 
         # Linesearch parameters
+        opt.linesearch_flag = true
         opt.max_linsearch_steps = 2000
         opt.delta = .999
         opt.initial_theta = 1.
@@ -89,23 +93,27 @@ mutable struct Options
         opt.full_eig_decomp = false
         opt.max_target_rank_krylov_eigs = 16
         opt.min_size_krylov_eigs = 100
-        opt.warm_start_eig = true
+        opt.warm_start_eig = false
 
         # Reduce rank [warning: heuristics]
         opt.reduce_rank = false
         opt.rank_slack = 3
 
-        # equilibration parameters
+        # Equilibration parameters
         opt.equilibration = false
         opt.equilibration_iters = 100
-        opt.equilibration_lb = -10.0
-        opt.equilibration_ub = +10.0
+        opt.equilibration_lb = -10.
+        opt.equilibration_ub = +10.
         opt.equilibration_force = false
-        opt.equilibration_limit = 0.8
+        opt.equilibration_limit = .8
 
-        # spectral norm [using exact norm via svds may result in nondeterministic behavior]
+        # Spectral norm [using exact norm via svds may result in nondeterministic behavior]
         opt.approx_norm = true
 
+        # Heavy ball method parameters
+        opt.heavy_ball_flag = true
+        opt.relaxation_ratio = .8
+    
         return opt
     end
 end
