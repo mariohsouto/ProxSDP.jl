@@ -3,7 +3,7 @@ function print_header_1()
     println("=======================================================================================")
     println("                  ProxSDP : Proximal Semidefinite Programming Solver                   ")
     println("                         (c) Mario Souto and Joaquim D. Garcia, 2019                   ")
-    println("                                                              v1.0.0                   ")
+    println("                                                              v1.1.0                   ")
     println("---------------------------------------------------------------------------------------")
 end
 
