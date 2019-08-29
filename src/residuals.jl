@@ -1,13 +1,16 @@
 
-function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params)
+function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params, Einv)::Nothing
 
     # Inplace primal feasibility error
-    a.Mx_old_eq .-= aff.b
+    # a.Mx_old_eq .-= aff.b
+    # a.Mx_old_eq = Einv * a.Mx_old_eq
+    a.Mx -= aff.b
     residuals.equa_feasibility = norm(a.Mx_old_eq, 2) / (1. + p.norm_b)
-    a.Mx_old_in .-= aff.h
-    a.Mx_old_in .= max.(a.Mx_old_in, 0.)
-    residuals.ineq_feasibility = norm(a.Mx_old_in, 2) / (1. + p.norm_h)
-    residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
+    # a.Mx_old_in .-= aff.h
+    # a.Mx_old_in .= max.(a.Mx_old_in, 0.)
+    # a.Mx_old_in = Einv * a.Mx_old_in
+    # residuals.ineq_feasibility = norm(a.Mx_old_in, 2) / (1. + p.norm_h)
+    # residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
 
     # Recover previous a.Mx
     copyto!(a.Mx_old, a.Mx)
@@ -27,7 +30,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     return nothing
 end
 
-function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, p::Params, aff::AffineSets)
+function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, p::Params, aff::AffineSets, Einv)::Nothing
 
     # Primal residual
     # Px_old

@@ -42,17 +42,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         @timeit "equilibrate" begin
             if opt.equilibration
                 M = vcat(affine_sets.A, affine_sets.G) 
-                UB = maximum(M)
-                LB = minimum(M)
-                if LB/UB <= opt.equilibration_limit
-                    opt.equilibration = false
-                end
-            end
-            if opt.equilibration_force
-                opt.equilibration = true
-            end
-            if opt.equilibration
-                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
+                @timeit "equilibrate inner" E, D, Einv = equilibrate!(M, affine_sets, opt)
                 @timeit "equilibrate scaling" begin
                     M = E * M * D
                     affine_sets.A = M[1:affine_sets.p, :]
@@ -123,10 +113,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
 
         # Compute residuals and update old iterates
-        @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets)
+        @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets, Einv)
 
         # Compute optimality gap and feasibility error
-        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p)
+        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p, Einv)
 
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0

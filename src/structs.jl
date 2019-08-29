@@ -44,7 +44,7 @@ mutable struct Options
     equilibration_iters::Int
     equilibration_lb::Float64
     equilibration_ub::Float64
-    equilibration_limit::Float64
+    equil_regularization::Float64
     equilibration_force::Bool
     approx_norm::Bool
     warm_start_eig::Bool
@@ -97,11 +97,11 @@ mutable struct Options
 
         # equilibration parameters
         opt.equilibration = false
-        opt.equilibration_iters = 100
+        opt.equilibration_iters = 100000
         opt.equilibration_lb = -10.0
         opt.equilibration_ub = +10.0
         opt.equilibration_force = false
-        opt.equilibration_limit = 0.8
+        opt.equil_regularization = .01
 
         # spectral norm [using exact norm via svds may result in nondeterministic behavior]
         opt.approx_norm = true
