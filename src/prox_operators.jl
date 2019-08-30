@@ -1,6 +1,6 @@
  
 
-function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)
+function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
 
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
 
@@ -27,7 +27,6 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             p.min_eig[idx] = a.m[idx][1]
 
         elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
-
             @timeit "eigs" begin 
                 eig!(arc_list[idx], a.m[idx], p.target_rank[idx], iter, opt.warm_start_eig)
                 if hasconverged(arc_list[idx])
@@ -68,7 +67,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
     return nothing
 end
 
-function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)
+function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
     p.current_rank[idx] = 0
     fact = eigen!(a.m[idx])
     fill!(a.m[idx].data, 0.)
@@ -84,7 +83,7 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)
     return nothing
 end
 
-function soc_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)
+function soc_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)::Nothing
     for (idx, soc) in enumerate(cones.socone)
         soc_projection!(a.soc_v[idx], a.soc_s[idx])
     end
@@ -92,7 +91,7 @@ function soc_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
     return nothing
 end
 
-function soc_projection!(v::ViewVector, s::ViewScalar)
+function soc_projection!(v::ViewVector, s::ViewScalar)::Nothing
     nv = norm(v, 2)
     if nv <= -s[]
         s[] = 0.
@@ -108,7 +107,7 @@ function soc_projection!(v::ViewVector, s::ViewScalar)
     return nothing
 end
 
-function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)
+function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)::Nothing
     # Projection onto = b
     @inbounds @simd for i in 1:length(aff.b)
         v[i] = aff.b[i]
