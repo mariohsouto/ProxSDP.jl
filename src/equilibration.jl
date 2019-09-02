@@ -1,23 +1,22 @@
 
 using LinearAlgebra
 
-function equilibrate!(M, aff::AffineSets, opt::Options)
-    max_iters=opt.equilibration_iters
+function equilibrate!(M, aff::AffineSets, opt::Options)::Tuple{LinearAlgebra.Diagonal{Float64,Array{Float64,1}}, LinearAlgebra.Diagonal{Float64,Array{Float64,1}}}
+    max_iters = opt.equilibration_iters
     lb = opt.equilibration_lb
     ub = opt.equilibration_ub
     γ = opt.equil_regularization
 
     @timeit "eq init" begin
-        α = (aff.n / (aff.m + aff.p)) ^ .25
-        β = ((aff.m + aff.p) / aff.n ) ^ .25
-        α2, β2 = α^2, β^2
+        α = Float64(aff.n / (aff.m + aff.p)) ^ .25
+        β = Float64((aff.m + aff.p) / aff.n) ^ .25
 
         u, v           = zeros(aff.m + aff.p), zeros(aff.n)
         u_next, v_next = zeros(aff.m + aff.p), zeros(aff.n)
         u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
         row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
-        E = Diagonal(u)
-        D = Diagonal(v)
+        E    = Diagonal(u)
+        D    = Diagonal(v)
         Einv = Diagonal(u)
         M_ = copy(M)
         rows_M_ = rowvals(M_)
@@ -25,10 +24,11 @@ function equilibrate!(M, aff::AffineSets, opt::Options)
         step_size = 1.
         previous_eval = Inf
         tol_equil = 1e-6
-        linesearch_max_iter = 100
+        linesearch_max_iter = 1000
     end
 
     for iter in 1:max_iters
+
         @timeit "update diags" begin
             E.diag .= exp.(u)
             D.diag .= exp.(v)
@@ -52,13 +52,16 @@ function equilibrate!(M, aff::AffineSets, opt::Options)
                 end
             end
         end
+
         @timeit "grad" begin
-            @. u_grad = row_norms - α2 + γ * u
-            @. v_grad = col_norms - β2 + γ * v
+            @. u_grad = row_norms - α^2 + γ * u
+            @. v_grad = col_norms - β^2 + γ * v
         end
 
         # Linesearch 
         @timeit "linesearch equil " begin
+            step_size = 1.
+
             for _iter in 1:linesearch_max_iter
                 # Projected gradient step
                 @timeit "proj grad equil " begin
@@ -66,6 +69,7 @@ function equilibrate!(M, aff::AffineSets, opt::Options)
                     @. u_next .= u - step_size * u_grad
                     # v update
                     @. v_next .= v - step_size * v_grad
+                    # Project
                     sum_v = sum(v_next)
                     v_next .= sum_v / aff.n
                     # Box projection
@@ -74,20 +78,20 @@ function equilibrate!(M, aff::AffineSets, opt::Options)
                 end
 
                 # Evaluate incumbent
-                next_eval = evaluate_equil(u_next, v_next, α2, β2, γ, M, rows_M_, aff.n)
+                next_eval = evaluate_equil(u_next, v_next, α, β, γ, M, rows_M_, aff.n)
 
                 if next_eval <= previous_eval
                     # Check convergence
                     # if (norm(u - u_next) + norm(v - v_next)) / step_size <= tol_equil
-                    if previous_eval - next_eval <= tol_equil
-                        @show _iter, iter
-                        @timeit "update diags" begin 
-                            E.diag .= exp.(u_next)
-                            D.diag .= exp.(v_next)
-                            Einv.diag .= 1. ./ u_next
-                        end
-                        return E, D, Einv
-                    end
+                    # if previous_eval - next_eval <= tol_equil
+                    #     @show _iter, iter
+                    #     @timeit "update diags" begin 
+                    #         E.diag .= exp.(u_next)
+                    #         D.diag .= exp.(v_next)
+                    #         Einv.diag .= 1. ./ u_next
+                    #     end
+                    #     return E, D, Einv
+                    # end
 
                     # Accept update
                     copyto!(u, u_next)
@@ -97,7 +101,6 @@ function equilibrate!(M, aff::AffineSets, opt::Options)
                     # Increase stepsize
                     step_size *= 1.2
 
-                    # @show _iter, previous_eval
                     break
                 else
                     # Decrease stepsize
@@ -110,13 +113,12 @@ function equilibrate!(M, aff::AffineSets, opt::Options)
     @timeit "update diags" begin 
         E.diag .= exp.(u)
         D.diag .= exp.(v)
-        Einv.diag .= 1. ./ u
     end
 
-    return E, D, Einv
+    return E, D
 end
 
-function evaluate_equil(u::Vector{Float64}, v::Vector{Float64}, α2::Float64, β2::Float64, γ::Float64, M::SparseMatrixCSC{Float64,Int64}, rows_M_, n::Int64)::Float64
+function evaluate_equil(u::Vector{Float64}, v::Vector{Float64}, α::Float64, β::Float64, γ::Float64, M::SparseMatrixCSC{Float64,Int64}, rows_M_, n::Int64)::Float64
 
     obj_equil = 0.
 
@@ -126,14 +128,14 @@ function evaluate_equil(u::Vector{Float64}, v::Vector{Float64}, α2::Float64, β
         end
     end
 
-    obj_equil -= α2 * sum(u)
-    obj_equil -= β2 * sum(v)
+    obj_equil -= α^2 * sum(u)
+    obj_equil -= β^2 * sum(v)
     obj_equil += (γ / 2.) * (norm(u, 2)^2 + norm(v, 2)^2)
 
     return obj_equil
 end
 
-function box_project!(y, lb, ub)
+function box_project!(y::Vector{Float64}, lb::Float64, ub::Float64)::Nothing
     y .= min.(ub, max.(y, lb))
-    nothing
+    return nothing
 end

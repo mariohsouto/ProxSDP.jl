@@ -41,10 +41,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Diagonal preconditioning
         @timeit "equilibrate" begin
             if opt.equilibration
-                M = vcat(affine_sets.A, affine_sets.G) 
-                @timeit "equilibrate inner" E, D, Einv = equilibrate!(M, affine_sets, opt)
+                M = vcat(affine_sets.A, affine_sets.G)
+                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
                 @timeit "equilibrate scaling" begin
-                    M = E * M * D
+                    mul!(M, M, D)
+                    mul!(M, E, M)
                     affine_sets.A = M[1:affine_sets.p, :]
                     affine_sets.G = M[affine_sets.p + 1:end, :]
                     rhs = E * rhs_orig
@@ -57,16 +58,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         
         # Scale the off-diagonal entries associated with p.s.d. matrices by √2
         @timeit "normscale" norm_scaling(affine_sets, conic_sets)
+        M = vcat(affine_sets.A, affine_sets.G)
+        Mt = M'
 
         # Initialization
         pair = PrimalDual(affine_sets)
         a = AuxiliaryData(affine_sets, conic_sets)
         map_socs!(pair.x, conic_sets, a)
-        residuals = Residuals(p.window)
-
-        # Diagonal scaling
-        M = vcat(affine_sets.A, affine_sets.G)
-        Mt = M'
+        residuals = Residuals(p.window)        
 
         # Stepsize parameters and linesearch parameters
         if !opt.approx_norm
@@ -84,6 +83,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         else
             spectral_norm = norm(M)
         end
+
+        @show spectral_norm
 
         # Build struct for storing matrices
         mat = Matrices(M, Mt, affine_sets.c)
@@ -113,10 +114,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
 
         # Compute residuals and update old iterates
-        @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets, Einv)
+        @timeit "residual" compute_residual!(residuals, pair, a, p, affine_sets)
 
         # Compute optimality gap and feasibility error
-        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p, Einv)
+        @timeit "gap" compute_gap!(residuals, pair, a, affine_sets, p)
 
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
@@ -126,6 +127,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Check convergence
         p.rank_update += 1
         if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
+ 
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
                 p.stop_reason = 1 # Optimal
                 if opt.log_verbose

@@ -1,23 +1,33 @@
 
-function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params, Einv)::Nothing
+function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, aff::AffineSets, p::Params)::Nothing
 
     # Inplace primal feasibility error
-    # a.Mx_old_eq .-= aff.b
-    # a.Mx_old_eq = Einv * a.Mx_old_eq
-    a.Mx -= aff.b
-    residuals.equa_feasibility = norm(a.Mx_old_eq, 2) / (1. + p.norm_b)
-    # a.Mx_old_in .-= aff.h
-    # a.Mx_old_in .= max.(a.Mx_old_in, 0.)
-    # a.Mx_old_in = Einv * a.Mx_old_in
-    # residuals.ineq_feasibility = norm(a.Mx_old_in, 2) / (1. + p.norm_h)
-    # residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
+    if aff.p > 0
+        residuals.equa_feasibility = 0.
+        for i in 1:aff.p
+            a.residual[i] = a.Mx[i]
+            a.residual[i] -= aff.b[i]
+            a.residual[i] = abs(a.residual[i])
+            residuals.equa_feasibility = max(residuals.equa_feasibility, a.residual[i])
+        end
+        residuals.equa_feasibility /= (1. + p.norm_b)
+    end
+    if aff.m > 0
+        residuals.ineq_feasibility = 0.
+        for i in aff.p+1:aff.p+aff.m
+            a.residual[i] = a.Mx[i]
+            a.residual[i] -= aff.h[i-aff.p]
+            a.residual[i] = max(a.residual[i], 0.)
+            residuals.ineq_feasibility = max(residuals.ineq_feasibility, a.residual[i])
+        end
+        residuals.ineq_feasibility /= (1. + p.norm_h)
+    end
 
-    # Recover previous a.Mx
-    copyto!(a.Mx_old, a.Mx)
+    residuals.feasibility = norm(a.residual, 2)
+    # residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
 
     # Primal-dual gap
     residuals.prim_obj = dot(aff.c, pair.x)
-
     residuals.dual_obj = 0.
     if aff.p > 0
         residuals.dual_obj -= dot(aff.b, @view pair.y[1:aff.p])
@@ -30,7 +40,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     return nothing
 end
 
-function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, p::Params, aff::AffineSets, Einv)::Nothing
+function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, p::Params, aff::AffineSets)::Nothing
 
     # Primal residual
     # Px_old
@@ -62,7 +72,7 @@ function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryD
     return nothing
 end
 
-function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, opt::Options, p::Params)
+function soc_convergence(a::AuxiliaryData, cones::ConicSets, pair::PrimalDual, opt::Options, p::Params)::Bool
     for (idx, soc) in enumerate(cones.socone)
         if soc_gap(a.soc_v[idx], a.soc_s[idx]) >= opt.tol_soc
             return false
@@ -77,7 +87,7 @@ function soc_gap(v::ViewVector, s::ViewScalar)
     return norm(v, 2) - s[]
 end
 
-function convergedrank(p::Params, cones::ConicSets, opt::Options)
+function convergedrank(p::Params, cones::ConicSets, opt::Options)::Bool
     for (idx, sdp) in enumerate(cones.sdpcone)
         if !(p.min_eig[idx] < opt.tol_psd || p.target_rank[idx] > opt.max_target_rank_krylov_eigs || sdp.sq_side < opt.min_size_krylov_eigs)
             return false
