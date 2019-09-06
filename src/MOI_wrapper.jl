@@ -8,31 +8,34 @@ const MOIU = MOI.Utilities
 const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
 const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle}
 
-mutable struct MOISolution
-    ret_val::Int
-    primal::Vector{Float64} # primal of variables
-    dual::Vector{Float64} # dual of constraints
+Base.@kwdef mutable struct MOISolution
+    ret_val::Int = 0
+    raw_status::String = "Problem not solved"
+    primal::Vector{Float64} = Float64[] # primal of variables
+    dual::Vector{Float64} = Float64[] # dual of constraints
     # dual_sd::Vector{Vector{Float64}}
     # dual_so::Vector{Vector{Float64}}
     # dual_ep::Vector{Vector{Float64}}
     # dual_ed::Vector{Vector{Float64}}
     # dual_pw::Vector{Vector{Float64}}
-    slack::Vector{Float64}
+    slack::Vector{Float64} = Float64[]
     # slack_sd::Vector{Vector{Float64}}
     # slack_so::Vector{Vector{Float64}}
     # slack_ep::Vector{Vector{Float64}}
     # slack_ed::Vector{Vector{Float64}}
     # slack_pw::Vector{Vector{Float64}}
-    primal_residual::Float64
-    dual_residual::Float64
-    objval::Float64
-    dual_objval::Float64
-    gap::Float64
-    time::Float64
-    final_rank::Int
+    primal_residual::Float64 = NaN
+    dual_residual::Float64 = NaN
+    objval::Float64 = NaN
+    dual_objval::Float64 = NaN
+    # obj_cte::Float64 = NaN # used in rays - see SCS
+    gap::Float64 = NaN
+    time::Float64 = NaN
+    final_rank::Int = -1
 end
-MOISolution() = MOISolution(0, # SCS_UNFINISHED
-                      Float64[], Float64[], Float64[], NaN, NaN, NaN, NaN, NaN, NaN, 0)
+
+# MOISolution() = MOISolution(0, # SCS_UNFINISHED
+#                       Float64[], Float64[], Float64[], NaN, NaN, NaN, NaN, NaN, NaN, 0)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is passed to SCS
@@ -57,56 +60,87 @@ end
 
 # This is tied to SCS's internal representation
 mutable struct ConeData
-    f::Int # number of linear equality constraints
-    l::Int # length of LP cone
-    q::Int # length of SOC cone
-    qa::Vector{Int} # array of second-order cone constraints
-    s::Int # length of SD cone
-    sa::Vector{Int} # array of semi-definite constraints
-    ep::Int # number of primal exponential cone triples
-    ed::Int # number of dual exponential cone triples
-    p::Vector{Float64} # array of power cone params
-    setconstant::Dict{Int, Float64} # For the constant of EqualTo, LessThan and GreaterThan, they are used for getting the `ConstraintPrimal` as the slack is Ax - b but MOI expects Ax so we need to add the constant b to the slack to get Ax
-    nrows::Dict{Int, Int} # The number of rows of each vector sets, this is used by `constrrows` to recover the number of rows used by a constraint when getting `ConstraintPrimal` or `ConstraintDual`
+    f::Int = 0 # number of linear equality constraints
+    l::Int = 0 # length of LP cone
+    q::Int = 0 # length of SOC cone
+    qa::Vector{Int} = Int[] # array of second-order cone constraints
+    s::Int = 0 # length of SD cone
+    sa::Vector{Int} = Int[] # array of semi-definite constraints
+    ep::Int = 0 # number of primal exponential cone triples
+    ed::Int = 0 # number of dual exponential cone triples
+    p::Vector{Float64} = Float64[] # array of power cone params
+    setconstant::Dict{Int, Float64} = Dict{Int, Float64}() # For the constant of EqualTo, LessThan and GreaterThan, they are used for getting the `ConstraintPrimal` as the slack is Ax - b but MOI expects Ax so we need to add the constant b to the slack to get Ax
+    nrows::Dict{Int, Int} = Dict{Int, Int}() # The number of rows of each vector sets, this is used by `constrrows` to recover the number of rows used by a constraint when getting `ConstraintPrimal` or `ConstraintDual`
 
     # cones
-    sdc::Vector{Vector{Int}} # semidefinite
-    soc::Vector{Vector{Int}} # second order
-    epc::Vector{Vector{Int}} # exponential primal
-    edc::Vector{Vector{Int}} # exponential dual
-    pwc::Vector{Tuple{Vector{Int},Float64}} # power
-    function ConeData()
-        new(0, 0,
-            0, Int[],
-            0, Int[],
-            0, 0, Float64[],
-            Dict{Int, Float64}(),
-            Dict{Int, Int}(),
-            Vector{Int}[],
-            Vector{Int}[],
-            Vector{Int}[],
-            Vector{Int}[],
-            Tuple{Vector{Int},Float64}[],
-            )
-    end
+    sdc::Vector{Vector{Int}} = Vector{Int}[] # semidefinite
+    soc::Vector{Vector{Int}} = Vector{Int}[] # second order
+    epc::Vector{Vector{Int}} = Vector{Int}[] # exponential primal
+    edc::Vector{Vector{Int}} = Vector{Int}[] # exponential dual
+    pwc::Vector{Tuple{Vector{Int},Float64}} = Tuple{Vector{Int},Float64}[] # power
 end
 
-mutable struct Optimizer <: MOI.AbstractOptimizer
-    cone::ConeData
-    maxsense::Bool
-    data::Union{Nothing, ModelData} # only non-Void between MOI.copy_to and MOI.optimize!
-    sol::MOISolution
-
-    params
-    function Optimizer(args)
-        new(ConeData(), false, nothing, MOISolution(), args)
-    end
+Base.@kwdef mutable struct Optimizer <: MOI.AbstractOptimizer
+    cone::ConeData = ConeData()
+    maxsense::Bool = false
+    data::Union{Nothing, ModelData} = nothing # only non-Void between MOI.copy_to and MOI.optimize!
+    sol::MOISolution = MOISolution()
+    params::Options = Options()
 end
-function Optimizer(;args...)
-    return Optimizer(args)
+function Optimizer(;kwargs...)
+    optimizer = Optimizer()
+    for (key, value) in kwargs
+        MOI.set(optimizer, MOI.RawParameter(key), value)
+    end
+    return optimizer
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ProxSDP"
+
+function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    fields = fieldnames(Options)
+    name = param.name
+    if name in fields
+        setfield!(optimizer.options, name, value)
+    else
+        error("No parameter matching $(name)")
+    end
+    return value
+end
+function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    fields = fieldnames(Options)
+    name = param.name
+    if name in fields
+        return getfield(optimizer.options, name)
+    else
+        error("No parameter matching $(name)")
+    end
+end
+
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+function MOI.set(optimizer::Optimizer, ::MOI.Silent, value::Bool)
+    if value == true
+        optimizer.options.timer_verbose = false
+    end
+    optimizer.options.log_verbose = !value
+end
+function MOI.get(optimizer::Optimizer, ::MOI.Silent)
+    if optimizer.options.log_verbose
+        return false
+    elseif optimizer.options.timer_verbose
+        return false
+    else
+        return true
+    end
+end
+
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec ) = true
+function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec , value)
+    optimizer.options.time_limit = value
+end
+function MOI.get(optimizer::Optimizer, ::MOI.TimeLimitSec)
+    return optimizer.options.time_limit
+end
 
 function MOI.is_empty(optimizer::Optimizer)
     !optimizer.maxsense && optimizer.data === nothing
@@ -404,6 +438,7 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
     MOIU.load(optimizer,
           MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
           MOI.ScalarAffineFunction{Float64}(f))
+    return nothing
 end
 function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
                f::MOI.ScalarAffineFunction)
@@ -582,6 +617,8 @@ function MOI.optimize!(optimizer::Optimizer)
         print("\n")
         TimerOutputs.print_timer(TimerOutputs.flatten(TimerOutputs.DEFAULT_TIMER))
         print("\n")
+    end
+    if options.timer_file
         f = open("time.log","w")
         TimerOutputs.print_timer(f,TimerOutputs.DEFAULT_TIMER)
         print(f,"\n")
@@ -591,6 +628,7 @@ function MOI.optimize!(optimizer::Optimizer)
     end
 
     optimizer.sol = MOISolution(ret_val,
+                                sol.status_string,
                                 primal,
                                 dual,
                                 slack,
@@ -700,6 +738,14 @@ ivec(X) = Matrix(Symmetric(ivech(X),:U))
     Status
 =#
 
+function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
+    return optimizer.sol.time
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
+    return optimizer.sol.raw_status
+end
+
 # Implements getter for result value and statuses
 # ProxSDP returns one of the following integers:
 # 0 - MOI.OPTIMIZE_NOT_CALLED
@@ -724,6 +770,7 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue) = optimizer.sol.objval
+MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue) = optimizer.sol.dual_objval
 
 function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
     s = optimizer.sol.ret_val

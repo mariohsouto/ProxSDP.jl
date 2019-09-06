@@ -13,101 +13,64 @@ function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
     V.v[mod1(i, V.l)] = val
 end
 
-mutable struct Options
-    log_verbose::Bool
-    log_freq::Int
-    timer_verbose::Bool
-    time_limit::Float64
-    tol_primal::Float64
-    tol_dual::Float64
-    tol_psd::Float64
-    tol_soc::Float64
-    min_beta::Float64
-    max_beta::Float64
-    initial_beta::Float64
-    initial_adapt_level::Float64
-    adapt_decay::Float64
-    adapt_window::Int64
-    convergence_window::Int
-    convergence_check::Int
-    max_iter::Int
-    max_linsearch_steps::Int
-    delta::Float64
-    initial_theta::Float64
-    linsearch_decay::Float64
-    full_eig_decomp::Bool
-    max_target_rank_krylov_eigs::Int
-    min_size_krylov_eigs::Int
-    reduce_rank::Bool
-    rank_slack::Int
-    equilibration::Bool
-    equilibration_iters::Int
-    equilibration_lb::Float64
-    equilibration_ub::Float64
-    equilibration_limit::Float64
-    equilibration_force::Bool
-    approx_norm::Bool
-    warm_start_eig::Bool
+Base.@kwdef mutable struct Options
 
-    function Options()
-        opt = new()
+    # Printing options
+    log_verbose::Bool = false
+    log_freq::Int = 100
+    timer_verbose::Bool = false
+    timer_file::Bool = false
 
-        # Printing options
-        opt.log_verbose = false
-        opt.log_freq = 100
-        opt.timer_verbose = false
-        opt.time_limit = 360000. #100 hours
+    # time options
+    time_limit::Float64 = 3600_00. #100 hours
 
-        # Default tolerances
-        opt.tol_primal = 1e-3
-        opt.tol_dual = 1e-3
-        opt.tol_psd = 1e-6
-        opt.tol_soc = 1e-6
+    # Default tolerances
+    tol_primal::Float64 = 1e-3
+    tol_dual::Float64 = 1e-3
+    tol_psd::Float64 = 1e-6
+    tol_soc::Float64 = 1e-6
 
-        # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
-        opt.min_beta = 1e-5
-        opt.max_beta = 1e+5
-        opt.initial_beta = 1.
+    # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
+    min_beta::Float64 = 1e-5
+    max_beta::Float64 = 1e+5
+    initial_beta::Float64 = 1.
 
-        # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]
-        opt.initial_adapt_level = .9
-        opt.adapt_decay = .8
-        opt.adapt_window = 50
+    # Adaptive primal-dual steps parameters [adapt_decay above .7 may lead to slower convergence]
+    initial_adapt_level::Float64 = .9
+    adapt_decay::Float64 = .8
+    adapt_window::Int64 = 50
 
-        # PDHG parameters
-        opt.convergence_window = 200
-        opt.convergence_check = 50
-        opt.max_iter = Int(1e+5)
+    # PDHG parameters
+    convergence_window::Int = 200
+    convergence_check::Int = 50
+    max_iter::Int = Int(1e+5)
 
-        # Linesearch parameters
-        opt.max_linsearch_steps = 2000
-        opt.delta = .999
-        opt.initial_theta = 1.
-        opt.linsearch_decay = .9
+    # Linesearch parameters
+    max_linsearch_steps::Int = 2000
+    delta::Float64 = .999
+    initial_theta::Float64 = 1.
+    linsearch_decay::Float64 = .9
 
-        # Spectral decomposition parameters
-        opt.full_eig_decomp = false
-        opt.max_target_rank_krylov_eigs = 16
-        opt.min_size_krylov_eigs = 100
-        opt.warm_start_eig = true
+    # Spectral decomposition parameters
+    full_eig_decomp::Bool = false
+    max_target_rank_krylov_eigs::Int = 16
+    min_size_krylov_eigs::Int = 100
+    warm_start_eig::Bool = true
 
-        # Reduce rank [warning: heuristics]
-        opt.reduce_rank = false
-        opt.rank_slack = 3
+    # Reduce rank [warning: heuristics]
+    reduce_rank::Bool = false
+    rank_slack::Int = 3
 
-        # equilibration parameters
-        opt.equilibration = false
-        opt.equilibration_iters = 100
-        opt.equilibration_lb = -10.0
-        opt.equilibration_ub = +10.0
-        opt.equilibration_force = false
-        opt.equilibration_limit = 0.8
+    # equilibration parameters
+    equilibration::Bool = false
+    equilibration_iters::Int = 100
+    equilibration_lb::Float64 = -10.0
+    equilibration_ub::Float64 = +10.0
+    equilibration_limit::Float64 = false
+    equilibration_force::Bool = 0.8
 
-        # spectral norm [using exact norm via svds may result in nondeterministic behavior]
-        opt.approx_norm = true
-
-        return opt
-    end
+    # spectral norm [using exact norm via svds may result in nondeterministic behavior]
+    approx_norm::Bool = true
 end
 
 function Options(args)
@@ -165,6 +128,7 @@ end
 
 struct CPResult
     status::Int
+    status_string::String
     primal::Vector{Float64}
     dual::Vector{Float64}
     slack::Vector{Float64}
@@ -254,6 +218,7 @@ mutable struct Params
     min_eig::Vector{Float64}
     iter::Int
     stop_reason::Int
+    stop_reason_string::String
     iteration::Int
     primal_step::Float64
     primal_step_old::Float64

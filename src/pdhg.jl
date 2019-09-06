@@ -2,15 +2,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Initialize parameters
     p = Params()
-    p.theta = opt.initial_theta             
-    p.adapt_level = opt.initial_adapt_level 
-    p.window = opt.convergence_window       
+    p.theta = opt.initial_theta
+    p.adapt_level = opt.initial_adapt_level
+    p.window = opt.convergence_window
     p.beta = opt.initial_beta
     p.time0 = time()
     p.norm_b = norm(affine_sets.b, 2)
     p.norm_h = norm(affine_sets.h, 2)
     p.norm_c = norm(affine_sets.c, 2)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
+    p.stop_reason_string = "Not optimized"
     p.target_rank = 2 * ones(length(conic_sets.sdpcone))
     p.current_rank = 2 * ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
@@ -139,6 +140,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
  
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
                 p.stop_reason = 1 # Optimal
+                p.stop_reason_string = "Optimal solution found"
                 if opt.log_verbose
                     print_progress(residuals, p)
                 end
@@ -177,6 +179,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.rank_update, p.update_cont = 0, 0
                 if full_rank_flag == true
                     p.stop_reason = 4 # Infeasible
+                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
                     break
                 end
             end
@@ -219,6 +222,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 print_progress(residuals, p)
             end
             p.stop_reason = 2 # Time limit
+            p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
             break
         end
 
@@ -228,6 +232,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 print_progress(residuals, p)
             end
             p.stop_reason = 3 # Iteration limit
+            p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
         end
     end
 
@@ -273,6 +278,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     return CPResult(p.stop_reason,
+                    p.stop_reason_string,
                     pair.x,
                     pair.y,
                     -vcat(equa_error, slack_ineq, -ctr_primal),
