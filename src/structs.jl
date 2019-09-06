@@ -66,8 +66,8 @@ Base.@kwdef mutable struct Options
     equilibration_iters::Int = 100
     equilibration_lb::Float64 = -10.0
     equilibration_ub::Float64 = +10.0
-    equilibration_limit::Float64 = false
-    equilibration_force::Bool = 0.8
+    equilibration_limit::Float64 = 0.8
+    equilibration_force::Bool = false
 
     # spectral norm [using exact norm via svds may result in nondeterministic behavior]
     approx_norm::Bool = true

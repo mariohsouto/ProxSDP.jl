@@ -3,7 +3,6 @@ module ProxSDP
     using MathOptInterface
     using TimerOutputs
     using Arpack
-    using Compat
     using Printf
     using SparseArrays
     using LinearAlgebra
@@ -11,16 +10,17 @@ module ProxSDP
     import Random
     import LinearAlgebra: BlasInt
 
-    include("MOI_wrapper.jl")
     include("structs.jl")
     include("util.jl")
-    include("printing.jl")    
+    include("printing.jl")
     include("scaling.jl")
     include("equilibration.jl")
     include("pdhg.jl")
     include("residuals.jl")
     include("eigsolver.jl")
     include("prox_operators.jl")
+
+    include("MOI_wrapper.jl")
 
     MOIU.@model _ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 
