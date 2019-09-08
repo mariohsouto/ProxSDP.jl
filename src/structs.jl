@@ -130,8 +130,10 @@ struct CPResult
     status::Int
     status_string::String
     primal::Vector{Float64}
-    dual::Vector{Float64}
-    slack::Vector{Float64}
+    dual_eq::Vector{Float64}
+    dual_in::Vector{Float64}
+    slack_eq::Vector{Float64}
+    slack_in::Vector{Float64}
     primal_residual::Float64
     dual_residual::Float64
     objval::Float64
@@ -150,6 +152,12 @@ mutable struct PrimalDual
     PrimalDual(aff::AffineSets) = new(
         zeros(aff.n), zeros(aff.n), zeros(aff.m+aff.p), zeros(aff.m+aff.p)
     )
+end
+
+mutable struct WarmStart
+    x::Vector{Float64}
+    y_eq::Vector{Float64}
+    y_in::Vector{Float64}
 end
 
 mutable struct Residuals

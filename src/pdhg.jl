@@ -1,4 +1,5 @@
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult#,
+    # warm::WarmStart)::CPResult
 
     # Initialize parameters
     p = Params()
@@ -269,19 +270,25 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Post processing
     pair.x = pair.x[var_ordering]
-    ctr_primal = Float64[]
-    for soc in conic_sets.socone
-        append!(ctr_primal, pair.x[soc.idx])
-    end
-    for sdp in conic_sets.sdpcone
-        append!(ctr_primal, pair.x[sdp.vec_i])
-    end
+    # ctr_primal = Float64[]
+    # for soc in conic_sets.socone
+    #     append!(ctr_primal, pair.x[soc.idx])
+    # end
+    # for sdp in conic_sets.sdpcone
+    #     append!(ctr_primal, pair.x[sdp.vec_i])
+    # end
+
+    dual_eq = pair.y[1:length[b_orig]]
+    dual_in = pair.y[length[b_orig]+1:end]
 
     return CPResult(p.stop_reason,
                     p.stop_reason_string,
                     pair.x,
-                    pair.y,
-                    -vcat(equa_error, slack_ineq, -ctr_primal),
+                    # pair.y,
+                    dual_eq,
+                    dual_in,
+                    equa_error,
+                    slack_ineq,
                     residuals.equa_feasibility,
                     residuals.ineq_feasibility,
                     residuals.prim_obj,
