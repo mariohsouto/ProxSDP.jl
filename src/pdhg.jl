@@ -278,8 +278,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     #     append!(ctr_primal, pair.x[sdp.vec_i])
     # end
 
-    dual_eq = pair.y[1:length[b_orig]]
-    dual_in = pair.y[length[b_orig]+1:end]
+    dual_eq = pair.y[1:length(b_orig)]
+    dual_in = pair.y[length(b_orig)+1:end]
 
     return CPResult(p.stop_reason,
                     p.stop_reason_string,
