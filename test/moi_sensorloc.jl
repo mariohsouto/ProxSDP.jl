@@ -1,5 +1,5 @@
 
-function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
+function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar = false)
 
     Random.seed!(seed)
     MOI.empty!(optimizer)
@@ -21,14 +21,26 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
     # Constraint with distances from anchors to sensors
     for j in 1:n
         for k in 1:m
-            MOI.add_constraint(optimizer,
-                MOI.ScalarAffineFunction([
+            if scalar
+                MOI.add_constraint(optimizer,
+                    MOI.ScalarAffineFunction([
+                            MOI.ScalarAffineTerm(a[k][1]*a[k][1], Xsq[1,1]),
+                            MOI.ScalarAffineTerm(a[k][2]*a[k][2], Xsq[2,2]),
+                            MOI.ScalarAffineTerm(-2 * a[k][1], Xsq[1, j+2]),
+                            MOI.ScalarAffineTerm(-2 * a[k][2], Xsq[2, j+2]),
+                            MOI.ScalarAffineTerm(1.0, Xsq[j+2, j+2]),
+                        ], 0.0), MOI.EqualTo(d_bar[k, j]^2))
+            else
+                MOI.add_constraint(optimizer,
+                MOI.VectorAffineFunction(
+                    MOI.VectorAffineTerm.([1], [
                         MOI.ScalarAffineTerm(a[k][1]*a[k][1], Xsq[1,1]),
                         MOI.ScalarAffineTerm(a[k][2]*a[k][2], Xsq[2,2]),
                         MOI.ScalarAffineTerm(-2 * a[k][1], Xsq[1, j+2]),
                         MOI.ScalarAffineTerm(-2 * a[k][2], Xsq[2, j+2]),
                         MOI.ScalarAffineTerm(1.0, Xsq[j+2, j+2]),
-                    ], 0.0), MOI.EqualTo(d_bar[k, j]^2))
+                    ]), -[d_bar[k, j]^2]), MOI.Zeros(1))
+            end
         end
     end
 
@@ -39,28 +51,42 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false)
             count_all += 1
             if rand() > 0.9
                 count += 1
-                MOI.add_constraint(optimizer, 
-                    MOI.ScalarAffineFunction([
-                        MOI.ScalarAffineTerm(1.0, Xsq[i+2,i+2] ),
-                        MOI.ScalarAffineTerm(1.0, Xsq[j+2,j+2] ),
-                        MOI.ScalarAffineTerm(-2.0, Xsq[i+2,j+2]),
-                    ], 0.0), MOI.EqualTo(d[i, j]^2))
+                if scalar
+                    MOI.add_constraint(optimizer, 
+                        MOI.ScalarAffineFunction([
+                            MOI.ScalarAffineTerm(1.0, Xsq[i+2,i+2] ),
+                            MOI.ScalarAffineTerm(1.0, Xsq[j+2,j+2] ),
+                            MOI.ScalarAffineTerm(-2.0, Xsq[i+2,j+2]),
+                        ], 0.0), MOI.EqualTo(d[i, j]^2))
+                else
+                    MOI.add_constraint(optimizer, 
+                        MOI.VectorAffineFunction(
+                            MOI.VectorAffineTerm.([1],[
+                                MOI.ScalarAffineTerm(1.0, Xsq[i+2,i+2] ),
+                                MOI.ScalarAffineTerm(1.0, Xsq[j+2,j+2] ),
+                                MOI.ScalarAffineTerm(-2.0, Xsq[i+2,j+2]),
+                            ]), -[d[i, j]^2]), MOI.Zeros(1))
+                end
             end
         end
     end
     if verbose
         @show count_all, count
     end
-    if false
+    if scalar
         MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 1]), MOI.EqualTo(1.0))
         MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[1, 2]), MOI.EqualTo(0.0))
         MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 1]), MOI.EqualTo(0.0))
         MOI.add_constraint(optimizer, MOI.SingleVariable(Xsq[2, 2]), MOI.EqualTo(1.0))
     else
-        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[1, 1])], 0.0), MOI.EqualTo(1.0))
-        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[1, 2])], 0.0), MOI.EqualTo(0.0))
-        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[2, 1])], 0.0), MOI.EqualTo(0.0))
-        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, Xsq[2, 2])], 0.0), MOI.EqualTo(1.0))
+        MOI.add_constraint(optimizer, MOI.VectorAffineFunction(
+            MOI.VectorAffineTerm.([1],[MOI.ScalarAffineTerm(1.0, Xsq[1, 1])]), [-1.0]), MOI.Zeros(1))
+        MOI.add_constraint(optimizer, MOI.VectorAffineFunction(
+            MOI.VectorAffineTerm.([1],[MOI.ScalarAffineTerm(1.0, Xsq[1, 2])]), [ 0.0]), MOI.Zeros(1))
+        MOI.add_constraint(optimizer, MOI.VectorAffineFunction(
+            MOI.VectorAffineTerm.([1],[MOI.ScalarAffineTerm(1.0, Xsq[2, 1])]), [ 0.0]), MOI.Zeros(1))
+        MOI.add_constraint(optimizer, MOI.VectorAffineFunction(
+            MOI.VectorAffineTerm.([1],[MOI.ScalarAffineTerm(1.0, Xsq[2, 2])]), [-1.0]), MOI.Zeros(1))
     end
 
     objf_t = [MOI.ScalarAffineTerm(0.0, Xsq[1, 1])]

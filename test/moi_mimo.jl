@@ -26,9 +26,9 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false, scalar = fa
         MOI.add_constraint(optimizer,
                             MOI.VectorAffineFunction(
                                 MOI.VectorAffineTerm.(
-                                    collect(1:nvars), MOI.ScalarAffineTerm.(1.0, X)),
-                                ones(nvars)),
-                            MOI.Nonnegatives(nvars))
+                                    collect(1:nvars), MOI.ScalarAffineTerm.(-1.0, X)),
+                                -ones(nvars)),
+                            MOI.Nonpositives(nvars))
     end
 
     Xsq = Matrix{MOI.VariableIndex}(undef, n+1,n+1)

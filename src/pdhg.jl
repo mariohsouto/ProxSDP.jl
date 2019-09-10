@@ -155,6 +155,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                             if p.min_eig[idx] > opt.tol_psd
                                 p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                                # p.target_rank[idx] = min(1 + p.target_rank[idx], sdp.sq_side)
                             end
                         end
                     end
@@ -174,6 +175,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if p.min_eig[idx] > opt.tol_psd
                             p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                            # p.target_rank[idx] = min(1 + p.target_rank[idx], sdp.sq_side)
                         end
                     end
                 end

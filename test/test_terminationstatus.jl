@@ -38,6 +38,9 @@ function build_simple_lp!(pre_opt::MOIU.CachingOptimizer)
     MOI.set(optim, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 end
 
+const optimizer_maxiter = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(max_iter = 1, log_verbose = false))
+const optimizer_timelimit = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = false))
+
 @testset "MOI status" begin
     @testset "MOI.OPTIMAL" begin
         build_simple_lp!(optimizer)
@@ -53,10 +56,10 @@ end
         MOI.empty!(optimizer_maxiter)
     end
 
-    @testset "MOI.ITERATION_LIMIT" begin
-        build_simple_lp!(optimizer_timelimit)
-        MOI.optimize!(optimizer_timelimit)
-        @test MOI.get(optimizer_timelimit, MOI.TerminationStatus()) == MOI.TIME_LIMIT
-        MOI.empty!(optimizer_timelimit)
-    end
+    # @testset "MOI.TIME_LIMIT" begin
+    #     build_simple_lp!(optimizer_timelimit)
+    #     MOI.optimize!(optimizer_timelimit)
+    #     @test MOI.get(optimizer_timelimit, MOI.TerminationStatus()) == MOI.TIME_LIMIT
+    #     MOI.empty!(optimizer_timelimit)
+    # end
 end

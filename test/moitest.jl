@@ -7,18 +7,10 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-# MOIU.@model ProxSDPModelData () (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan) (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.PositiveSemidefiniteConeTriangle) () (MOI.SingleVariable,) (MOI.ScalarAffineFunction,) (MOI.VectorOfVariables,) (MOI.VectorAffineFunction,)
 const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 
 const optimizer = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
-const optimizer_lin = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6))
-const optimizer_con = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
-const optimizer_con2 = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_soc = 1e-3, tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false, max_iter = 1_000_000))
-const optimizer_lin_hd = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6))
-const optimizer3 = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(log_freq = 1000, log_verbose = false, tol_primal = 1e-6, tol_dual = 1e-6))
-const optimizer_log = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(log_freq = 10, log_verbose = true, tol_primal = 1e-6, tol_dual = 1e-6))
-const optimizer_maxiter = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(max_iter = 1, log_verbose = true))
-const optimizer_timelimit = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = true))
+const optimizer_low_acc = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = true, timer_verbose = true))
 const optimizer_full = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_print = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
@@ -34,7 +26,7 @@ end
 end
 
 @testset "Unit" begin
-    bridged = MOIB.full_bridge_optimizer(optimizer_lin, Float64)
+    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOIT.unittest(bridged, config,[
         # Quadratic functions are not supported
         "solve_qcp_edge_cases", "solve_qp_edge_cases",
@@ -52,7 +44,7 @@ end
 end
 
 @testset "MOI Continuous Linear" begin
-    bridged = MOIB.full_bridge_optimizer(optimizer_lin, Float64)
+    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOIT.contlineartest(bridged, config, [
         # infeasible/unbounded
         # "linear8a", "linear8b", "linear8c", "linear12",
@@ -64,11 +56,11 @@ end
         "partial_start",
         ]
     )
-    # MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer_lin_hd), config)
+    # MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer), config)
 end
 
 @testset "MOI Continuous Conic" begin
-    MOIT.contconictest(MOIB.full_bridge_optimizer(optimizer_lin_hd, Float64), config_conic, [
+    MOIT.contconictest(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic, [
         # bridge: some problem with square psd
         "rootdets",
         # exp cone
@@ -86,7 +78,7 @@ end
 
 @testset "Simple LP" begin
 
-    bridged = MOIB.full_bridge_optimizer(optimizer_con, Float64)
+    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOI.empty!(bridged)
     @test MOI.is_empty(bridged)
 
@@ -442,7 +434,11 @@ end
 
 end
 
-#=
+using LinearAlgebra
+LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
+LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
+LinearAlgebra.transpose(v::MathOptInterface.VariableIndex) = v
+
 @testset "MIMO Sizes" begin
     include("base_mimo.jl")
     include("moi_mimo.jl")
@@ -456,42 +452,40 @@ end
 @testset "RANDSDP Sizes" begin
     include("base_randsdp.jl")
     include("moi_randsdp.jl")
-    for n in 10:12, m in 10:12
+    for n in 10:11, m in 10:11
         @testset "RANDSDP n=$n, m=$m" begin 
             moi_randsdp(optimizer, 123, n, m, test = true, atol = 1e-1)
         end
     end
 end
-=#
+
 # This problems are too large for Travis
-#=
 @testset "SDPLIB Sizes" begin
     datapath = joinpath(dirname(@__FILE__), "data")
     include("base_sdplib.jl")
     include("moi_sdplib.jl")
     @testset "EQPART" begin
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-1.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-2.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
+        # badly conditioned
+        # moi_sdplib(optimizer_low_acc, joinpath(datapath, "gpp124-1.dat-s"), test = true)
+        moi_sdplib(optimizer_low_acc, joinpath(datapath, "gpp124-2.dat-s"), test = true)
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
+        # moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
     end
     @testset "MAX CUT" begin
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-1.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
-        moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)
+        moi_sdplib(optimizer_low_acc, joinpath(datapath, "mcp124-1.dat-s"), test = true)
+        # moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
+        # moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
+        # moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)
     end
 end
-=#
-#=
+
 @testset "Sensor Localization" begin
     include("base_sensorloc.jl")
     include("moi_sensorloc.jl")
-    for n in 20:5:30
+    for n in 5:5:10
         moi_sensorloc(optimizer, 0, n, test = true)
     end
 end
-=#
 
 @testset "Full eig" begin
     MOIT.psdt0vtest(

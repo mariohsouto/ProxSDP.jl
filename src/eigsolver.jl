@@ -9,7 +9,7 @@ mutable struct ARPACKAlloc{T}
     which::String
     mode::Int
     A::Function
-    Amat::Symmetric{Float64,Matrix{Float64}}
+    Amat::Symmetric{T,Matrix{T}}
     lworkl::Int
     TOL::Vector{T}
     v::Matrix{T}
@@ -31,7 +31,7 @@ mutable struct ARPACKAlloc{T}
     arpackerror::Bool
     x::Vector{T}
     y::Vector{T}
-    tol::Float64
+    tol::T
 
     function ARPACKAlloc{T}() where T
         new{T}()
@@ -50,7 +50,7 @@ end
 
 function ARPACKAlloc(T::DataType, n::Int64)::ARPACKAlloc
     arc = ARPACKAlloc{T}()
-    @timeit "init_arc" _init_arc!(arc::ARPACKAlloc, Symmetric(Matrix{T}(I, n, n)), 1, n)
+    @timeit "init_arc" _init_arc!(arc::ARPACKAlloc, Symmetric(Matrix{T}(I, n, n), :U), 1, n)
     return arc
 end
 
@@ -97,11 +97,11 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     arc.workl = Vector{T}(undef, arc.lworkl)
     arc.rwork = Vector{T}()
     arc.iparam = ones(BlasInt, 11)
-    arc.iparam[1] = BlasInt(1)       
+    arc.iparam[1] = BlasInt(1)
     arc.iparam[3] = BlasInt(arc.maxiter)
     arc.iparam[4] = BlasInt(1)
     arc.iparam[7] = BlasInt(arc.mode)
-    arc.ipntr = zeros(BlasInt, 11) 
+    arc.ipntr = zeros(BlasInt, 11)
     # IDO must be zero on the first call to dsaupd
     arc.ido = zeros(BlasInt, 1)
 
@@ -135,28 +135,46 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
         # Parameters for _EUPD! routine
         arc.select = Vector{BlasInt}(undef, arc.ncv)
         arc.d = Vector{T}(undef, arc.nev)
+    else
+        # Number of eigenvalues of OP to be computed
+        arc.nev = nev
+        # How many Lanczos vectors are generated
+        # arc.ncv = arc.nev + 1
+        arc.ncv = max(20, 2 * arc.nev + 1)
+        # Lanczos basis vectors (output)
+        # arc.v = Matrix{T}(undef, arc.n, arc.ncv)
+        # Workspace
+        arc.lworkl = arc.ncv * (arc.ncv + 8)
+        # arc.workl = Vector{T}(undef, arc.lworkl)
+        # Parameters for _EUPD! routine
+        # arc.select = Vector{BlasInt}(undef, arc.ncv)
+        # arc.d = Vector{T}(undef, arc.nev)
     end
 
     # Build linear operator
     arc.Amat = A
 
     # If info != 0, RESID contains the initial residual vector
-    arc.info = ones(BlasInt, 1)
-    arc.info_e = ones(BlasInt, 1)
+    arc.info[] = BlasInt(1)#ones(BlasInt, 1)
+    arc.info_e[] = BlasInt(1)#ones(BlasInt, 1)
 
     # Iparam
-    arc.iparam = ones(BlasInt, 11)
-    arc.iparam[1] = BlasInt(1)       
+    # arc.iparam = ones(BlasInt, 11)
+    fill!(arc.iparam, BlasInt(1))
+    arc.iparam[1] = BlasInt(1)
     arc.iparam[3] = BlasInt(arc.maxiter)
     arc.iparam[4] = BlasInt(1)
     arc.iparam[7] = BlasInt(arc.mode)
-    arc.ipntr = zeros(BlasInt, 11) 
+    # arc.ipntr = zeros(BlasInt, 11)
+    fill!(arc.ipntr, BlasInt(0))
     # IDO must be zero on the first call to dsaupd
-    arc.ido = zeros(BlasInt, 1)
+    # arc.ido = zeros(BlasInt, 1)
+    fill!(arc.ido, BlasInt(0))
 
     # Stopping criterion
     arc.tol = max(arc.tol / (iter / 10.), 1e-10)
-    arc.TOL = arc.tol * ones(T, 1)
+    # arc.TOL = arc.tol * ones(T, 1)
+    arc.TOL[] = arc.tol * one(T)
 
     return nothing
 end
@@ -187,7 +205,7 @@ function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
     end
 
     # Check if _AUPD has converged properly
-    if !(arc.info[] in [0, 1])
+    if !(0 <= arc.info[] <= 1)
         arc.converged = false
         arc.arpackerror = true
     else
@@ -201,7 +219,7 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
 
     # Check if _AUPD has converged properly
     if !arc.converged
-        arc.converged = false        
+        arc.converged = false
         return nothing
     end
 
@@ -221,7 +239,7 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
     if nconv < arc.nev 
         arc.converged = false
         arc.arpackerror = false
-        return nothing        
+        return nothing
     end
 
     arc.converged = true
