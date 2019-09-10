@@ -136,6 +136,7 @@ end
 function MOI.empty!(optimizer::Optimizer)
     optimizer.maxsense = false
     optimizer.data = nothing # It should already be nothing except if an error is thrown inside copy_to
+    optimizer.cone = ConeData()
     optimizer.sol.ret_val = 0
 end
 
@@ -179,35 +180,96 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
 end
 
+#=
+    modificaiton from MOI
+=#
+function MOIU.allocate_vector_of_variables(dest::Optimizer, src::MOI.ModelLike,
+    idxmap::MOIU.IndexMap,
+    S::Type{<:MOI.AbstractSet})
+    allocated = MOI.ConstraintIndex{MOI.VectorOfVariables, S}[]
+    not_allocated = MOI.ConstraintIndex{MOI.VectorOfVariables, S}[]
+    cis_src = MOI.get(src, MOI.ListOfConstraintIndices{MOI.VectorOfVariables, S}())
+    fs_src = MOI.get(src, MOI.ConstraintFunction(), cis_src)::Vector{MOI.VectorOfVariables}
+    for (ci_src, f_src) in zip(cis_src, fs_src)
+        if all(vi -> !haskey(idxmap, vi), f_src.variables)
+            set = MOI.get(src, MOI.ConstraintSet(), ci_src)::S
+            # this is the moficiation v
+            # vis_dest, ci_dest = allocate_constrained_variables(dest, set)
+            vis_dest, ci_dest = MOIU.allocate_constrained_variables(dest, f_src, set)
+            idxmap[ci_src] = ci_dest
+            for (vi_src, vi_dest) in zip(f_src.variables, vis_dest)
+                idxmap[vi_src] = vi_dest
+            end
+            push!(allocated, ci_src)
+        else
+            push!(not_allocated, ci_src)
+        end
+    end
+    return allocated, not_allocated
+end
+
+
 const SupportedSets = Union{MOI.PositiveSemidefiniteConeTriangle,
                             MOI.SecondOrderCone}
-function get_new_variable_indexes(optimizer::Optimizer, set::SupportedSets)
-    len = MOI.dimension(set)
-    first = optimizer.cone.cone_cols + 1
-    last = optimizer.cone.cone_cols + len
-    optimizer.cone.cone_cols += len
-    return first, last
+function get_new_variable_indexes(optimizer::Optimizer, func::MOI.VectorOfVariables, set::SupportedSets)
+    # len = MOI.dimension(set)
+    if allunique(func.variables)
+        len = length(func.variables)
+        first = optimizer.cone.cone_cols + 1
+        last = optimizer.cone.cone_cols + len
+        optimizer.cone.cone_cols += len
+        return collect(first:last)
+    else
+        max_len = MOI.dimension(set)
+        map = Dict{Int,Int}() # old -> new
+        inds = Int[]
+        sizehint!(inds, max_len)
+        len = 0
+        current = 0
+        for i in func.variables
+            optimizer.cone.cone_cols
+            if haskey(map, i.value)
+                current = map[i.value]
+            else
+                len += 1
+                map[i.value] = len
+                current = len
+            end
+            push!(inds, current)
+        end
+        return inds
+    end
 end
-function get_cone_list(optimizer::Optimizer, set::MOI.PositiveSemidefiniteConeTriangle)
-    return optimizer.cone.sdc
+function get_cone_list(cone::ConeData, set::MOI.PositiveSemidefiniteConeTriangle)
+    return cone.sdc
 end
-function get_cone_list(optimizer::Optimizer, set::MOI.SecondOrderCone)
-    return optimizer.cone.soc
+function get_cone_list(cone::ConeData, set::MOI.SecondOrderCone)
+    return cone.soc
+end
+function get_cone_list(optimizer::Optimizer, set::SupportedSets)
+    get_cone_list(optimizer.cone, set)
 end
 
 function MOIU.allocate_constrained_variables(optimizer::Optimizer,
-    set::SupportedSets)
-    first, last = get_new_variable_indexes(optimizer, set)
+    func::MOI.VectorOfVariables, set::SupportedSets)
+    inds = get_new_variable_indexes(optimizer, func, set)
+    vars = MOI.VariableIndex.(inds)
     list = get_cone_list(optimizer, set)
-    push!(list, collect(first:last))
+    push!(list, inds)
     ci = MOI.ConstraintIndex{MOI.VectorOfVariables, typeof(set)}(length(list))
-    return [MOI.VariableIndex(i) for i in first:last], ci
+    return vars, ci
 end
 
 function MOIU.load_constrained_variables(
     optimizer::Optimizer, vis::Vector{MOI.VariableIndex},
     ci::MOI.ConstraintIndex{MOI.VectorOfVariables},
     set::SupportedSets)
+end
+
+function _allocate_constraint(cone::ConeData, f, set::SupportedSets)
+    list = get_cone_list(cone, set)
+    push!(list, Int[])
+    return length(list)
 end
 
 function _allocate_constraint(cone::ConeData, f, s::MOI.Zeros)
@@ -224,6 +286,16 @@ function _allocate_constraint(cone::ConeData, f, s::MOI.Nonpositives)
     push!(cone.in_len, len)
     cone.in_tot += len
     return length(cone.in_len)
+end
+
+function MOIU.load_constraint(optimizer::Optimizer, ci::CI,
+    f::MOI.VectorOfVariables,
+    set::SupportedSets)
+
+    vec = get_cone_list(optimizer.cone, set)[ci.value]
+
+    append!(vec, [i.value for i in f.variables])
+    nothing
 end
 
 function MOIU.allocate_constraint(optimizer::Optimizer, f::F, s::S) where {F <: MOI.AbstractFunction, S <: MOI.AbstractSet}
@@ -292,10 +364,10 @@ function matrix_rhs_vec(optimizer::Optimizer, set::MOI.Nonpositives)
     return optimizer.data.h
 end
 
-# first allocate-load method to be called
+# called after ctr var - only aditonal
 function MOIU.allocate_variables(optimizer::Optimizer, nvars::Integer)
-    optimizer.cone = ConeData()
-    VI.(1:nvars)
+    allocated = optimizer.cone.cone_cols
+    VI.(allocated .+ (1:nvars))
 end
 
 function MOIU.load_variables(optimizer::Optimizer, nvars::Integer)
@@ -311,7 +383,7 @@ function MOIU.load_variables(optimizer::Optimizer, nvars::Integer)
     Vi = Float64[]
     h = zeros(cone.in_tot)
 
-    tot_vars = nvars + cone.cone_cols
+    tot_vars = nvars# + cone.cone_cols
     c = zeros(tot_vars)
     optimizer.data = ModelData(m, tot_vars, I, J, V, b, Ii, Ji, Vi, h, 0., c)
     # `optimizer.sol` contains the result of the previous optimization.
@@ -384,7 +456,6 @@ end
 function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
                f::MOI.ScalarAffineFunction)
     # @show f
-    # @show optimizer.data.n
     c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
                         optimizer.data.n))
     optimizer.data.objective_constant = f.constant
@@ -523,6 +594,14 @@ function MOI.optimize!(optimizer::Optimizer)
     end
 
     # warm = WarmStart()
+
+    # @show c
+    # @show b
+    # @show Matrix{Float64}(A)
+    # @show h
+    # @show Matrix{Float64}(G)
+
+    # @show con
 
     sol = @timeit "Main" chambolle_pock(aff, con, options)
 

@@ -201,7 +201,7 @@ mutable struct AuxiliaryData
     function AuxiliaryData(aff::AffineSets, cones::ConicSets) 
         Mx_old = zeros(aff.p+aff.m)
     new(
-        [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :L) for sdp in cones.sdpcone], 
+        [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :U) for sdp in cones.sdpcone], 
         zeros(aff.n), zeros(aff.n),
         zeros(aff.p+aff.m), Mx_old, zeros(aff.p+aff.m), 
         zeros(aff.p+aff.m), zeros(aff.p+aff.m),

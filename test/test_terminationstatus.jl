@@ -1,4 +1,5 @@
-function build_simple_lp!(optim::MOIU.CachingOptimizer)
+function build_simple_lp!(pre_opt::MOIU.CachingOptimizer)
+    optim = MOIB.full_bridge_optimizer(pre_opt, Float64)
     MOI.empty!(optim)
     @test MOI.is_empty(optim)
 

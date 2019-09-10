@@ -239,7 +239,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Remove diag scaling
     cont = 1
-    @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+    @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
         if i != j
             pair.x[cont] /= sqrt(2.)
         end

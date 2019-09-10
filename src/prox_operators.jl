@@ -7,7 +7,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
     # Build symmetric matrix(es) X
     @timeit "reshape1" begin
         cont = 1
-        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
+        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
             if i != j
                 a.m[idx].data[i,j] = v[cont] / sqrt_2
             else
@@ -54,7 +54,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
 
     @timeit "reshape2" begin
         cont = 1
-        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in j:sdp.sq_side
+        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
             if i != j
                 v[cont] = a.m[idx].data[i, j] * sqrt_2
             else
