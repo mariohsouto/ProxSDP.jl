@@ -272,13 +272,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Post processing
     pair.x = pair.x[var_ordering]
-    # ctr_primal = Float64[]
-    # for soc in conic_sets.socone
-    #     append!(ctr_primal, pair.x[soc.idx])
-    # end
-    # for sdp in conic_sets.sdpcone
-    #     append!(ctr_primal, pair.x[sdp.vec_i])
-    # end
 
     dual_eq = pair.y[1:length(b_orig)]
     dual_in = pair.y[length(b_orig)+1:end]

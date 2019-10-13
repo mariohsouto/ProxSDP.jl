@@ -50,7 +50,6 @@ mutable struct ModelData
     c::Vector{Float64}
 end
 
-# This is tied to SCS's internal representation
 Base.@kwdef mutable struct ConeData
 
     cone_cols::Int = 0
@@ -152,25 +151,13 @@ function MOI.supports(::Optimizer,
     return true
 end
 
-# function MOI.supports_constraint(
-#     ::Optimizer, ::Type{MOI.VectorOfVariables}, ::Type{MOI.Reals})
-#     return true
-# end
-
-MOI.supports_constraint(::Optimizer, f::MOI.AbstractFunction, s::MOI.AbstractSet) = false
 function MOI.supports_constraint(
     ::Optimizer,
     ::Type{<:MOI.VectorAffineFunction{Float64}},
     ::Type{<:Union{MOI.Zeros, MOI.Nonpositives}})
     return true
 end
-# function MOI.supports_constraint(
-#     ::Optimizer,
-#     ::Type{<:MOI.ScalarAffineFunction{Float64}},
-#     ::Type{<:Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64},
-#         MOI.LessThan{Float64}}})
-#     return true
-# end
+
 function MOI.supports_constraint(
     ::Optimizer,
     ::Type{<:MOI.VectorOfVariables},
@@ -382,21 +369,9 @@ end
 function MOIU.load(::Optimizer, ::MOI.ConstraintPrimalStart,
     ::MOI.ConstraintIndex, ::Nothing)
 end
-# function MOIU.load(optimizer::Optimizer, ::MOI.ConstraintPrimalStart,
-#                    ci::MOI.ConstraintIndex, value)
-#     offset = constroffset(optimizer, ci)
-#     rows = constrrows(optimizer, ci)
-#     optimizer.sol.primal[offset .+ rows] .= value
-# end
 function MOIU.load(::Optimizer, ::MOI.ConstraintDualStart,
     ::MOI.ConstraintIndex, ::Nothing)
 end
-# function MOIU.load(optimizer::Optimizer, ::MOI.ConstraintDualStart,
-#                    ci::MOI.ConstraintIndex, value)
-#     offset = constroffset(optimizer, ci)
-#     rows = constrrows(optimizer, ci)
-#     optimizer.sol.primal[offset .+ rows] .= value
-# end
 function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense)
 end
 function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
@@ -408,7 +383,6 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
 end
 function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
                f::MOI.ScalarAffineFunction)
-    # @show f
     c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
                         optimizer.data.n))
     optimizer.data.objective_constant = f.constant
@@ -461,33 +435,23 @@ function MOI.optimize!(optimizer::Optimizer)
         SOCSet[]
         )
 
-    # preAt = sparse(preA')
-
     # create extra variables
     n_tot_variables = n_variables
     In, Jn, Vn = Int[], Int[], Float64[]
 
     # this way there is a single elements per column
     # because we assume VOV in SET and NOT AFF in SET
-    # Asoc = preAt[:,cone.f+cone.l+1:cone.f+cone.l+cone.q]
-    # A = Asoc
-    # rows = rowvals(A)
-    # first_ind_local = 1
     for i in eachindex(cone.soc)
         n_vars = length(cone.soc[i])
-        vec_inds = cone.soc[i] #get_indices_cone(A, rows, n_vars, first_ind_local)
+        vec_inds = cone.soc[i]
         n_tot_variables += fix_duplicates!(vec_inds, n_tot_variables, In, Jn, Vn)
         push!(con.socone, SOCSet(vec_inds, n_vars))
         # first_ind_local += n_vars
     end
 
-    # Asdp = preAt[:,cone.f+cone.l+cone.q+1:end]
-    # A = Asdp
-    # rows = rowvals(A)
-    # first_ind_local = 1
     for i in eachindex(cone.sdc)
         n_vars = length(cone.sdc[i])
-        vec_inds = cone.sdc[i]#get_indices_cone(A, rows, n_vars, first_ind_local)
+        vec_inds = cone.sdc[i]
         n_tot_variables += fix_duplicates!(vec_inds, n_tot_variables, In, Jn, Vn)
         sq_side = sympackeddim(n_vars)
         sq_len = sq_side*sq_side
@@ -548,17 +512,7 @@ function MOI.optimize!(optimizer::Optimizer)
 
     # warm = WarmStart()
 
-    # @show c
-    # @show b
-    # @show Matrix{Float64}(A)
-    # @show h
-    # @show Matrix{Float64}(G)
-
-    # @show con
-
     sol = @timeit "Main" chambolle_pock(aff, con, options)
-
-    # sol = @enter chambolle_pock(aff, con, options)
 
     #= 
         Unload solution
@@ -622,9 +576,7 @@ function fix_duplicates!(vec1::Vector{Int}, vec2::Vector{Int}, n::Int,
     if n_dups == 0
         return 0
     end
-    # if n_dups > 0
-    #     error("SOC cones must be disjoint")
-    # end
+
     append!(Jn, duplicates)
     append!(Jn, collect(1:n_dups) .+ n)
     append!(In, collect(1:n_dups) .+ n)
