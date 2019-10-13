@@ -1,16 +1,18 @@
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult#,
+    # warm::WarmStart)::CPResult
 
     # Initialize parameters
     p = Params()
-    p.theta = opt.initial_theta             
-    p.adapt_level = opt.initial_adapt_level 
-    p.window = opt.convergence_window       
+    p.theta = opt.initial_theta
+    p.adapt_level = opt.initial_adapt_level
+    p.window = opt.convergence_window
     p.beta = opt.initial_beta
     p.time0 = time()
     p.norm_b = norm(affine_sets.b, 2)
     p.norm_h = norm(affine_sets.h, 2)
     p.norm_c = norm(affine_sets.c, 2)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
+    p.stop_reason_string = "Not optimized"
     p.target_rank = 2 * ones(length(conic_sets.sdpcone))
     p.current_rank = 2 * ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
@@ -139,6 +141,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
  
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
                 p.stop_reason = 1 # Optimal
+                p.stop_reason_string = "Optimal solution found"
                 if opt.log_verbose
                     print_progress(residuals, p)
                 end
@@ -152,6 +155,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                             if p.min_eig[idx] > opt.tol_psd
                                 p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                                # p.target_rank[idx] = min(1 + p.target_rank[idx], sdp.sq_side)
                             end
                         end
                     end
@@ -171,12 +175,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if p.min_eig[idx] > opt.tol_psd
                             p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
+                            # p.target_rank[idx] = min(1 + p.target_rank[idx], sdp.sq_side)
                         end
                     end
                 end
                 p.rank_update, p.update_cont = 0, 0
                 if full_rank_flag == true
                     p.stop_reason = 4 # Infeasible
+                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
                     break
                 end
             end
@@ -219,6 +225,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 print_progress(residuals, p)
             end
             p.stop_reason = 2 # Time limit
+            p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
             break
         end
 
@@ -228,12 +235,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 print_progress(residuals, p)
             end
             p.stop_reason = 3 # Iteration limit
+            p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
         end
     end
 
     # Remove diag scaling
     cont = 1
-    @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+    @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
         if i != j
             pair.x[cont] /= sqrt(2.)
         end
@@ -264,18 +272,18 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Post processing
     pair.x = pair.x[var_ordering]
-    ctr_primal = Float64[]
-    for soc in conic_sets.socone
-        append!(ctr_primal, pair.x[soc.idx])
-    end
-    for sdp in conic_sets.sdpcone
-        append!(ctr_primal, pair.x[sdp.vec_i])
-    end
+
+    dual_eq = pair.y[1:length(b_orig)]
+    dual_in = pair.y[length(b_orig)+1:end]
 
     return CPResult(p.stop_reason,
+                    p.stop_reason_string,
                     pair.x,
-                    pair.y,
-                    -vcat(equa_error, slack_ineq, -ctr_primal),
+                    # pair.y,
+                    dual_eq,
+                    dual_in,
+                    equa_error,
+                    slack_ineq,
                     residuals.equa_feasibility,
                     residuals.ineq_feasibility,
                     residuals.prim_obj,

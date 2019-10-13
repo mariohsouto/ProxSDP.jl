@@ -1,4 +1,4 @@
-function moi_sdplib(optimizer, path; verbose = false, test = false)
+function moi_sdplib(optimizer, path; verbose = false, test = false, scalar = false)
 
     if verbose
         println("running: $(path)")
@@ -30,7 +30,12 @@ function moi_sdplib(optimizer, path; verbose = false, test = false)
     for k in 1:m
         ctr_k = [MOI.ScalarAffineTerm(F[k][idx...], Xsq[idx...]) 
             for idx in zip(findnz(F[k])[1:end-1]...)]
-        MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
+        if scalar
+            MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
+        else
+            MOI.add_constraint(optimizer,
+                MOI.VectorAffineFunction(MOI.VectorAffineTerm.([1], ctr_k), [-c[k]]), MOI.Zeros(1))
+        end
     end
 
     MOI.optimize!(optimizer)

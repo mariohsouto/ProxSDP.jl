@@ -1,4 +1,4 @@
-function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol = 1e-2)
+function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol = 1e-2, scalar = false)
 
     MOI.empty!(optimizer)
     if test
@@ -17,7 +17,12 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
     for k in 1:m
         ctr_k = vec([MOI.ScalarAffineTerm(A[k][i,j], Xsq[i,j]) for j in 1:n, i in 1:n])
+        if scalar
             MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(b[k]))
+        else
+            MOI.add_constraint(optimizer,
+                MOI.VectorAffineFunction(MOI.VectorAffineTerm.([1], ctr_k), [-b[k]]), MOI.Zeros(1))
+        end
     end
 
     vov = MOI.VectorOfVariables(X)

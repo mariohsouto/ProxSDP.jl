@@ -43,7 +43,7 @@ function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
     cte = (sqrt(2.) / 2.)
     rows = rowvals(affine_sets.A)
     cont = 1
-    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in 1:j
         if i != j
             for line in nzrange(affine_sets.A, cont)
                 affine_sets.A[rows[line], cont] *= cte
@@ -53,7 +53,7 @@ function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
     end
     rows = rowvals(affine_sets.G)
     cont = 1
-    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+    for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in 1:j
         if i != j
             for line in nzrange(affine_sets.G, cont)
                 affine_sets.G[rows[line], cont] *= cte
@@ -62,7 +62,7 @@ function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
         cont += 1
     end
     cont = 1
-    @inbounds for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in j:sdp.sq_side
+    @inbounds for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in 1:j
         if i != j
             affine_sets.c[cont] *= cte
         end
