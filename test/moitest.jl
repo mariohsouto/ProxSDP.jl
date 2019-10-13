@@ -36,7 +36,8 @@ end
         "solve_zero_one_with_bounds_2",
         "solve_zero_one_with_bounds_3",
                     # `TimeLimitSec` not supported.
-                    "time_limit_sec",
+                    # "time_limit_sec",
+                    "number_threads",
                     # ArgumentError: The number of constraints in SCSModel must be greater than 0
                     "solve_unbounded_model",
         ]
@@ -64,9 +65,9 @@ end
         # bridge: some problem with square psd
         "rootdets",
         # exp cone
-        "logdet", "exp",
+        "logdet", "exp", "dualexp",
         # pow cone
-        "pow",
+        "pow","dualpow",
         # infeasible/unbounded
         # "lin3", "lin4", 
         "soc3", "psdt2", "normone2", "norminf2",#, "rotatedsoc2"

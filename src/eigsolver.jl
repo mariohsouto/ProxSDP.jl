@@ -33,6 +33,8 @@ mutable struct ARPACKAlloc{T}
     y::Vector{T}
     tol::T
 
+    rng::Random.MersenneTwister
+
     function ARPACKAlloc{T}() where T
         new{T}()
     end
@@ -88,8 +90,8 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     arc.info = ones(BlasInt, 1)
     arc.info_e = ones(BlasInt, 1)
     # Resid contains the initial residual vector
-    Random.seed!(1234);
-    arc.resid = rand(arc.n)
+    arc.rng = Random.MersenneTwister(1234)
+    arc.resid = rand(arc.rng, arc.n)
 
     # Workspace
     arc.workd = Vector{T}(undef, 3 * arc.n)

@@ -122,13 +122,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.Silent)
     end
 end
 
-MOI.supports(::Optimizer, ::MOI.TimeLimitSec ) = true
-function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec , value)
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, value)
     optimizer.options.time_limit = value
 end
 function MOI.get(optimizer::Optimizer, ::MOI.TimeLimitSec)
     return optimizer.options.time_limit
 end
+
+
+MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
 
 function MOI.is_empty(optimizer::Optimizer)
     !optimizer.maxsense && optimizer.data === nothing
@@ -180,65 +183,14 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
 end
 
-#=
-    modificaiton from MOI
-=#
-function MOIU.allocate_vector_of_variables(dest::Optimizer, src::MOI.ModelLike,
-    idxmap::MOIU.IndexMap,
-    S::Type{<:MOI.AbstractSet})
-    allocated = MOI.ConstraintIndex{MOI.VectorOfVariables, S}[]
-    not_allocated = MOI.ConstraintIndex{MOI.VectorOfVariables, S}[]
-    cis_src = MOI.get(src, MOI.ListOfConstraintIndices{MOI.VectorOfVariables, S}())
-    fs_src = MOI.get(src, MOI.ConstraintFunction(), cis_src)::Vector{MOI.VectorOfVariables}
-    for (ci_src, f_src) in zip(cis_src, fs_src)
-        if all(vi -> !haskey(idxmap, vi), f_src.variables)
-            set = MOI.get(src, MOI.ConstraintSet(), ci_src)::S
-            # this is the moficiation v
-            # vis_dest, ci_dest = allocate_constrained_variables(dest, set)
-            vis_dest, ci_dest = MOIU.allocate_constrained_variables(dest, f_src, set)
-            idxmap[ci_src] = ci_dest
-            for (vi_src, vi_dest) in zip(f_src.variables, vis_dest)
-                idxmap[vi_src] = vi_dest
-            end
-            push!(allocated, ci_src)
-        else
-            push!(not_allocated, ci_src)
-        end
-    end
-    return allocated, not_allocated
-end
-
-
 const SupportedSets = Union{MOI.PositiveSemidefiniteConeTriangle,
                             MOI.SecondOrderCone}
-function get_new_variable_indexes(optimizer::Optimizer, func::MOI.VectorOfVariables, set::SupportedSets)
-    # len = MOI.dimension(set)
-    if allunique(func.variables)
-        len = length(func.variables)
-        first = optimizer.cone.cone_cols + 1
-        last = optimizer.cone.cone_cols + len
-        optimizer.cone.cone_cols += len
-        return collect(first:last)
-    else
-        max_len = MOI.dimension(set)
-        map = Dict{Int,Int}() # old -> new
-        inds = Int[]
-        sizehint!(inds, max_len)
-        len = 0
-        current = 0
-        for i in func.variables
-            optimizer.cone.cone_cols
-            if haskey(map, i.value)
-                current = map[i.value]
-            else
-                len += 1
-                map[i.value] = len
-                current = len
-            end
-            push!(inds, current)
-        end
-        return inds
-    end
+function get_new_variable_indexes_unique(optimizer::Optimizer, set::SupportedSets)
+    len = MOI.dimension(set)
+    first = optimizer.cone.cone_cols + 1
+    last = optimizer.cone.cone_cols + len
+    optimizer.cone.cone_cols += len
+    return collect(first:last)
 end
 function get_cone_list(cone::ConeData, set::MOI.PositiveSemidefiniteConeTriangle)
     return cone.sdc
@@ -250,9 +202,10 @@ function get_cone_list(optimizer::Optimizer, set::SupportedSets)
     get_cone_list(optimizer.cone, set)
 end
 
-function MOIU.allocate_constrained_variables(optimizer::Optimizer,
-    func::MOI.VectorOfVariables, set::SupportedSets)
-    inds = get_new_variable_indexes(optimizer, func, set)
+function MOIU.allocate_constrained_variables(optimizer::Optimizer, set::SupportedSets)
+    inds = get_new_variable_indexes_unique(optimizer,
+    # func,
+    set)
     vars = MOI.VariableIndex.(inds)
     list = get_cone_list(optimizer, set)
     push!(list, inds)
@@ -773,73 +726,104 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
+function MOI.get(optimizer::Optimizer, attr::MOI.ObjectiveValue)
+    result_count_err(optimizer, attr)
     value = optimizer.sol.objval
     return value
 end
-function MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue)
+function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
+    result_count_err(optimizer, attr)
     value = optimizer.sol.dual_objval
     return value
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
+function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
     s = optimizer.sol.ret_val
+    if attr.N > 1 || s ==0
+        return MOI.NO_SOLUTION
+    end
     if s == 1
-        MOI.FEASIBLE_POINT
+        return MOI.FEASIBLE_POINT
     else
-        MOI.INFEASIBLE_POINT
+        return MOI.INFEASIBLE_POINT
     end
 end
-function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
+function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
     s = optimizer.sol.ret_val
+    if attr.N > 1 || s ==0
+        return MOI.NO_SOLUTION
+    end
     if s == 1
-        MOI.FEASIBLE_POINT
+        return MOI.FEASIBLE_POINT
     else
-        MOI.INFEASIBLE_POINT
+        return MOI.INFEASIBLE_POINT
     end
 end
+
+function result_count_err(optimizer::Optimizer, attr)
+    if optimizer.sol.ret_val == 0
+        throw(MOI.ResultIndexBoundsError{typeof(attr)}(attr, 0))
+    elseif result_index(attr) > 1
+        throw(MOI.ResultIndexBoundsError{typeof(attr)}(attr, 1))
+    end
+    return nothing
+end
+
+result_index(a::MOI.ObjectiveValue) = a.result_index
+result_index(a::MOI.DualObjectiveValue) = a.result_index
+result_index(a::MOI.ConstraintDual) = a.N
+result_index(a::MOI.ConstraintPrimal) = a.N
+result_index(a::MOI.VariablePrimal) = a.N
 
 #=
     Solution
 =#
 
-function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, vi::VI)
+function MOI.get(optimizer::Optimizer, attr::MOI.VariablePrimal, vi::VI)
+    result_count_err(optimizer, attr)
     optimizer.sol.primal[vi.value]
 end
 function MOI.get(optimizer::Optimizer, a::MOI.VariablePrimal, vi::Vector{VI})
+    result_count_err(optimizer, a)
     return MOI.get.(optimizer, a, vi)
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintPrimal,
                  ci::CI{<:MOI.AbstractFunction, MOI.Zeros})
+    result_count_err(optimizer, attr)
     cone = optimizer.cone
     inds = (cone.eq_start[ci.value]-1) .+ (1:cone.eq_len[ci.value])
     return optimizer.sol.slack_eq[inds]
 end
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintPrimal,
     ci::CI{<:MOI.AbstractFunction, MOI.Nonpositives})
+    result_count_err(optimizer, attr)
     cone = optimizer.cone
     inds = (cone.in_start[ci.value]-1) .+ (1:cone.in_len[ci.value])
     return optimizer.sol.slack_in[inds]
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintPrimal,
         ci::CI{MOI.VectorOfVariables, MOI.PositiveSemidefiniteConeTriangle})
+    result_count_err(optimizer, attr)
     optimizer.sol.primal[optimizer.cone.sdc[ci.value]]
 end
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintPrimal,
     ci::CI{MOI.VectorOfVariables, MOI.SecondOrderCone})
+    result_count_err(optimizer, attr)
     optimizer.sol.primal[optimizer.cone.soc[ci.value]]
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
     ci::CI{<:MOI.AbstractFunction, MOI.Zeros})
+    result_count_err(optimizer, attr)
     cone = optimizer.cone
     inds = (cone.eq_start[ci.value]-1) .+ (1:cone.eq_len[ci.value])
     return -optimizer.sol.dual_eq[inds]
 end
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
 ci::CI{<:MOI.AbstractFunction, MOI.Nonpositives})
+    result_count_err(optimizer, attr)
     cone = optimizer.cone
     inds = (cone.in_start[ci.value]-1) .+ (1:cone.in_len[ci.value])
     return -optimizer.sol.dual_in[inds]
@@ -852,7 +836,7 @@ function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual,
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ResultCount)
-    if MOI.get(optimizer, MOI.TerminationStatus()) == MOI.INFEASIBLE_OR_UNBOUNDED
+    if MOI.get(optimizer, MOI.TerminationStatus()) in [MOI.INFEASIBLE_OR_UNBOUNDED, MOI.OPTIMIZE_NOT_CALLED]
         return 0
     else
         return 1
