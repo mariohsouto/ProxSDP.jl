@@ -78,6 +78,7 @@ end
         "soc3", "psdt2", "normone2", "norminf2",#, "rotatedsoc2"
                 # TODO - should not fail
                 #"psdt1v", "soc4"
+        "relentr"
         ]
     )
 end
