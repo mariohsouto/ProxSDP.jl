@@ -504,6 +504,16 @@ function MOI.optimize!(optimizer::Optimizer)
     aff.p += n_new_variables
     aff.extra = n_new_variables
 
+    @show Matrix{Float64}(aff.A)
+    @show aff.b
+    @show aff.c
+    @show aff
+    @show con
+    error("vish")
+
+
+
+
     #= 
         Solve modified problem
     =#

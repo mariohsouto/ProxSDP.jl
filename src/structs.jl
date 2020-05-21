@@ -17,7 +17,7 @@ Base.@kwdef mutable struct Options
 
     # Printing options
     log_verbose::Bool = false
-    log_freq::Int = 100
+    log_freq::Int = 1000
     timer_verbose::Bool = false
     timer_file::Bool = false
 
