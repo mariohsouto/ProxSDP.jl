@@ -28,5 +28,5 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
     if JuMP.termination_status(model) == MOI.OPTIMAL
         status = 1
     end
-    return (objval, stime, rank, status)
+    return (objval, stime, rank, status, -1.0, -1.0)
 end

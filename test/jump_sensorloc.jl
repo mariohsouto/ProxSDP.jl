@@ -1,4 +1,4 @@
-
+using Random
 function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
@@ -26,11 +26,14 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     # Constraint with distances from sensors to sensors
     count, count_all = 0, 0
+    rng = Random.MersenneTwister(seed)
+    has_ctr = zeros(Bool,n,n)
     for i in 1:n
         for j in 1:i - 1
             count_all += 1
-            if rand() > 0.9
+            if rand(rng) > 0.9
                 count += 1
+                has_ctr[i,j] = true
                 # e = zeros(n, 1)
                 # e[i] = 1.0
                 # e[j] = -1.0
@@ -75,6 +78,48 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
     if JuMP.termination_status(model) == MOI.OPTIMAL
         status = 1
     end
-    return (objval, stime, rank, status)
+
+    # SDP constraints
+    max_spd_violation = minimum(eigen(XX).values)
+
+    # test violations of linear constraints
+    max_lin_viol = 0.0
+
+    # Constraint with distances from anchors to sensors
+    for j in 1:n
+        for k in 1:m
+            val =  abs(XX[1,1]*a[k][1]*a[k][1] + XX[2,2]*a[k][2]*a[k][2] -
+                2 * XX[1, j+2] * a[k][1] -
+                2 * XX[2, j+2] * a[k][2] +
+                XX[j+2, j+2] -
+                d_bar[k, j]^2)
+            if val > 0.0
+                if val > max_lin_viol
+                    max_lin_viol = val
+                end
+            end
+        end
+    end
+
+    # Constraint with distances from sensors to sensors
+    count, count_all = 0, 0
+    rng = Random.MersenneTwister(seed)
+    has_ctr = zeros(Bool,n,n)
+    for i in 1:n
+        for j in 1:i - 1
+            if has_ctr[i,j]
+                val =  abs(XX[i+2,i+2] + XX[j+2,j+2] - 2*XX[i+2,j+2] - d[i, j]^2)
+                if val > max_lin_viol
+                    max_lin_viol = val
+                end
+            end
+        end
+    end
+    max_lin_viol = max(max_lin_viol, abs(XX[1, 1] - 1.0))
+    max_lin_viol = max(max_lin_viol, abs(XX[1, 2] - 0.0))
+    max_lin_viol = max(max_lin_viol, abs(XX[2, 1] - 0.0))
+    max_lin_viol = max(max_lin_viol, abs(XX[2, 2] - 1.0))
+
+    return (objval, stime, rank, status, max_lin_viol, max_spd_violation)
     # return (objval, stime)
 end

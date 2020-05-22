@@ -4,7 +4,7 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
     m = 10n
     s, H, y, L = mimo_data(seed, m, n)
 
-    nvars = sympackedlen(n + 1)
+    nvars = ProxSDP.sympackedlen(n + 1)
 
     model = Model(with_optimizer(solver))
     @variable(model, X[1:n+1, 1:n+1], PSD)
@@ -41,6 +41,29 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
     if JuMP.termination_status(model) == MOI.OPTIMAL
         status = 1
     end
-    return (objval, stime, rank, status)
+
+    # SDP constraints
+    max_spd_violation = minimum(eigen(XX).values)
+
+    # test violations of linear constraints
+    max_lin_viol = 0.0
+    for j in 1:(n+1), i in j:(n+1)
+        val = abs(XX[i,j]) - 1.0
+        if val > 0.0
+            if val > max_lin_viol
+                max_lin_viol = val
+            end
+        end
+    end
+    for j in 1:(n+1)
+        val = abs(XX[j,j] - 1.0)
+        if val > 0.0
+            if val > max_lin_viol
+                max_lin_viol = val
+            end
+        end
+    end
+
+    return (objval, stime, rank, status, max_lin_viol, max_spd_violation)
     # return (objval, stime)
 end

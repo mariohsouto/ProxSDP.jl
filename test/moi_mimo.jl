@@ -8,7 +8,7 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false, scalar = fa
     m = 10n
     s, H, y, L = mimo_data(seed, m, n)
 
-    nvars = sympackedlen(n + 1)
+    nvars = ProxSDP.sympackedlen(n + 1)
 
     X = MOI.add_variables(optimizer, nvars)
     if scalar

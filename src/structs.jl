@@ -46,7 +46,7 @@ Base.@kwdef mutable struct Options
     max_iter::Int = Int(1e+5)
 
     # Linesearch parameters
-    max_linsearch_steps::Int = 2000
+    max_linsearch_steps::Int = 5000
     delta::Float64 = .999
     initial_theta::Float64 = 1.
     linsearch_decay::Float64 = .9
@@ -56,6 +56,8 @@ Base.@kwdef mutable struct Options
     max_target_rank_krylov_eigs::Int = 16
     min_size_krylov_eigs::Int = 100
     warm_start_eig::Bool = true
+    rank_increment::Int = 0 # 0=multiply, 1 = add
+    rank_increment_factor::Int = 2 # 0 multiply, 1 = add
 
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
@@ -63,10 +65,10 @@ Base.@kwdef mutable struct Options
 
     # equilibration parameters
     equilibration::Bool = false
-    equilibration_iters::Int = 100
+    equilibration_iters::Int = 1000
     equilibration_lb::Float64 = -10.0
     equilibration_ub::Float64 = +10.0
-    equilibration_limit::Float64 = 0.8
+    equilibration_limit::Float64 = 0.9
     equilibration_force::Bool = false
 
     # spectral norm [using exact norm via svds may result in nondeterministic behavior]

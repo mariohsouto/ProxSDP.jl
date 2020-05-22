@@ -1,9 +1,10 @@
+using Random
 function randsdp_data(seed, m, n)
-    Random.seed!(seed)
+    rng = Random.MersenneTwister(seed)
     # n = 15  # Instance size
     # m = 10  # Number of constraints
     # Objective function
-    c_sqrt = rand(Float64, (n, n))
+    c_sqrt = rand(rng, Float64, (n, n))
     C = c_sqrt * c_sqrt'
     # C[1, 2] *= 0.5
     # C[2, 1] = C[1, 2]
@@ -12,7 +13,7 @@ function randsdp_data(seed, m, n)
     X_ = randn((n, n))
     X_ = X_ * X_'
     for i in 1:m
-        A[i] = rand(Float64, (n, n))
+        A[i] = rand(rng, Float64, (n, n))
         A[i] = A[i] * A[i]'
         b[i] = tr(A[i] * X_)
     end

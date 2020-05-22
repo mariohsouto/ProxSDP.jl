@@ -1,7 +1,7 @@
 using StatsBase
 
 function quad_knapsack(solver, seed)
-    Random.seed!(seed)
+    rng = Random.MersenneTwister(seed)
     if Base.libblas_name == "libmkl_rt"
         model = Model()
     else
@@ -19,7 +19,7 @@ function quad_knapsack(solver, seed)
     # Build weights and capacity
     a = zeros(n)
     for i in 1:n
-        a[i] = rand(1:50)
+        a[i] = rand(rng, 1:50)
     end
     a = ones(n)
     b = rand(100:sum(a)+100)
@@ -28,8 +28,8 @@ function quad_knapsack(solver, seed)
     C = zeros((n, n))
     for i in 1:n
         for j in 1:n
-            if sample([1, 0],Weights([delta, 1.0 - delta])) == 1
-                c_ = - rand(1:100)
+            if sample(rng, [1, 0],Weights([delta, 1.0 - delta])) == 1
+                c_ = - rand(rng, 1:100)
                 C[i, j] = c_
                 C[j, i] = c_
             end

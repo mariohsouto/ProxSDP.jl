@@ -10,7 +10,7 @@ function moi_sdplib(optimizer, path; verbose = false, test = false, scalar = fal
 
     n, m, F, c = sdplib_data(path)
 
-    nvars = sympackedlen(n)
+    nvars = ProxSDP.sympackedlen(n)
 
     X = MOI.add_variables(optimizer, nvars)
     vov = MOI.VectorOfVariables(X)
