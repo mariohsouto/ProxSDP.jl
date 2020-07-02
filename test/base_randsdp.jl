@@ -1,4 +1,6 @@
 using Random
+using LinearAlgebra
+
 function randsdp_data(seed, m, n)
     rng = Random.MersenneTwister(seed)
     # n = 15  # Instance size
