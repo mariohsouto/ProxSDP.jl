@@ -65,5 +65,4 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
     end
 
     return (objval, stime, rank, status, max_lin_viol, max_spd_violation)
-    # return (objval, stime)
 end
