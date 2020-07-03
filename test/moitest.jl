@@ -9,10 +9,14 @@ const MOIU = MOI.Utilities
 
 const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 
-const optimizer = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
-const optimizer_low_acc = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = true, timer_verbose = true))
-const optimizer_full = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4))
-const optimizer_print = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
+const optimizer_low_acc = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = true, timer_verbose = true))
+const optimizer_full = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_print = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
 
@@ -68,11 +72,13 @@ end
         "logdet", "exp", "dualexp",
         # pow cone
         "pow","dualpow",
+        # other cones
+        "relentr",
         # infeasible/unbounded
         # "lin3", "lin4", 
         "soc3", "psdt2", "normone2", "norminf2",#, "rotatedsoc2"
-                # TODO - should not fail
-                #"psdt1v", "soc4"
+        # some geometric mean problems
+        "geomean2v","geomean2f",
         ]
     )
 end
