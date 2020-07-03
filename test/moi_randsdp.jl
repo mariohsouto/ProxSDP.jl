@@ -7,7 +7,7 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
     A, b, C = randsdp_data(seed, m, n)
 
-    nvars = sympackedlen(n)
+    nvars = ProxSDP.sympackedlen(n)
 
     X = MOI.add_variables(optimizer, nvars)
 

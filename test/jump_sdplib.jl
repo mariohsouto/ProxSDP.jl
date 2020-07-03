@@ -40,6 +40,22 @@ function jump_sdplib(solver, path; verbose = false, test = false)
     if JuMP.termination_status(model) == MOI.OPTIMAL
         status = 1
     end
-    return (objval, stime, rank, status)
+
+    # SDP constraints
+    max_spd_violation = minimum(eigen(XX).values)
+
+    # test violations of linear constraints
+    max_lin_viol = 0.0
+    for k = 1:m
+        val = abs(sum(F[k][idx...] * XX[idx...]
+            for idx in zip(findnz(F[k])[1:end-1]...)) - c[k])
+        if val > 0.0
+            if val > max_lin_viol
+                max_lin_viol = val
+            end
+        end
+    end
+
+    return (objval, stime, rank, status, max_lin_viol, max_spd_violation)
     # return (objval, stime)
 end

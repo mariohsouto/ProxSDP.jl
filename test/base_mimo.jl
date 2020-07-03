@@ -1,11 +1,13 @@
+using Random
 function mimo_data(seed, m, n)
-    Random.seed!(seed)
+    rng = Random.MersenneTwister(seed)
+
     # Channel
     H = randn((m, n))
     # Gaussian noise
     v = randn((m, 1))
     # True signal
-    s = rand([-1, 1], n)
+    s = rand(rng, [-1, 1], n)
     # Received signal
     sigma = .0001
     y = H * s + sigma * v

@@ -1,7 +1,7 @@
 
 function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar = false)
 
-    Random.seed!(seed)
+    rng = Random.MersenneTwister(seed)
     MOI.empty!(optimizer)
     if test
         @test MOI.is_empty(optimizer)
@@ -10,7 +10,7 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
     # Decision variable
-    nvars = sympackedlen(n + 2) 
+    nvars = ProxSDP.sympackedlen(n + 2) 
     X = MOI.add_variables(optimizer, nvars)
     Xsq = Matrix{MOI.VariableIndex}(undef, n + 2, n + 2)
     ivech!(Xsq, X)
@@ -49,7 +49,7 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar
     for i in 1:n
         for j in 1:i - 1
             count_all += 1
-            if rand() > 0.9
+            if rand(rng) > 0.9
                 count += 1
                 if scalar
                     MOI.add_constraint(optimizer, 

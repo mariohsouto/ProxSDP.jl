@@ -257,12 +257,38 @@ coefficient(t::MOI.VectorAffineTerm) = coefficient(t.scalar_term)
 function MOIU.load_constraint(optimizer::Optimizer, ci::CI,
                               f::MOI.VectorAffineFunction,
                               set::MOI.AbstractVectorSet)
-    A = sparse(output_index.(f.terms), variable_index_value.(f.terms),
-               coefficient.(f.terms))
-    # sparse combines duplicates with + but does
-    # not remove zeros created so we call dropzeros!
-    dropzeros!(A)
-    I, J, V = findnz(A)
+
+    n = length(f.terms)
+    if n != 1
+        A = sparse(output_index.(f.terms), variable_index_value.(f.terms),
+        coefficient.(f.terms))
+        # sparse combines duplicates with + but does
+        # not remove zeros created so we call dropzeros!
+        dropzeros!(A)
+        I, J, V = findnz(A)
+    else
+        I, J, V = output_index.(f.terms), variable_index_value.(f.terms), coefficient.(f.terms)
+    end
+#=
+    n = length(f.terms)
+    I = Int[]
+    J = Int[]
+    V = Float64[]
+    sizehint!(I, n)
+    sizehint!(J, n)
+    sizehint!(V, n)
+    for i in 1:n
+        if !iszero(coefficient(f.terms[i]))
+            push!(I, output_index(f.terms[i]))
+            push!(J, variable_index_value(f.terms[i]))
+            push!(V, coefficient(f.terms[i]))
+        end
+    end
+=#
+    #=
+    I,J,V = output_index.(f.terms), variable_index_value.(f.terms), coefficient.(f.terms)
+    =#
+
     offset = ctr_offset(optimizer, set, ci)
     rows = 1:len(optimizer, set, ci)
     i = (offset-1) .+ rows
@@ -311,16 +337,23 @@ function MOIU.allocate_variables(optimizer::Optimizer, nvars::Integer)
 end
 
 function MOIU.load_variables(optimizer::Optimizer, nvars::Integer)
+    # @show "load var"
     # @show nvars
     cone = optimizer.cone
     m = cone.eq_tot + cone.in_tot # + cone.q + cone.s + 3cone.ep + cone.ed
     I = Int[]
     J = Int[]
     V = Float64[]
+    sizehint!(I, cone.eq_tot)
+    sizehint!(J, cone.eq_tot)
+    sizehint!(V, cone.eq_tot)
     b = zeros(cone.eq_tot)
     Ii = Int[]
     Ji = Int[]
     Vi = Float64[]
+    sizehint!(Ii, cone.in_tot)
+    sizehint!(Ji, cone.in_tot)
+    sizehint!(Vi, cone.in_tot)
     h = zeros(cone.in_tot)
 
     tot_vars = nvars# + cone.cone_cols
@@ -394,6 +427,8 @@ matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,
 
 function MOI.optimize!(optimizer::Optimizer)
 
+    # @show "in opt"
+
     TimerOutputs.reset_timer!()
 
     @timeit "pre-processing" begin
@@ -411,19 +446,30 @@ function MOI.optimize!(optimizer::Optimizer)
     n = optimizer.data.n #cols
 
     objective_constant = optimizer.data.objective_constant
-    c = optimizer.data.c
+    # c = optimizer.data.c
 
     # Build Prox SDP Affine Sets
-    b = optimizer.data.b
-    A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V, length(b), n)
-    h = optimizer.data.h
-    G = sparse(optimizer.data.Ii, optimizer.data.Ji, optimizer.data.Vi, length(h), n)
+    # b = optimizer.data.b
+    # A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V, length(b), n)
+    # h = optimizer.data.h
+    # G = sparse(optimizer.data.Ii, optimizer.data.Ji, optimizer.data.Vi, length(h), n)
 
     # Dimensions (of affine sets)
-    n_variables = size(A)[2] # primal
-    n_eqs = size(A)[1]
-    n_ineqs = size(G)[1]
-    aff = AffineSets(n_variables, n_eqs, n_ineqs, 0, A, G, b, h, c)
+
+    aff = AffineSets(0, 0, 0, 0,
+    sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V, length(optimizer.data.b), n),
+    sparse(optimizer.data.Ii, optimizer.data.Ji, optimizer.data.Vi, length(optimizer.data.h), n),
+    optimizer.data.b,
+    optimizer.data.h,
+    optimizer.data.c)
+    # A, G, b, h, c)
+
+    n_variables = size(aff.A)[2] # primal
+    n_eqs = size(aff.A)[1]
+    n_ineqs = size(aff.G)[1]
+    aff.n = n_variables
+    aff.p = n_eqs
+    aff.m = n_ineqs
 
     #= 
         Build conic sets
@@ -503,6 +549,9 @@ function MOI.optimize!(optimizer::Optimizer)
     aff.n += n_new_variables
     aff.p += n_new_variables
     aff.extra = n_new_variables
+
+    In, Jn, Vn = Int[], Int[], Float64[]
+    A2 = sparse(In, Jn, Vn, 0, 0)
 
     #= 
         Solve modified problem

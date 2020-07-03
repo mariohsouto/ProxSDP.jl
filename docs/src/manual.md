@@ -73,3 +73,9 @@ The first version of the paper can be found [here](https://arxiv.org/abs/1810.05
   year={2018}
 }
 ```
+
+### Disclaimer
+
+* ProxSDP is a research software, therefore it should not be used in production.
+* Please open an issue if you find any problems, developers will try to fix and find alternatives.
+* ProxSDP assumes primal and dual feasibility. Currently, it is not able to reliably identify infeasibility and unboundedness.

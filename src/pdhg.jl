@@ -138,7 +138,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Check convergence
         p.rank_update += 1
         if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
- 
+
             if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
                 p.stop_reason = 1 # Optimal
                 p.stop_reason_string = "Optimal solution found"
@@ -154,8 +154,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     for (idx, sdp) in enumerate(conic_sets.sdpcone)
                         if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                             if p.min_eig[idx] > opt.tol_psd
-                                p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
-                                # p.target_rank[idx] = min(1 + p.target_rank[idx], sdp.sq_side)
+                                if opt.rank_increment == 0
+                                    p.target_rank[idx] = min(opt.rank_increment_factor * p.target_rank[idx], sdp.sq_side)
+                                else
+                                    p.target_rank[idx] = min(opt.rank_increment_factor + p.target_rank[idx], sdp.sq_side)
+                                end
                             end
                         end
                     end
@@ -174,8 +177,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     end
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if p.min_eig[idx] > opt.tol_psd
-                            p.target_rank[idx] = min(2 * p.target_rank[idx], sdp.sq_side)
-                            # p.target_rank[idx] = min(1 + p.target_rank[idx], sdp.sq_side)
+                            if opt.rank_increment == 0
+                                p.target_rank[idx] = min(opt.rank_increment_factor * p.target_rank[idx], sdp.sq_side)
+                            else
+                                p.target_rank[idx] = min(opt.rank_increment_factor + p.target_rank[idx], sdp.sq_side)
+                            end
                         end
                     end
                 end
@@ -297,7 +303,7 @@ end
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
     cont = 0
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
-    
+
     for i in 1:opt.max_linsearch_steps
         cont += 1
         p.theta = p.primal_step / p.primal_step_old

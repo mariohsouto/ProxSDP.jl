@@ -25,8 +25,8 @@ Base.@kwdef mutable struct Options
     time_limit::Float64 = 3600_00. #100 hours
 
     # Default tolerances
-    tol_primal::Float64 = 1e-3
-    tol_dual::Float64 = 1e-3
+    tol_primal::Float64 = 1e-4
+    tol_dual::Float64 = 1e-4
     tol_psd::Float64 = 1e-6
     tol_soc::Float64 = 1e-6
 
@@ -46,7 +46,7 @@ Base.@kwdef mutable struct Options
     max_iter::Int = Int(1e+5)
 
     # Linesearch parameters
-    max_linsearch_steps::Int = 2000
+    max_linsearch_steps::Int = 5000
     delta::Float64 = .999
     initial_theta::Float64 = 1.
     linsearch_decay::Float64 = .9
@@ -56,17 +56,19 @@ Base.@kwdef mutable struct Options
     max_target_rank_krylov_eigs::Int = 16
     min_size_krylov_eigs::Int = 100
     warm_start_eig::Bool = true
+    rank_increment::Int = 1 # 0=multiply, 1 = add
+    rank_increment_factor::Int = 1 # 0 multiply, 1 = add
 
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
     rank_slack::Int = 3
 
     # equilibration parameters
-    equilibration::Bool = false
-    equilibration_iters::Int = 100
+    equilibration::Bool = true
+    equilibration_iters::Int = 1000
     equilibration_lb::Float64 = -10.0
     equilibration_ub::Float64 = +10.0
-    equilibration_limit::Float64 = 0.8
+    equilibration_limit::Float64 = 0.9
     equilibration_force::Bool = false
 
     # spectral norm [using exact norm via svds may result in nondeterministic behavior]
