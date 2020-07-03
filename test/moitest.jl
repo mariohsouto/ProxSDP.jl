@@ -75,10 +75,13 @@ end
         # other cones
         "relentr",
         # infeasible/unbounded
-        # "lin3", "lin4", 
+        # "lin3", "lin4",
+        # See https://travis-ci.com/blegat/SolverTests/jobs/268551133
+        # geomean2v: Test Failed at /home/travis/.julia/dev/MathOptInterface/src/Test/contconic.jl:1328
+        # Expression: MOI.get(model, MOI.TerminationStatus()) == config.optimal_status
+        #  Evaluated: INFEASIBLE_OR_UNBOUNDED::TerminationStatusCode = 6 == OPTIMAL::TerminationStatusCode = 1
+        "geomean2v", "geomean2f",
         "soc3", "psdt2", "normone2", "norminf2",#, "rotatedsoc2"
-        # some geometric mean problems
-        "geomean2v","geomean2f",
         ]
     )
 end
