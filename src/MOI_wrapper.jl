@@ -86,7 +86,7 @@ MOI.get(::Optimizer, ::MOI.SolverName) = "ProxSDP"
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
     fields = fieldnames(Options)
-    name = param.name
+    name = Symbol(param.name)
     if name in fields
         setfield!(optimizer.options, name, value)
     else
@@ -96,7 +96,7 @@ function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
 end
 function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
     fields = fieldnames(Options)
-    name = param.name
+    name = Symbol(param.name)
     if name in fields
         return getfield(optimizer.options, name)
     else
