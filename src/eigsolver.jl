@@ -1,4 +1,3 @@
-
 mutable struct ARPACKAlloc{T}
 
     n::Int

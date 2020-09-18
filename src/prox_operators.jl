@@ -2,6 +2,7 @@
 
 function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
 
+    eig_solver = "arpack"
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
 
     # Build symmetric matrix(es) X
@@ -17,7 +18,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
         end
     end
 
-    # Project onto the p.s.d. cone
+    # Project each symmetric matrix onto the p.s.d. cone
     for (idx, sdp) in enumerate(cones.sdpcone)
         p.current_rank[idx] = 0
 
@@ -28,22 +29,51 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
 
         elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
             @timeit "eigs" begin 
-                eig!(arc_list[idx], a.m[idx], p.target_rank[idx], iter, opt.warm_start_eig)
-                if hasconverged(arc_list[idx])
+
+                if eig_solver == "arpack"
+                    eig!(arc_list[idx], a.m[idx], p.target_rank[idx], iter, opt.warm_start_eig)
+                    if hasconverged(arc_list[idx])
+                        fill!(a.m[idx].data, 0.)
+                        for i in 1:p.target_rank[idx]
+                            if unsafe_getvalues(arc_list[idx])[i] > 0. 
+                                p.current_rank[idx] += 1
+                                vec = unsafe_getvectors(arc_list[idx])[:, i]
+                                LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc_list[idx])[i], vec, vec, 1., a.m[idx].data)
+                            end
+                        end
+                    end
+
+                else
+                    jobz = 'V'
+                    range = 'I'
+                    uplo = 'U'
+                    vl = 0.0
+                    vu = 10000.0
+                    il = sdp.sq_side - p.target_rank[idx]
+                    iu = sdp.sq_side
+                    abstol = 1e-15
+                    
+                    bla, ble = LinearAlgebra.LAPACK.syevr!(jobz, range, a.m[idx].uplo, a.m[idx].data, convert(LinearAlgebra.BlasReal, vl), convert(LinearAlgebra.BlasReal, vl), il, iu, abstol)
+
                     fill!(a.m[idx].data, 0.)
                     for i in 1:p.target_rank[idx]
-                        if unsafe_getvalues(arc_list[idx])[i] > 0. 
+                        if bla[i] > 0
                             p.current_rank[idx] += 1
-                            vec = unsafe_getvectors(arc_list[idx])[:, i]
-                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc_list[idx])[i], vec, vec, 1., a.m[idx].data)
+                            LinearAlgebra.BLAS.gemm!('N', 'T', bla[i], ble[:,i], ble[:,i], 1., a.m[idx].data)
                         end
                     end
                 end
+
             end
-            if hasconverged(arc_list[idx])
-                @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc_list[idx]))
+
+            if eig_solver == "arpack"
+                if hasconverged(arc_list[idx])
+                    @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc_list[idx]))
+                else
+                    @timeit "eigfact" full_eig!(a, idx, opt, p)
+                end
             else
-                @timeit "eigfact" full_eig!(a, idx, opt, p)
+                p.min_eig[idx] = minimum(bla)
             end
 
         else

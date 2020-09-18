@@ -21,10 +21,10 @@ using JuMP
     select problem types to be tested
 =#
 sets_to_test = Symbol[]
-push!(sets_to_test, :RANDSDP)
-push!(sets_to_test, :SENSORLOC)
+# push!(sets_to_test, :RANDSDP)
+# push!(sets_to_test, :SENSORLOC)
 push!(sets_to_test, :SDPLIB)
-push!(sets_to_test, :MIMO)
+# push!(sets_to_test, :MIMO)
 
 #=
     select solvers to be tested
@@ -37,7 +37,8 @@ solvers = Tuple{String, Function}[]
 using ProxSDP
 push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(
     log_verbose=true,
-    time_limit = 10.0,#900.0,
+    timer_verbose=true,
+    time_limit = 2*60.0,#900.0,
     log_freq = 1_000,
     )))
 
@@ -113,12 +114,12 @@ MIMO_TEST_SET = [
     ]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
-    "gpp124-1.dat-s",
-    "gpp124-2.dat-s",
-    "gpp124-3.dat-s",
-    "gpp124-4.dat-s",
+    # "gpp124-1.dat-s",
+    # "gpp124-2.dat-s",
+    # "gpp124-3.dat-s",
+    # "gpp124-4.dat-s",
 
-    # "gpp250-1.dat-s",
+    "gpp250-1.dat-s",
     # "gpp250-2.dat-s",
     # "gpp250-3.dat-s",
     # "gpp250-4.dat-s",
@@ -131,11 +132,11 @@ GPP_TEST_SET = [
     # "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
-    "mcp124-1.dat-s",
-    "mcp124-1.dat-s",
-    "mcp124-2.dat-s",
-    "mcp124-3.dat-s",
-    "mcp124-4.dat-s",
+    # "mcp124-1.dat-s",
+    # "mcp124-1.dat-s",
+    # "mcp124-2.dat-s",
+    # "mcp124-3.dat-s",
+    # "mcp124-4.dat-s",
 
     # "mcp250-1.dat-s",
     # "mcp250-2.dat-s",
