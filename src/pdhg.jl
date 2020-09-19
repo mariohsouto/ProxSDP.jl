@@ -108,6 +108,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         line_search_flag = true
     end
 
+    # Initialization
+    pair.x = p.primal_step .* mat.c
+    mul!(a.Mx, mat.M, pair.x)
+    mul!(a.Mx_old, mat.M, pair.x_old)
+
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
 

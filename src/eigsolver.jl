@@ -70,13 +70,13 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     arc.mode = 1
 
     # How many Lanczos vectors are generated
-    # arc.ncv = arc.nev + 1
-    arc.ncv = max(20, 2 * arc.nev + 1)
+    arc.ncv = max(2 * arc.nev, 10)
+    
     # Stopping criterion
-    arc.tol = 1e-6
+    arc.tol = 1e-10
     arc.TOL = arc.tol * ones(T, 1)
     # Maximum number of iterations
-    arc.maxiter = Int(1e+3)
+    arc.maxiter = Int(1e+4)
 
     # Build linear operator
     arc.Amat = A
@@ -103,6 +103,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     arc.iparam[3] = BlasInt(arc.maxiter)
     arc.iparam[4] = BlasInt(1)
     arc.iparam[7] = BlasInt(arc.mode)
+    
     arc.ipntr = zeros(BlasInt, 11)
     # IDO must be zero on the first call to dsaupd
     arc.ido = zeros(BlasInt, 1)
@@ -123,59 +124,60 @@ end
 
 function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, iter::Int64) where T
 
-    if arc.nev < nev
-        # Number of eigenvalues of OP to be computed
-        arc.nev = nev
-        # How many Lanczos vectors are generated
-        # arc.ncv = arc.nev + 1
-        arc.ncv = max(20, 2 * arc.nev + 1)
-        # Lanczos basis vectors (output)
-        arc.v = Matrix{T}(undef, arc.n, arc.ncv)
-        # Workspace
-        arc.lworkl = arc.ncv * (arc.ncv + 8)
-        arc.workl = Vector{T}(undef, arc.lworkl)
-        # Parameters for _EUPD! routine
-        arc.select = Vector{BlasInt}(undef, arc.ncv)
-        arc.d = Vector{T}(undef, arc.nev)
-    else
-        # Number of eigenvalues of OP to be computed
-        arc.nev = nev
-        # How many Lanczos vectors are generated
-        # arc.ncv = arc.nev + 1
-        arc.ncv = max(20, 2 * arc.nev + 1)
-        # Lanczos basis vectors (output)
-        # arc.v = Matrix{T}(undef, arc.n, arc.ncv)
-        # Workspace
-        arc.lworkl = arc.ncv * (arc.ncv + 8)
-        # arc.workl = Vector{T}(undef, arc.lworkl)
-        # Parameters for _EUPD! routine
-        # arc.select = Vector{BlasInt}(undef, arc.ncv)
-        # arc.d = Vector{T}(undef, arc.nev)
-    end
+    # Number of eigenvalues of OP to be computed. Needs to be 0 < NEV < N.
+    arc.nev = nev
+
+    # How many Lanczos vectors are generated. Needs to be NCV > NEV. It is recommended that NCV >= 2*NEV.
+    # After the startup phase in which NEV Lanczos vectors are generated, 
+    # the algorithm generates NCV-NEV Lanczos vectors at each subsequent update iteration.
+    arc.ncv = max(2 * arc.nev, 10)
+
+    # Lanczos basis vectors (output)
+    arc.v = Matrix{T}(undef, arc.n, arc.ncv)
+
+    # Workspace, LWORKL must be at least NCV**2 + 8*NCV
+    arc.lworkl = arc.ncv * (arc.ncv + 8)
+
+    # Allocate memory for workl
+    arc.workl = Vector{T}(undef, arc.lworkl)
+
+    # Parameters for _EUPD! routine
+    arc.select = Vector{BlasInt}(undef, arc.ncv)
+    arc.d = Vector{T}(undef, arc.nev)
 
     # Build linear operator
     arc.Amat = A
 
-    # If info != 0, RESID contains the initial residual vector
-    arc.info[] = BlasInt(1)#ones(BlasInt, 1)
-    arc.info_e[] = BlasInt(1)#ones(BlasInt, 1)
+    # If info != 0, RESID contains the initial residual vector,
+    # If info == 0, randomly initial residual vector is used.
+    arc.info[] = BlasInt(0)
+    arc.info_e[] = BlasInt(0)
 
     # Iparam
-    # arc.iparam = ones(BlasInt, 11)
     fill!(arc.iparam, BlasInt(1))
     arc.iparam[1] = BlasInt(1)
+
+    # IPARAM(3) = MXITER
+    # On INPUT:  maximum number of Arnoldi update iterations allowed. 
+    # On OUTPUT: actual number of Arnoldi update iterations taken. 
     arc.iparam[3] = BlasInt(arc.maxiter)
+
+    # IPARAM(4) = NB: blocksize to be used in the recurrence.
+    # The code currently works only for NB = 1.
     arc.iparam[4] = BlasInt(1)
+
+    # Determines what type of eigenproblem is being solved.
     arc.iparam[7] = BlasInt(arc.mode)
-    # arc.ipntr = zeros(BlasInt, 11)
+
+    # 
     fill!(arc.ipntr, BlasInt(0))
+
     # IDO must be zero on the first call to dsaupd
-    # arc.ido = zeros(BlasInt, 1)
     fill!(arc.ido, BlasInt(0))
 
     # Stopping criterion
-    arc.tol = max(arc.tol / (iter / 10.), 1e-10)
-    # arc.TOL = arc.tol * ones(T, 1)
+    # arc.tol = max(arc.tol / (iter / 10.), 1e-10)
+    arc.tol = 1e-10
     arc.TOL[] = arc.tol * one(T)
 
     return nothing

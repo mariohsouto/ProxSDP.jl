@@ -37,7 +37,8 @@ solvers = Tuple{String, Function}[]
 using ProxSDP
 push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(
     log_verbose=true,
-    time_limit = 10.0,#900.0,
+    timer_verbose=true,
+    time_limit = 6 * 10.0,
     log_freq = 1_000,
     )))
 
@@ -118,16 +119,16 @@ GPP_TEST_SET = [
     "gpp124-3.dat-s",
     "gpp124-4.dat-s",
 
-    # "gpp250-1.dat-s",
-    # "gpp250-2.dat-s",
-    # "gpp250-3.dat-s",
-    # "gpp250-4.dat-s",
-    # "gpp500-1.dat-s",
-    # "gpp500-2.dat-s",
-    # "gpp500-3.dat-s",
-    # "gpp500-4.dat-s",
+    "gpp250-1.dat-s",
+    "gpp250-2.dat-s",
+    "gpp250-3.dat-s",
+    "gpp250-4.dat-s",
+    "gpp500-1.dat-s",
+    "gpp500-2.dat-s",
+    "gpp500-3.dat-s",
+    "gpp500-4.dat-s",
 
-    # "equalG11.dat-s",
+    "equalG11.dat-s",
     # "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
@@ -137,16 +138,16 @@ MAXCUT_TEST_SET = [
     "mcp124-3.dat-s",
     "mcp124-4.dat-s",
 
-    # "mcp250-1.dat-s",
-    # "mcp250-2.dat-s",
-    # "mcp250-3.dat-s",
-    # "mcp250-4.dat-s",
-    # "mcp500-1.dat-s",
-    # "mcp500-2.dat-s",
-    # "mcp500-3.dat-s",
-    # "mcp500-4.dat-s",
+    "mcp250-1.dat-s",
+    "mcp250-2.dat-s",
+    "mcp250-3.dat-s",
+    "mcp250-4.dat-s",
+    "mcp500-1.dat-s",
+    "mcp500-2.dat-s",
+    "mcp500-3.dat-s",
+    "mcp500-4.dat-s",
 
-    # "maxG11.dat-s"  ,
+    "maxG11.dat-s"  ,
     # "maxG51.dat-s"  ,
     # "maxG32.dat-s"  ,
     # "maxG55.dat-s"  ,
