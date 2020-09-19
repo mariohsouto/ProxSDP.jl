@@ -2,8 +2,8 @@ function print_header_1()
     println("---------------------------------------------------------------------------------------")
     println("=======================================================================================")
     println("                  ProxSDP : Proximal Semidefinite Programming Solver                   ")
-    println("                         (c) Mario Souto and Joaquim D. Garcia, 2019                   ")
-    println("                                                              v1.2.0                   ")
+    println("                         (c) Mario Souto and Joaquim D. Garcia, 2020                   ")
+    println("                                                              v1.4.0                   ")
     println("---------------------------------------------------------------------------------------")
 end
 
@@ -88,7 +88,7 @@ function print_header_2()
     println("---------------------------------------------------------------------------------------")
     println("    Initializing Primal-Dual Hybrid Gradient method                                    ")
     println("---------------------------------------------------------------------------------------")
-    println("|  iter  | prim obj | rel. gap |  feasb.  | prim res | dual res | max rank |  time(s) |")
+    println("|  iter  | prim obj | rel. gap |  feasb.  | prim res | dual res | tg. rank |  time(s) |")
     println("---------------------------------------------------------------------------------------")
 
     return nothing

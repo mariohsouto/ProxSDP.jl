@@ -109,8 +109,8 @@ MIMO_TEST_SET = [
     100,
     500,
     1000,
-    1500,
-    2000,
+    # 1500,
+    # 2000,
     ]
 GPP_TEST_SET = [
     "gpp124-1.dat-s",
@@ -128,7 +128,7 @@ GPP_TEST_SET = [
     "gpp500-3.dat-s",
     "gpp500-4.dat-s",
 
-    "equalG11.dat-s",
+    # "equalG11.dat-s",
     # "equalG51.dat-s",
 ]
 MAXCUT_TEST_SET = [
@@ -147,7 +147,7 @@ MAXCUT_TEST_SET = [
     "mcp500-3.dat-s",
     "mcp500-4.dat-s",
 
-    "maxG11.dat-s"  ,
+    # "maxG11.dat-s"  ,
     # "maxG51.dat-s"  ,
     # "maxG32.dat-s"  ,
     # "maxG55.dat-s"  ,
