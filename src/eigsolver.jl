@@ -342,10 +342,9 @@ mutable struct ARPACKAlloc{T}
     bmat::String
     which::String
     mode::Int
-    A::Function
     Amat::Symmetric{T,Matrix{T}}
     lworkl::Int
-    TOL::Vector{T}
+    TOL::Base.RefValue{T}
     v::Matrix{T}
     workd::Vector{T}
     workl::Vector{T}
@@ -364,7 +363,6 @@ mutable struct ARPACKAlloc{T}
     arpackerror::Bool
     x::Vector{T}
     y::Vector{T}
-    tol::T
 
     rng::Random.MersenneTwister
 
@@ -383,13 +381,13 @@ function unsafe_getvectors(arc::ARPACKAlloc)
     return arc.v
 end
 
-function ARPACKAlloc(T::DataType, n::Int64)::ARPACKAlloc
+function ARPACKAlloc(T::DataType, n::Int64, opt::Options)::ARPACKAlloc
     arc = ARPACKAlloc{T}()
-    @timeit "init_arc" _init_arc!(arc::ARPACKAlloc, Symmetric(Matrix{T}(I, n, n), :U), 1, n)
+    @timeit "init_arc" _init_arc!(arc, Symmetric(Matrix{T}(I, n, n), :U), 1, n, opt)
     return arc
 end
 
-function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64) where T
+function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
 
     # IDO - Integer.  (INPUT/OUTPUT)  (in julia its is a integer vector)
     # Reverse communication flag.
@@ -415,8 +413,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
 
     # TOL - Double precision scalar.  (INPUT)
     # Stopping criterion
-    arc.tol = 1e-10
-    arc.TOL = arc.tol * ones(T, 1)
+    arc.TOL = Ref(opt.arpack_tol)
 
     #  RESID - Double precision array of length N.  (INPUT/OUTPUT)
     # Resid contains the initial residual vector
@@ -428,8 +425,18 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     # On OUTPUT:
     # RESID contains the final residual vector. 
     # reset the curent mersenne twister to keep determinism
-    arc.rng = Random.MersenneTwister(1234)
-    arc.resid = Random.rand(arc.rng, arc.n)
+    if opt.arpack_resid_init == 2
+        arc.rng = Random.MersenneTwister(opt.arpack_resid_seed)
+        arc.resid = Random.rand(arc.rng, arc.n)
+    elseif opt.arpack_resid_init == 3
+        arc.rng = Random.MersenneTwister(opt.arpack_resid_seed)
+        arc.resid = Random.randn(arc.rng, arc.n)
+        LinearAlgebra.normalize!(arc.resid)
+    elseif opt.arpack_resid_init == 1
+        arc.resid = ones(arc.n)
+    else
+        arc.resid = zeros(arc.n)
+    end
 
     # NCV - Integer.  (INPUT)
     # How many Lanczos vectors are generated
@@ -443,7 +450,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     #    also increases the work and storage required to maintain the orthogonal
     #    basis vectors.   The optimal "cross-over" with respect to CPU time
     #    is problem dependent and must be determined empirically.
-    arc.ncv = max(2 * arc.nev, 10)
+    arc.ncv = max(2 * arc.nev + 1, opt.arpack_min_lanczos)
     # TODO: 10 might be a way to tight bound
     # why not 20
 
@@ -459,9 +466,8 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     # same as N here !!!
     # arc.n = n
 
-
     # IPARAM  Integer array of length 11.  (INPUT/OUTPUT)
-    arc.iparam = ones(BlasInt, 11)
+    arc.iparam = zeros(BlasInt, 11)
     # IPARAM(1) = ISHIFT
     # ISHIFT = 1: exact shifts
     arc.iparam[1] = BlasInt(1)
@@ -470,8 +476,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     # IPARAM(3) = MXITER
     # On INPUT:  maximum number of Arnoldi update iterations allowed. 
     # On OUTPUT: actual number of Arnoldi update iterations taken.
-    arc.maxiter = Int(1e+4)
-    arc.iparam[3] = BlasInt(arc.maxiter)
+    arc.iparam[3] = BlasInt(opt.arpack_max_iter)
     # IPARAM(4) = NB: blocksize to be used in the recurrence.
     # The code currently works only for NB = 1.
     arc.iparam[4] = BlasInt(1)
@@ -507,8 +512,13 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     #         If INFO .EQ. 0, a randomly initial residual vector is used.
     #         If INFO .NE. 0, RESID contains the initial residual vector,
     #                         possibly from a previous run.
-    arc.info = ones(BlasInt, 1)
-    arc.info_e = ones(BlasInt, 1)
+    if opt.arpack_resid_init == 0
+        arc.info = zeros(BlasInt, 1)
+        arc.info_e = zeros(BlasInt, 1)
+    else
+        arc.info = ones(BlasInt, 1)
+        arc.info_e = ones(BlasInt, 1)
+    end
 
     # Build linear operator
     arc.Amat = A
@@ -529,7 +539,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     return nothing
 end
 
-function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, iter::Int64) where T
+function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options) where T
 
     need_resize = nev != arc.nev
 
@@ -540,18 +550,29 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
     arc.nev = nev
 
     # Stopping criterion
-    # arc.tol = max(arc.tol / (iter / 10.), 1e-10)
-    arc.TOL[] = arc.tol
+    arc.TOL[] = opt.arpack_tol
 
     #  RESID - Double precision array of length N.  (INPUT/OUTPUT)
-    Random.seed!(arc.rng, 1234)
-    Random.rand!(arc.rng, arc.resid)
+    if opt.arpack_reset_resid
+        if opt.arpack_resid_init == 2
+            Random.seed!(arc.rng, opt.arpack_resid_seed)
+            Random.rand!(arc.rng, arc.resid)
+        elseif opt.arpack_resid_init == 3
+            Random.seed!(arc.rng, opt.arpack_resid_seed)
+            Random.randn!(arc.rng, arc.resid)
+            LinearAlgebra.normalize!(arc.resid)
+        elseif opt.arpack_resid_init == 1
+            fill!(arc.resid, 1.0)
+        else
+            fill!(arc.resid, 0.0)
+        end
+    end
 
     # How many Lanczos vectors are generated. Needs to be NCV > NEV. It is recommended that NCV >= 2*NEV.
     # After the startup phase in which NEV Lanczos vectors are generated, 
     # the algorithm generates NCV-NEV Lanczos vectors at each subsequent update iteration.
     if need_resize
-        arc.ncv = max(2 * arc.nev, 10)
+        arc.ncv = max(2 * arc.nev + 1, opt.arpack_min_lanczos)
     end
 
     # Lanczos basis vectors (output)
@@ -560,7 +581,7 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
     end
 
     # Iparam
-    fill!(arc.iparam, BlasInt(1))
+    fill!(arc.iparam, BlasInt(0))
     # IPARAM(1) = ISHIFT
     # ISHIFT = 1: exact shifts
     arc.iparam[1] = BlasInt(1)
@@ -591,16 +612,16 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
     #         If INFO .EQ. 0, a randomly initial residual vector is used.
     #         If INFO .NE. 0, RESID contains the initial residual vector,
     #                         possibly from a previous run.
-    arc.info = ones(BlasInt, 1)
-    arc.info_e = ones(BlasInt, 1)
+    if opt.arpack_resid_init == 0
+        arc.info[] = zero(BlasInt)
+        arc.info_e[] = zero(BlasInt)
+    else
+        arc.info[] = one(BlasInt)
+        arc.info_e[] = one(BlasInt)
+    end
 
     # Build linear operator
     arc.Amat = A
-
-    # If info != 0, RESID contains the initial residual vector,
-    # If info == 0, randomly initial residual vector is used.
-    arc.info[] = BlasInt(0)
-    arc.info_e[] = BlasInt(0)
 
     # Parameters for _EUPD! routine
     if need_resize
@@ -616,18 +637,18 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
 end
 
 function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
-    
+
     while true
-        Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
+        Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
         arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info)
 
         if arc.ido[] == 1
-            @inbounds @simd for i in 1:arc.n
-                arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
+            @simd for i in 1:arc.n
+                @inbounds arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
             end
             mul!(arc.y, arc.Amat, arc.x)
-            @inbounds @simd for i in 1:arc.n
-                 arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
+            @simd for i in 1:arc.n
+                 @inbounds arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
             end
             # using views
             # x = view(arc.workd, arc.ipntr[1] .+ arc.zernm1)
@@ -651,6 +672,13 @@ function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
         arc.converged = true
     end
 
+    # check convergenc for all ritz pairs
+    # https://github.com/JuliaLinearAlgebra/Arpack.jl/blob/a7cdb6d7f19f076f5fadd8b58a9c5a061c48322f/src/Arpack.jl#L188
+    # @assert arc.nev <= arc.iparam[5]
+    # if arc.nev > arc.iparam[5]
+    #     arc.converged = false
+    # end
+
     return nothing
 end
 
@@ -663,7 +691,7 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
     end
 
     Arpack.seupd(true, arc.howmny, arc.select, arc.d, arc.v, arc.n, arc.sigmar,
-    arc.bmat, arc.n, arc.which, arc.nev, Ref(arc.TOL[1]), arc.resid, arc.ncv, arc.v, arc.n,
+    arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
     arc.iparam, arc.ipntr, arc.workd, arc.workl, arc.lworkl, arc.info_e)
 
     # Check if seupd has converged properly
@@ -687,10 +715,10 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
     return nothing
 end
 
-function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, iter::Int64, warm_start_eig::Bool)::Nothing where T1
+function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, opt::Options)::Nothing where T1
 
     # Initialize parameters and do memory allocation
-    @timeit "update_arc" _update_arc!(arc, A, nev, iter)::Nothing
+    @timeit "update_arc" _update_arc!(arc, A, nev, opt)::Nothing
 
     # Top level reverse communication interface to solve real double precision symmetric problems.
     @timeit "saupd" _saupd!(arc)::Nothing

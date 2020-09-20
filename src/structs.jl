@@ -63,6 +63,20 @@ Base.@kwdef mutable struct Options
     rank_increment::Int = 1 # 0=multiply, 1 = add
     rank_increment_factor::Int = 1 # 0 multiply, 1 = add
 
+    # Arpack
+    arpack_tol::Float64 = 1e-10
+    #=
+        0: arpack random [usually faster - NON-DETERMINISTIC - slightly]
+        1: all ones [???]
+        2: julia random uniform (arpack_resid_seed) [best for DETERMINISTIC]
+        3: julia normalized random normal (arpack_resid_seed) [not good for DETERMINISTIC]
+    =#
+    arpack_resid_init::Int = 2
+    arpack_resid_seed::Int = 1234
+    arpack_reset_resid::Bool = true # true for determinism
+    arpack_max_iter::Int = Int(1e+4)
+    arpack_min_lanczos::Int = 10
+
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
     rank_slack::Int = 3
@@ -210,7 +224,7 @@ mutable struct AuxiliaryData
             zeros(aff.p+aff.m), zeros(aff.p+aff.m),
             zeros(aff.p+aff.m), zeros(aff.p+aff.m),
             ViewVector[], ViewScalar[]
-    )
+        )
     end
 end
 

@@ -12,7 +12,7 @@ function randsdp_data(seed, m, n)
     # C[2, 1] = C[1, 2]
     # Generate m-dimensional feasible system
     A, b = Dict(), Dict()
-    X_ = randn((n, n))
+    X_ = Random.randn(rng, (n, n))
     X_ = X_ * X_'
     for i in 1:m
         A[i] = Random.rand(rng, Float64, (n, n))

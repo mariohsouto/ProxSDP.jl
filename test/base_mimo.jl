@@ -3,9 +3,9 @@ function mimo_data(seed, m, n)
     rng = Random.MersenneTwister(seed)
 
     # Channel
-    H = randn((m, n))
+    H = Random.randn(rng, (m, n))
     # Gaussian noise
-    v = randn((m, 1))
+    v = Random.randn(rng, (m, 1))
     # True signal
     s = Random.rand(rng, [-1, 1], n)
     # Received signal

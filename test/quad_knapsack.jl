@@ -22,7 +22,7 @@ function quad_knapsack(solver, seed)
         a[i] = Random.rand(rng, 1:50)
     end
     a = ones(n)
-    b = Random.rand(100:sum(a)+100)
+    b = Random.rand(rng, 100:sum(a)+100)
 
     # Profits
     C = zeros((n, n))

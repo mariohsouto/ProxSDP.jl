@@ -3,25 +3,15 @@ os:
     - linux
 julia:
     - 1.0
-    - 1.4
-    - 1.5
-matrix:
-    allow_failures:
-        - julia: nightly
+    - 1
 notifications:
     email: false
 sudo: false
-addons:
-    apt_packages:
-        - gfortran
-        - liblapack-dev
-        - libgmp-dev
-        - libglpk-dev
 after_success:
-- julia -e 'import Pkg; Pkg.add("Documenter")'
-- julia -e 'import Pkg; cd(Pkg.dir("ProxSDP")); include(joinpath("docs", "make.jl"))'
-# push coverage results to Codecov
-- julia --inline=no -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
-- echo $TRAVIS_JULIA_VERSION
+    - julia -e 'import Pkg; Pkg.add("Documenter")'
+    - julia -e 'import Pkg; cd(Pkg.dir("ProxSDP")); include(joinpath("docs", "make.jl"))'
+    # push coverage results to Codecov
+    - julia --inline=no -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+    - echo $TRAVIS_JULIA_VERSION
 env:
-- CODECOV_TOKEN="257536e4-7c71-4d18-b459-443db91d2870"
+    - CODECOV_TOKEN="257536e4-7c71-4d18-b459-443db91d2870"
