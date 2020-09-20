@@ -539,9 +539,15 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     return nothing
 end
 
-function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options) where T
+function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options, up_ncv::Bool) where T
 
-    need_resize = nev != arc.nev
+    need_resize = up_ncv
+    if !need_resize
+        need_resize = nev != arc.nev
+    end
+    if !need_resize
+        need_resize = arc.ncv != max(2 * arc.nev + 1, opt.arpack_min_lanczos)
+    end
 
     # IDO must be zero on the first call to dsaupd
     fill!(arc.ido, BlasInt(0))
@@ -572,7 +578,11 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
     # After the startup phase in which NEV Lanczos vectors are generated, 
     # the algorithm generates NCV-NEV Lanczos vectors at each subsequent update iteration.
     if need_resize
-        arc.ncv = max(2 * arc.nev + 1, opt.arpack_min_lanczos)
+        if up_ncv
+            arc.ncv += max(arc.nev, 10)
+        else
+            arc.ncv = max(2 * arc.nev + 1, opt.arpack_min_lanczos)
+        end
     end
 
     # Lanczos basis vectors (output)
@@ -672,11 +682,12 @@ function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
         arc.converged = true
     end
 
-    # check convergenc for all ritz pairs
+    # check convergence for all ritz pairs
     # https://github.com/JuliaLinearAlgebra/Arpack.jl/blob/a7cdb6d7f19f076f5fadd8b58a9c5a061c48322f/src/Arpack.jl#L188
     # @assert arc.nev <= arc.iparam[5]
     # if arc.nev > arc.iparam[5]
     #     arc.converged = false
+    #     @show arc.nev , arc.iparam[5]
     # end
 
     return nothing
@@ -715,13 +726,22 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
     return nothing
 end
 
-function eig!(arc::ARPACKAlloc, A::Symmetric{T1,Matrix{T1}}, nev::Integer, opt::Options)::Nothing where T1
+function eig!(arc::ARPACKAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
 
-    # Initialize parameters and do memory allocation
-    @timeit "update_arc" _update_arc!(arc, A, nev, opt)::Nothing
+    up_ncv = false
+    for i in 1:1
+        # Initialize parameters and do memory allocation
+        @timeit "update_arc" _update_arc!(arc, A, nev, opt, up_ncv)::Nothing
 
-    # Top level reverse communication interface to solve real double precision symmetric problems.
-    @timeit "saupd" _saupd!(arc)::Nothing
+        # Top level reverse communication interface to solve real double precision symmetric problems.
+        @timeit "saupd" _saupd!(arc)::Nothing
+
+        if arc.nev > arc.iparam[5]
+            up_ncv = true
+        else
+            break
+        end
+    end
 
     # Post processing routine (eigenvalues and eigenvectors purification)
     @timeit "seupd" _seupd!(arc)::Nothing

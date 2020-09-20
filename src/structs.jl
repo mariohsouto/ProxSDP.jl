@@ -68,14 +68,16 @@ Base.@kwdef mutable struct Options
     #=
         0: arpack random [usually faster - NON-DETERMINISTIC - slightly]
         1: all ones [???]
-        2: julia random uniform (arpack_resid_seed) [best for DETERMINISTIC]
-        3: julia normalized random normal (arpack_resid_seed) [not good for DETERMINISTIC]
+        2: julia random uniform (arpack_resid_seed) [medium for DETERMINISTIC]
+        3: julia normalized random normal (arpack_resid_seed) [best for DETERMINISTIC]
     =#
-    arpack_resid_init::Int = 2
+    arpack_resid_init::Int = 3
     arpack_resid_seed::Int = 1234
     arpack_reset_resid::Bool = true # true for determinism
-    arpack_max_iter::Int = Int(1e+4)
-    arpack_min_lanczos::Int = 10
+    arpack_max_iter::Int = 10_000
+    arpack_min_lanczos::Int = 25
+    # larger is more stable to converge and more deterministic
+    # see remark for of dsaupd
 
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
