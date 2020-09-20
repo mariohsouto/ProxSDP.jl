@@ -7,7 +7,7 @@ function mimo_data(seed, m, n)
     # Gaussian noise
     v = randn((m, 1))
     # True signal
-    s = rand(rng, [-1, 1], n)
+    s = Random.rand(rng, [-1, 1], n)
     # Received signal
     sigma = .0001
     y = H * s + sigma * v

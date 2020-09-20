@@ -109,9 +109,11 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     # Initialization
-    pair.x = p.primal_step .* mat.c
-    mul!(a.Mx, mat.M, pair.x)
-    mul!(a.Mx_old, mat.M, pair.x_old)
+    if opt.advanced_initialization
+        pair.x = p.primal_step .* mat.c
+        mul!(a.Mx, mat.M, pair.x)
+        mul!(a.Mx_old, mat.M, pair.x_old)
+    end
 
     # Fixed-point loop
     @timeit "CP loop" for k in 1:opt.max_iter
@@ -144,7 +146,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.rank_update += 1
         if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
 
-            if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p)
+            if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
                 p.stop_reason = 1 # Optimal
                 p.stop_reason_string = "Optimal solution found"
                 if opt.log_verbose
@@ -174,7 +176,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Check divergence
         elseif k > p.window && residuals.comb_residual[k - p.window] < residuals.comb_residual[k] && p.rank_update > p.window
             p.update_cont += 1
-            if p.update_cont > 50
+            if p.update_cont > opt.divergence_min_update
                 full_rank_flag = true
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
                     if p.target_rank[idx] < sdp.sq_side
@@ -191,7 +193,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     end
                 end
                 p.rank_update, p.update_cont = 0, 0
-                if full_rank_flag == true
+                if full_rank_flag
                     p.stop_reason = 4 # Infeasible
                     p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
                     break

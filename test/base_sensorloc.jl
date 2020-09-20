@@ -8,12 +8,12 @@ function sensorloc_data(seed, n)
     m = floor(Int, 0.1 * n)
 
     # Sensor true position (2 dimensional)
-    x_true = rand(rng, Float64, (2, n))
+    x_true = Random.rand(rng, Float64, (2, n))
     # Distances from sensors to sensors
     d = Dict((i, j) => norm(x_true[:, i] - x_true[:, j]) for i in 1:n for j in 1:i)
 
     # Anchor positions
-    a = Dict(i => rand(rng, Float64, (2, 1)) for i in 1:m)
+    a = Dict(i => Random.rand(rng, Float64, (2, 1)) for i in 1:m)
     # Distances from anchor to sensors
     d_bar = Dict((k, j) => norm(x_true[:, j] - a[k]) for k in 1:m for j in 1:n)
 

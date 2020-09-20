@@ -44,6 +44,8 @@ Base.@kwdef mutable struct Options
     convergence_window::Int = 200
     convergence_check::Int = 50
     max_iter::Int = Int(1e+5)
+    min_iter::Int = 20
+    divergence_min_update::Int = 50
 
     # Linesearch parameters
     max_linsearch_steps::Int = 5000

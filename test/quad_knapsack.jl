@@ -19,17 +19,17 @@ function quad_knapsack(solver, seed)
     # Build weights and capacity
     a = zeros(n)
     for i in 1:n
-        a[i] = rand(rng, 1:50)
+        a[i] = Random.rand(rng, 1:50)
     end
     a = ones(n)
-    b = rand(100:sum(a)+100)
+    b = Random.rand(100:sum(a)+100)
 
     # Profits
     C = zeros((n, n))
     for i in 1:n
         for j in 1:n
             if sample(rng, [1, 0],Weights([delta, 1.0 - delta])) == 1
-                c_ = - rand(rng, 1:100)
+                c_ = - Random.rand(rng, 1:100)
                 C[i, j] = c_
                 C[j, i] = c_
             end
