@@ -11,6 +11,8 @@ const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 
 const optimizer = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
+const optimizer_high_acc = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(tol_primal = 1e-7, tol_dual = 1e-7, log_verbose = false))
 const optimizer_low_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = true, timer_verbose = true))
 const optimizer_full = MOIU.CachingOptimizer(cache,
@@ -39,11 +41,11 @@ end
         "solve_zero_one_with_bounds_1",
         "solve_zero_one_with_bounds_2",
         "solve_zero_one_with_bounds_3",
-                    # `TimeLimitSec` not supported.
-                    # "time_limit_sec",
-                    "number_threads",
-                    # ArgumentError: The number of constraints in SCSModel must be greater than 0
-                    "solve_unbounded_model",
+        # `TimeLimitSec` not supported.
+        # "time_limit_sec",
+        "number_threads",
+        # ArgumentError: The number of constraints in SCSModel must be greater than 0
+        "solve_unbounded_model",
         ]
     )
 end
@@ -57,11 +59,14 @@ end
         "linear10",
         # linear9 is requires precision
         "linear9",
+        "linear5",
         # primalstart not accepted
         "partial_start",
         ]
     )
-    # MOIT.linear9test(MOIB.SplitInterval{Float64}(optimizer), config)
+    # MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    MOIT.linear5test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    MOIT.linear10test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
 end
 
 @testset "MOI Continuous Conic" begin

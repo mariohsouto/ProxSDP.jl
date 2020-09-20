@@ -49,7 +49,7 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar
     for i in 1:n
         for j in 1:i - 1
             count_all += 1
-            if rand(rng) > 0.9
+            if Random.rand(rng) > 0.9
                 count += 1
                 if scalar
                     MOI.add_constraint(optimizer, 

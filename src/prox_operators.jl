@@ -13,6 +13,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             else
                 a.m[idx].data[i,j] = v[cont]
             end
+            # a.m[idx].data[i,j] = ifelse(i != j, v[cont] / sqrt_2, v[cont])
             cont += 1
         end
     end
@@ -28,7 +29,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
 
         elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
             @timeit "eigs" begin 
-                eig!(arc_list[idx], a.m[idx], p.target_rank[idx], iter, opt.warm_start_eig)
+                eig!(arc_list[idx], a.m[idx], p.target_rank[idx], opt)
                 if hasconverged(arc_list[idx])
                     fill!(a.m[idx].data, 0.)
                     for i in 1:p.target_rank[idx]
@@ -79,7 +80,6 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
             end
         end
     end
-    
     return nothing
 end
 
@@ -87,7 +87,6 @@ function soc_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
     for (idx, soc) in enumerate(cones.socone)
         soc_projection!(a.soc_v[idx], a.soc_s[idx])
     end
-
     return nothing
 end
 
@@ -103,19 +102,17 @@ function soc_projection!(v::ViewVector, s::ViewScalar)::Nothing
         v .*= val
         s[] = val * nv
     end
-
     return nothing
 end
 
 function box_projection!(v::Array{Float64,1}, aff::AffineSets, step::Float64)::Nothing
     # Projection onto = b
-    @inbounds @simd for i in 1:length(aff.b)
-        v[i] = aff.b[i]
+    @simd for i in 1:length(aff.b)
+        @inbounds v[i] = aff.b[i]
     end
     # Projection onto <= h
-    @inbounds @simd for i in 1:length(aff.h)
-        v[aff.p+i] = min(v[aff.p+i] / step, aff.h[i])
+    @simd for i in 1:length(aff.h)
+        @inbounds v[aff.p+i] = min(v[aff.p+i] / step, aff.h[i])
     end
-
     return nothing
 end

@@ -28,7 +28,7 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
     has_ctr = zeros(Bool,n,n)
     for i in 1:n, j in 1:i - 1
         count_all += 1
-        if rand(rng) > 0.9
+        if Random.rand(rng) > 0.9
             count += 1
             has_ctr[i,j] = true
             # e = zeros(n, 1)

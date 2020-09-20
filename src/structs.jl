@@ -44,6 +44,10 @@ Base.@kwdef mutable struct Options
     convergence_window::Int = 200
     convergence_check::Int = 50
     max_iter::Int = Int(1e+5)
+    min_iter::Int = 40
+    divergence_min_update::Int = 50
+
+    advanced_initialization::Bool = true
 
     # Linesearch parameters
     max_linsearch_steps::Int = 5000
@@ -58,6 +62,22 @@ Base.@kwdef mutable struct Options
     warm_start_eig::Bool = true
     rank_increment::Int = 1 # 0=multiply, 1 = add
     rank_increment_factor::Int = 1 # 0 multiply, 1 = add
+
+    # Arpack
+    arpack_tol::Float64 = 1e-10
+    #=
+        0: arpack random [usually faster - NON-DETERMINISTIC - slightly]
+        1: all ones [???]
+        2: julia random uniform (arpack_resid_seed) [medium for DETERMINISTIC]
+        3: julia normalized random normal (arpack_resid_seed) [best for DETERMINISTIC]
+    =#
+    arpack_resid_init::Int = 3
+    arpack_resid_seed::Int = 1234
+    arpack_reset_resid::Bool = true # true for determinism
+    arpack_max_iter::Int = 10_000
+    arpack_min_lanczos::Int = 25
+    # larger is more stable to converge and more deterministic
+    # see remark for of dsaupd
 
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
@@ -192,7 +212,6 @@ mutable struct AuxiliaryData
 
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
-    residual::Vector{Float64}
 
     y_half::Vector{Float64}
     y_temp::Vector{Float64}
@@ -201,14 +220,13 @@ mutable struct AuxiliaryData
     soc_s::Vector{ViewScalar}
 
     function AuxiliaryData(aff::AffineSets, cones::ConicSets) 
-        Mx_old = zeros(aff.p+aff.m)
-    new(
-        [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :U) for sdp in cones.sdpcone], 
-        zeros(aff.n), zeros(aff.n),
-        zeros(aff.p+aff.m), Mx_old, zeros(aff.p+aff.m), 
-        zeros(aff.p+aff.m), zeros(aff.p+aff.m),
-        ViewVector[], ViewScalar[]
-)
+        new(
+            [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :U) for sdp in cones.sdpcone], 
+            zeros(aff.n), zeros(aff.n),
+            zeros(aff.p+aff.m), zeros(aff.p+aff.m),
+            zeros(aff.p+aff.m), zeros(aff.p+aff.m),
+            ViewVector[], ViewScalar[]
+        )
     end
 end
 
