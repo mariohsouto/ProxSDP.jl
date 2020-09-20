@@ -10,9 +10,9 @@ const MOIU = MOI.Utilities
 const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 
 const optimizer = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(min_iter = 100, tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
+    ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
 const optimizer_high_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(min_iter = 200, tol_primal = 1e-7, tol_dual = 1e-7, log_verbose = false))
+    ProxSDP.Optimizer(tol_primal = 1e-7, tol_dual = 1e-7, log_verbose = false))
 const optimizer_low_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = true, timer_verbose = true))
 const optimizer_full = MOIU.CachingOptimizer(cache,

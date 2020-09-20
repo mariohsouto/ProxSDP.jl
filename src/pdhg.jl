@@ -110,7 +110,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Initialization
     if opt.advanced_initialization
-        pair.x = p.primal_step .* mat.c
+        pair.x .= p.primal_step .* mat.c
         mul!(a.Mx, mat.M, pair.x)
         mul!(a.Mx_old, mat.M, pair.x_old)
     end

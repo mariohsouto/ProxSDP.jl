@@ -44,8 +44,10 @@ Base.@kwdef mutable struct Options
     convergence_window::Int = 200
     convergence_check::Int = 50
     max_iter::Int = Int(1e+5)
-    min_iter::Int = 20
+    min_iter::Int = 40
     divergence_min_update::Int = 50
+
+    advanced_initialization::Bool = true
 
     # Linesearch parameters
     max_linsearch_steps::Int = 5000
@@ -194,7 +196,6 @@ mutable struct AuxiliaryData
 
     Mx::Vector{Float64}
     Mx_old::Vector{Float64}
-    residual::Vector{Float64}
 
     y_half::Vector{Float64}
     y_temp::Vector{Float64}
@@ -203,14 +204,13 @@ mutable struct AuxiliaryData
     soc_s::Vector{ViewScalar}
 
     function AuxiliaryData(aff::AffineSets, cones::ConicSets) 
-        Mx_old = zeros(aff.p+aff.m)
-    new(
-        [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :U) for sdp in cones.sdpcone], 
-        zeros(aff.n), zeros(aff.n),
-        zeros(aff.p+aff.m), Mx_old, zeros(aff.p+aff.m), 
-        zeros(aff.p+aff.m), zeros(aff.p+aff.m),
-        ViewVector[], ViewScalar[]
-)
+        new(
+            [Symmetric(zeros(sdp.sq_side, sdp.sq_side), :U) for sdp in cones.sdpcone], 
+            zeros(aff.n), zeros(aff.n),
+            zeros(aff.p+aff.m), zeros(aff.p+aff.m),
+            zeros(aff.p+aff.m), zeros(aff.p+aff.m),
+            ViewVector[], ViewScalar[]
+    )
     end
 end
 

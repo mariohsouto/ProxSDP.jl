@@ -13,6 +13,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             else
                 a.m[idx].data[i,j] = v[cont]
             end
+            # a.m[idx].data[i,j] = ifelse(i != j, v[cont] / sqrt_2, v[cont])
             cont += 1
         end
     end

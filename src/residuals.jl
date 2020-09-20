@@ -4,21 +4,15 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     # Inplace primal feasibility error
     if aff.p > 0
         residuals.equa_feasibility = 0.
-        for i in 1:aff.p
-            a.residual[i] = a.Mx[i]
-            a.residual[i] -= aff.b[i]
-            a.residual[i] = abs(a.residual[i])
-            residuals.equa_feasibility = max(residuals.equa_feasibility, a.residual[i])
+        @simd for i in 1:aff.p
+            @inbounds residuals.equa_feasibility = max(residuals.equa_feasibility, abs(a.Mx[i] - aff.b[i]))
         end
         residuals.equa_feasibility /= (1. + p.norm_b)
     end
     if aff.m > 0
         residuals.ineq_feasibility = 0.
-        for i in aff.p+1:aff.p+aff.m
-            a.residual[i] = a.Mx[i]
-            a.residual[i] -= aff.h[i-aff.p]
-            a.residual[i] = max(a.residual[i], 0.)
-            residuals.ineq_feasibility = max(residuals.ineq_feasibility, a.residual[i])
+        @simd for i in aff.p+1:aff.p+aff.m
+            @inbounds residuals.ineq_feasibility = max(residuals.ineq_feasibility, max(a.Mx[i] - aff.h[i-aff.p], 0.0))
         end
         residuals.ineq_feasibility /= (1. + p.norm_h)
     end
