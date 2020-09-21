@@ -63,6 +63,13 @@ Base.@kwdef mutable struct Options
     rank_increment::Int = 1 # 0=multiply, 1 = add
     rank_increment_factor::Int = 1 # 0 multiply, 1 = add
 
+    # eigsolver selection
+    #=
+        1: Arpack [dsaupd] (tipically non-deterministic)
+        2: KrylovKit [eigsolve/Lanczos] (DEFAULT)
+    =#
+    eigsolver::Int = 2
+
     # Arpack
     arpack_tol::Float64 = 1e-10
     #=
@@ -82,6 +89,9 @@ Base.@kwdef mutable struct Options
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
     rank_slack::Int = 3
+
+    full_eig_freq::Int = 10000000
+    full_eig_len::Int = 0
 
     # equilibration parameters
     equilibration::Bool = true

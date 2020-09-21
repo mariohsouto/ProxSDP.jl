@@ -729,22 +729,48 @@ end
 function eig!(arc::ARPACKAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
 
     up_ncv = false
-    for i in 1:1
-        # Initialize parameters and do memory allocation
+    if opt.eigsolver == 1
+        for i in 1:1
+            # Initialize parameters and do memory allocation
+            @timeit "update_arc" _update_arc!(arc, A, nev, opt, up_ncv)::Nothing
+
+            # Top level reverse communication interface to solve real double precision symmetric problems.
+            @timeit "saupd" _saupd!(arc)::Nothing
+
+            if arc.nev > arc.iparam[5]
+                up_ncv = true
+            else
+                break
+            end
+        end
+
+        # Post processing routine (eigenvalues and eigenvectors purification)
+        @timeit "seupd" _seupd!(arc)::Nothing
+    else
         @timeit "update_arc" _update_arc!(arc, A, nev, opt, up_ncv)::Nothing
-
-        # Top level reverse communication interface to solve real double precision symmetric problems.
-        @timeit "saupd" _saupd!(arc)::Nothing
-
-        if arc.nev > arc.iparam[5]
-            up_ncv = true
-        else
-            break
+        @timeit "krylovkit" begin
+            vals, vecs, info = eigsolve(A, arc.resid, arc.nev, :LR,
+                # Arnoldi(krylovdim = arc.ncv, maxiter=arc.maxiter))
+                Lanczos(krylovdim = arc.ncv))
+                # , maxiter=arc.maxiter
+                #, tol = 1e-18
+            if info.converged == 0
+                @show arc.nev, info
+            end
+            fill!(arc.d, 0.0)
+            fill!(arc.v, 0.0)
+            for i in 1:min(arc.nev, info.converged)
+                arc.d[i] = vals[i]
+                for j in 1:arc.n
+                    arc.v[j,i] = vecs[i][j]
+                end
+            end
+            arc.converged = true
+            arc.arpackerror = false
+            # if info.converged == 1
+            #     arc.converged = false
+            # end
         end
     end
-
-    # Post processing routine (eigenvalues and eigenvectors purification)
-    @timeit "seupd" _seupd!(arc)::Nothing
-
     return nothing
 end
