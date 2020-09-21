@@ -33,6 +33,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             mod(p.iter, opt.full_eig_freq) > opt.full_eig_len # for full from time to time
             @timeit "eigs" begin 
                 eig!(arc_list[idx], a.m[idx], p.target_rank[idx], opt)
+                
                 if hasconverged(arc_list[idx])
                     fill!(a.m[idx].data, 0.)
                     for i in 1:p.target_rank[idx]

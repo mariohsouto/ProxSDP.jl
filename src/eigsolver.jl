@@ -750,7 +750,7 @@ function eig!(arc::ARPACKAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Op
         @timeit "update_arc" _update_arc!(arc, A, nev, opt, up_ncv)::Nothing
         @timeit "krylovkit" begin
             vals, vecs, info = eigsolve(
-                A, arc.resid, arc.nev, :LR,Lanczos(krylovdim = arc.ncv, tol = 1e-12, maxiter=50)
+                A, arc.resid, arc.nev, :LR,Lanczos(krylovdim = arc.ncv, tol = 1e-12, maxiter=100)
             )
 
             if info.converged == 0
