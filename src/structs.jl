@@ -20,6 +20,7 @@ Base.@kwdef mutable struct Options
     log_freq::Int = 100
     timer_verbose::Bool = false
     timer_file::Bool = false
+    disable_julia_logger = true
 
     # time options
     time_limit::Float64 = 3600_00. #100 hours
@@ -73,6 +74,8 @@ Base.@kwdef mutable struct Options
     eigsolver_resid_seed::Int = 1234
 
     # Arpack
+    # note that Arpack is Non-deterministic
+    # (https://github.com/mariohsouto/ProxSDP.jl/issues/69)
     arpack_tol::Float64 = 1e-10
     #=
         0: arpack random [usually faster - NON-DETERMINISTIC - slightly]

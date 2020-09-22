@@ -9,6 +9,7 @@ module ProxSDP
     using SparseArrays
     using LinearAlgebra
     import Random
+    import Logging
 
     import LinearAlgebra: BlasInt
 

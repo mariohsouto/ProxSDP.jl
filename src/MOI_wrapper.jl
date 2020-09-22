@@ -561,7 +561,18 @@ function MOI.optimize!(optimizer::Optimizer)
 
     # warm = WarmStart()
 
+    if options.disable_julia_logger
+        # disable logger
+        global_log = Logging.current_logger()
+        Logging.global_logger(Logging.NullLogger())
+    end
+
     sol = @timeit "Main" chambolle_pock(aff, con, options)
+
+    if options.disable_julia_logger
+        # re-enable logger
+        Logging.global_logger(global_log)
+    end
 
     #= 
         Unload solution

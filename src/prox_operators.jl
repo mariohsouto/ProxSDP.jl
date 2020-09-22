@@ -1,5 +1,3 @@
- 
-
 function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
 
     p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
@@ -23,10 +21,8 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
         p.current_rank[idx] = 0
 
         if sdp.sq_side == 1
-
             a.m[idx][1] = max(0., a.m[idx][1])
             p.min_eig[idx] = a.m[idx][1]
-
         elseif !opt.full_eig_decomp &&
                 p.target_rank[idx] <= opt.max_target_rank_krylov_eigs &&
                 sdp.sq_side > opt.min_size_krylov_eigs &&
@@ -34,15 +30,12 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             @timeit "eigs" if opt.eigsolver == 1
                 arpack_eig!(arc_list[idx], a, idx, opt, p)
             else
-
+                krylovkit_eig!(arc_list[idx], a, idx, opt, p)
             end
-            if hasconverged(arc_list[idx])
-                @timeit "get min eig" p.min_eig[idx] = minimum(arpack_getvalues(arc_list[idx]))
-            else
+            if !hasconverged(arc_list[idx])
                 @timeit "eigfact" full_eig!(a, idx, opt, p)
             end
         else
-            p.min_eig[idx] = 0.
             @timeit "eigfact" full_eig!(a, idx, opt, p)
         end
     end
@@ -66,9 +59,14 @@ function arpack_eig!(solver::EigSolverAlloc, a::AuxiliaryData, idx::Int, opt::Op
     arpack_eig!(solver, a.m[idx], p.target_rank[idx], opt)
     if hasconverged(solver)
         fill!(a.m[idx].data, 0.)
+        # TODO: how to measure this when convergen eigs is less than target?
+        p.min_eig[idx] = minimum(arpack_getvalues(solver))
+        # if solver.converged_eigs < p.target_rank[idx] && p.min_eig[idx] > 0.0
+        #     p.min_eig[idx] = -Inf
+        # end
         for i in 1:p.target_rank[idx]
             val = arpack_getvalues(solver)[i]
-            if val > 0. 
+            if val > 0.
                 p.current_rank[idx] += 1
                 vec = view(arpack_getvectors(solver), :, i)
                 LinearAlgebra.BLAS.gemm!('N', 'T', val, vec, vec, 1., a.m[idx].data)
@@ -82,9 +80,15 @@ function krylovkit_eig!(solver::EigSolverAlloc, a::AuxiliaryData, idx::Int, opt:
     krylovkit_eig!(solver, a.m[idx], p.target_rank[idx], opt)
     if hasconverged(solver)
         fill!(a.m[idx].data, 0.)
-        for i in 1:p.target_rank[idx]
+        # TODO: how to measure this when convergen eigs is less than target?
+        # ? min_eig is just checking if the rank projection is going far enough to reach zeros and negatives
+        p.min_eig[idx] = minimum(krylovkit_getvalues(solver))
+        # if solver.converged_eigs < p.target_rank[idx] #&& p.min_eig[idx] > 0.0
+        #     p.min_eig[idx] = -Inf
+        # end
+        for i in 1:min(p.target_rank[idx], solver.converged_eigs)
             val = krylovkit_getvalues(solver)[i]
-            if val > 0. 
+            if val > 0.
                 p.current_rank[idx] += 1
                 vec = krylovkit_getvector(solver, i)
                 LinearAlgebra.BLAS.gemm!('N', 'T', val, vec, vec, 1., a.m[idx].data)
@@ -97,6 +101,7 @@ end
 function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
     p.current_rank[idx] = 0
     fact = eigen!(a.m[idx])
+    p.min_eig[idx] = 0.0 #minimum(fact.values)
     fill!(a.m[idx].data, 0.)
     for i in 1:length(fact.values)
         if fact.values[i] > 0.
@@ -108,6 +113,16 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
         end
     end
     return nothing
+end
+
+function min_eig(a::AuxiliaryData, idx::Int, p::Params)
+    # if p.min_eig[idx] == -Inf
+    #     @timeit "bad min eig" begin
+    #         fact = eigen!(a.m[idx])
+    #         p.min_eig[idx] = minimum(fact.values)
+    #     end
+    # end
+    return p.min_eig[idx]
 end
 
 function soc_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params)::Nothing

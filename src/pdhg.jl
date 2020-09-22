@@ -146,7 +146,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         p.rank_update += 1
         if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
 
-            if convergedrank(p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
+            if convergedrank(a, p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
                 p.stop_reason = 1 # Optimal
                 p.stop_reason_string = "Optimal solution found"
                 if opt.log_verbose
@@ -160,7 +160,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 if p.update_cont > 0
                     for (idx, sdp) in enumerate(conic_sets.sdpcone)
                         if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
-                            if p.min_eig[idx] > opt.tol_psd
+                            if min_eig(a, idx, p) > opt.tol_psd
                                 if opt.rank_increment == 0
                                     p.target_rank[idx] = min(opt.rank_increment_factor * p.target_rank[idx], sdp.sq_side)
                                 else
@@ -183,7 +183,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         full_rank_flag = false
                     end
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
-                        if p.min_eig[idx] > opt.tol_psd
+                        if min_eig(a, idx, p) > opt.tol_psd
                             if opt.rank_increment == 0
                                 p.target_rank[idx] = min(opt.rank_increment_factor * p.target_rank[idx], sdp.sq_side)
                             else

@@ -761,6 +761,8 @@ function arpack_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Intege
         end
     end
 
+    arc.converged_eigs = arc.iparam[5]
+
     # Post processing routine (eigenvalues and eigenvectors purification)
     @timeit "seupd" _seupd!(arc)::Nothing
     return nothing
@@ -771,7 +773,7 @@ function krylovkit_getvalues(arc::EigSolverAlloc)
 end
 
 function krylovkit_getvector(arc::EigSolverAlloc, i)
-    return arc.v[i]
+    return arc.vecs[i]
 end
 
 function krylovkit_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
@@ -783,8 +785,7 @@ function krylovkit_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     return nothing
 end
 
-function krylovkit_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
-    arc.n = n
+function krylovkit_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options) where T
     arc.nev = nev
     if opt.krylovkit_reset_resid
         eigsolver_update_resid!(arc, opt, opt.krylovkit_resid_init)
@@ -794,9 +795,8 @@ function krylovkit_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, ne
 end
 
 function krylovkit_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
-    up_ncv = false
     arc.converged = true
-    @timeit "update_arc" krylovkit_update!(arc, A, nev, opt, up_ncv)::Nothing
+    @timeit "update_arc" krylovkit_update!(arc, A, nev, opt)::Nothing
     @timeit "krylovkit" begin
         vals, vecs, info = KrylovKit.eigsolve(
             A, arc.resid, arc.nev, :LR,
@@ -809,6 +809,8 @@ function krylovkit_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Int
                 opt.krylovkit_verbose
             )
         )
+        arc.vals = vals
+        arc.vecs = vecs
         arc.converged_eigs = info.converged
         if info.converged == 0
             arc.converged = false
