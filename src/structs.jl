@@ -116,29 +116,6 @@ Base.@kwdef mutable struct Options
     approx_norm::Bool = true
 end
 
-function Options(args)
-    options = Options()
-    parse_args!(options, args)
-    return options
-end
-
-function parse_args!(options, args)
-    for i in args
-        parse_arg!(options, i)
-    end
-    return nothing
-end
-
-function parse_arg!(options::Options, arg)
-    fields = fieldnames(Options)
-    name = arg[1]
-    value = arg[2]
-    if name in fields
-        setfield!(options, name, value)
-    end
-    return nothing
-end
-
 mutable struct AffineSets
     n::Int  # Size of primal variables
     p::Int  # Number of linear equalities
