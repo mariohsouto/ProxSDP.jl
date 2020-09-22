@@ -333,12 +333,24 @@ c     WORKL(IPNTR(8)), WORKL(IPNTR(8)+1), ... , WORKL(IPNTR(8)+NCV-1).
 c
 c-----------------------------------------------------------------------------
 =#
-mutable struct ARPACKAlloc{T}
+mutable struct EigSolverAlloc{T}
 
+    converged::Bool
     n::Int
     nev::Int
     ncv::Int
     maxiter::Int
+    tol::Float64
+    resid::Vector{T}
+    converged_eigs::Int
+
+    rng::Random.MersenneTwister
+
+    # KrylovKit data
+    vals::Vector{Float64}
+    vecs::Vector{Vector{Float64}}
+
+    # Arpack data
     bmat::String
     which::String
     mode::Int
@@ -348,7 +360,6 @@ mutable struct ARPACKAlloc{T}
     v::Matrix{T}
     workd::Vector{T}
     workl::Vector{T}
-    resid::Vector{T}
     info::Vector{BlasInt}
     iparam::Vector{BlasInt}
     ipntr::Vector{BlasInt}
@@ -359,35 +370,63 @@ mutable struct ARPACKAlloc{T}
     info_e::Vector{BlasInt}
     d::Vector{T}
     sigmar::Vector{T}
-    converged::Bool
     arpackerror::Bool
     x::Vector{T}
     y::Vector{T}
 
-    rng::Random.MersenneTwister
 
-    function ARPACKAlloc{T}() where T
+    function EigSolverAlloc{T}() where T
         new{T}()
     end
 end
 
-hasconverged(arc::ARPACKAlloc) = arc.converged
+hasconverged(arc::EigSolverAlloc) = arc.converged
 
-function unsafe_getvalues(arc::ARPACKAlloc)
-    return arc.d
-end
-
-function unsafe_getvectors(arc::ARPACKAlloc)
-    return arc.v
-end
-
-function ARPACKAlloc(T::DataType, n::Int64, opt::Options)::ARPACKAlloc
-    arc = ARPACKAlloc{T}()
-    @timeit "init_arc" _init_arc!(arc, Symmetric(Matrix{T}(I, n, n), :U), 1, n, opt)
+function EigSolverAlloc(T::DataType, n::Int64, opt::Options)::EigSolverAlloc
+    arc = EigSolverAlloc{T}()
+    @timeit "init_arc" _init_eigsolver!(arc, Symmetric(Matrix{T}(I, n, n), :U), 1, n, opt)
     return arc
 end
 
-function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
+function eigsolver_init_resid!(arc, opt, n)
+    arc.resid = zeros(n)
+    arc.rng = Random.MersenneTwister(opt.eigsolver_resid_seed)
+    return nothing
+end
+function eigsolver_update_resid!(arc, opt, init)
+    if init == 2
+        Random.seed!(arc.rng, opt.eigsolver_resid_seed)
+        Random.rand!(arc.rng, arc.resid)
+    elseif init == 3
+        Random.seed!(arc.rng, opt.eigsolver_resid_seed)
+        Random.randn!(arc.rng, arc.resid)
+        LinearAlgebra.normalize!(arc.resid)
+    elseif init == 1
+        fill!(arc.resid, 1.0)
+    else
+        fill!(arc.resid, 0.0)
+    end
+    return nothing
+end
+
+function _init_eigsolver!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
+    if opt.eigsolver == 1
+        arpack_init!(arc, A, nev, n, opt)
+    else
+        krylovkit_init!(arc, A, nev, n, opt)
+    end
+    return nothing
+end
+
+function arpack_getvalues(arc::EigSolverAlloc)
+    return arc.d
+end
+
+function arpack_getvectors(arc::EigSolverAlloc)
+    return arc.v
+end
+
+function arpack_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
 
     # IDO - Integer.  (INPUT/OUTPUT)  (in julia its is a integer vector)
     # Reverse communication flag.
@@ -425,18 +464,8 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     # On OUTPUT:
     # RESID contains the final residual vector. 
     # reset the curent mersenne twister to keep determinism
-    if opt.arpack_resid_init == 2
-        arc.rng = Random.MersenneTwister(opt.arpack_resid_seed)
-        arc.resid = Random.rand(arc.rng, arc.n)
-    elseif opt.arpack_resid_init == 3
-        arc.rng = Random.MersenneTwister(opt.arpack_resid_seed)
-        arc.resid = Random.randn(arc.rng, arc.n)
-        LinearAlgebra.normalize!(arc.resid)
-    elseif opt.arpack_resid_init == 1
-        arc.resid = ones(arc.n)
-    else
-        arc.resid = zeros(arc.n)
-    end
+    eigsolver_init_resid!(arc, opt, n)
+    eigsolver_update_resid!(arc, opt, opt.arpack_resid_init)
 
     # NCV - Integer.  (INPUT)
     # How many Lanczos vectors are generated
@@ -450,7 +479,7 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     #    also increases the work and storage required to maintain the orthogonal
     #    basis vectors.   The optimal "cross-over" with respect to CPU time
     #    is problem dependent and must be determined empirically.
-    arc.ncv = max(2 * arc.nev + 1, opt.arpack_min_lanczos)
+    arc.ncv = max(2 * arc.nev + 1, opt.eigsolver_min_lanczos)
     # TODO: 10 might be a way to tight bound
     # why not 20
 
@@ -539,14 +568,14 @@ function _init_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, 
     return nothing
 end
 
-function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options, up_ncv::Bool) where T
+function arpack_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options, up_ncv::Bool) where T
 
     need_resize = up_ncv
     if !need_resize
         need_resize = nev != arc.nev
     end
     if !need_resize
-        need_resize = arc.ncv != max(2 * arc.nev + 1, opt.arpack_min_lanczos)
+        need_resize = arc.ncv != max(2 * arc.nev + 1, opt.eigsolver_min_lanczos)
     end
 
     # IDO must be zero on the first call to dsaupd
@@ -560,18 +589,7 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
 
     #  RESID - Double precision array of length N.  (INPUT/OUTPUT)
     if opt.arpack_reset_resid
-        if opt.arpack_resid_init == 2
-            Random.seed!(arc.rng, opt.arpack_resid_seed)
-            Random.rand!(arc.rng, arc.resid)
-        elseif opt.arpack_resid_init == 3
-            Random.seed!(arc.rng, opt.arpack_resid_seed)
-            Random.randn!(arc.rng, arc.resid)
-            LinearAlgebra.normalize!(arc.resid)
-        elseif opt.arpack_resid_init == 1
-            fill!(arc.resid, 1.0)
-        else
-            fill!(arc.resid, 0.0)
-        end
+        eigsolver_update_resid!(arc, opt, opt.arpack_resid_init)
     end
 
     # How many Lanczos vectors are generated. Needs to be NCV > NEV. It is recommended that NCV >= 2*NEV.
@@ -581,7 +599,7 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
         if up_ncv
             arc.ncv += max(arc.nev, 10)
         else
-            arc.ncv = max(2 * arc.nev + 1, opt.arpack_min_lanczos)
+            arc.ncv = max(2 * arc.nev + 1, opt.eigsolver_min_lanczos)
         end
     end
 
@@ -646,7 +664,7 @@ function _update_arc!(arc::ARPACKAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64
     return nothing
 end
 
-function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
+function _saupd!(arc::EigSolverAlloc{T})::Nothing where T
 
     while true
         Arpack.saupd(arc.ido, arc.bmat, arc.n, arc.which, arc.nev, arc.TOL, arc.resid, arc.ncv, arc.v, arc.n,
@@ -693,7 +711,7 @@ function _saupd!(arc::ARPACKAlloc{T})::Nothing where T
     return nothing
 end
 
-function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
+function _seupd!(arc::EigSolverAlloc{T})::Nothing where T
 
     # Check if _AUPD has converged properly
     if !arc.converged
@@ -726,50 +744,79 @@ function _seupd!(arc::ARPACKAlloc{T})::Nothing where T
     return nothing
 end
 
-function eig!(arc::ARPACKAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
+function arpack_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
 
     up_ncv = false
-    if opt.eigsolver == 1
-        for i in 1:1
-            # Initialize parameters and do memory allocation
-            @timeit "update_arc" _update_arc!(arc, A, nev, opt, up_ncv)::Nothing
+    for i in 1:1
+        # Initialize parameters and do memory allocation
+        @timeit "update_arc" arpack_update!(arc, A, nev, opt, up_ncv)::Nothing
 
-            # Top level reverse communication interface to solve real double precision symmetric problems.
-            @timeit "saupd" _saupd!(arc)::Nothing
+        # Top level reverse communication interface to solve real double precision symmetric problems.
+        @timeit "saupd" _saupd!(arc)::Nothing
 
-            if arc.nev > arc.iparam[5]
-                up_ncv = true
-            else
-                break
-            end
+        if arc.nev > arc.iparam[5]
+            up_ncv = true
+        else
+            break
         end
+    end
 
-        # Post processing routine (eigenvalues and eigenvectors purification)
-        @timeit "seupd" _seupd!(arc)::Nothing
-    else
-        @timeit "update_arc" _update_arc!(arc, A, nev, opt, up_ncv)::Nothing
-        @timeit "krylovkit" begin
-            vals, vecs, info = eigsolve(
-                A, arc.resid, arc.nev, :LR,Lanczos(krylovdim = arc.ncv, tol = 1e-12, maxiter=100)
+    arc.converged_eigs = arc.iparam[5]
+
+    # Post processing routine (eigenvalues and eigenvectors purification)
+    @timeit "seupd" _seupd!(arc)::Nothing
+    return nothing
+end
+
+function krylovkit_getvalues(arc::EigSolverAlloc)
+    return arc.vals
+end
+
+function krylovkit_getvector(arc::EigSolverAlloc, i)
+    return arc.vecs[i]
+end
+
+function krylovkit_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
+    arc.n = n
+    arc.nev = nev
+    eigsolver_init_resid!(arc, opt, n)
+    eigsolver_update_resid!(arc, opt, opt.krylovkit_resid_init)
+    arc.ncv = max(2 * arc.nev + 1, opt.eigsolver_min_lanczos)
+    return nothing
+end
+
+function krylovkit_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options) where T
+    arc.nev = nev
+    if opt.krylovkit_reset_resid
+        eigsolver_update_resid!(arc, opt, opt.krylovkit_resid_init)
+    end
+    arc.ncv = max(2 * arc.nev + 1, opt.eigsolver_min_lanczos)
+    return nothing
+end
+
+function krylovkit_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
+    arc.converged = true
+    @timeit "update_arc" krylovkit_update!(arc, A, nev, opt)::Nothing
+    @timeit "krylovkit" begin
+        vals, vecs, info = KrylovKit.eigsolve(
+            A, arc.resid, arc.nev, :LR,
+            KrylovKit.Lanczos(
+                KrylovKit.KrylovDefaults.orth,
+                arc.ncv,
+                opt.krylovkit_max_iter,
+                opt.krylovkit_tol,
+                opt.krylovkit_eager,
+                opt.krylovkit_verbose
             )
-
-            if info.converged == 0
-                @show arc.nev, info
-            end
-            fill!(arc.d, 0.0)
-            fill!(arc.v, 0.0)
-            for i in 1:min(arc.nev, info.converged)
-                arc.d[i] = vals[i]
-                for j in 1:arc.n
-                    arc.v[j,i] = vecs[i][j]
-                end
-            end
-            arc.converged = true
-            arc.arpackerror = false
-            # if info.converged == 1
-            #     arc.converged = false
-            # end
+        )
+        arc.vals = vals
+        arc.vecs = vecs
+        arc.converged_eigs = info.converged
+        if info.converged == 0
+            arc.converged = false
         end
+        arc.vals = vals
+        arc.vecs = vecs
     end
     return nothing
 end

@@ -19,6 +19,10 @@ const optimizer_full = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4))
 const optimizer_print = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
+const optimizer_lowacc_arpack = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(eigsolver = 1, tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = false))
+const optimizer_lowacc_krylovkit = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(eigsolver = 2, tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = false))
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
 
@@ -483,11 +487,15 @@ end
         # badly conditioned
         # moi_sdplib(optimizer_low_acc, joinpath(datapath, "gpp124-1.dat-s"), test = true)
         moi_sdplib(optimizer_low_acc, joinpath(datapath, "gpp124-2.dat-s"), test = true)
+        moi_sdplib(optimizer_lowacc_arpack, joinpath(datapath, "gpp124-2.dat-s"), test = true)
+        moi_sdplib(optimizer_lowacc_krylovkit, joinpath(datapath, "gpp124-2.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
     end
     @testset "MAX CUT" begin
         moi_sdplib(optimizer_low_acc, joinpath(datapath, "mcp124-1.dat-s"), test = true)
+        moi_sdplib(optimizer_lowacc_arpack, joinpath(datapath, "mcp124-1.dat-s"), test = true)
+        moi_sdplib(optimizer_lowacc_krylovkit, joinpath(datapath, "mcp124-1.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)

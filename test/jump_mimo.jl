@@ -30,8 +30,6 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
     objval = objective_value(model)
     stime = MOI.get(model, MOI.SolveTime())
 
-    # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
-    # @show fieldnames(tp)
     rank = -1
     try
         @show rank = model.moi_backend.optimizer.model.optimizer.sol.final_rank

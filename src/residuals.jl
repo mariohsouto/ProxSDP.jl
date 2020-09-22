@@ -79,9 +79,14 @@ function soc_gap(v::ViewVector, s::ViewScalar)
     return norm(v, 2) - s[]
 end
 
-function convergedrank(p::Params, cones::ConicSets, opt::Options)::Bool
+function convergedrank(a, p::Params, cones::ConicSets, opt::Options)::Bool
     for (idx, sdp) in enumerate(cones.sdpcone)
-        if !(p.min_eig[idx] < opt.tol_psd || p.target_rank[idx] > opt.max_target_rank_krylov_eigs || sdp.sq_side < opt.min_size_krylov_eigs)
+        if !(
+                sdp.sq_side < opt.min_size_krylov_eigs ||
+                p.target_rank[idx] > opt.max_target_rank_krylov_eigs ||
+                min_eig(a, idx, p) < opt.tol_psd
+            )
+            # @show min_eig(a, idx, p), -opt.tol_psd
             return false
         end
     end
