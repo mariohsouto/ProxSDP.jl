@@ -13,8 +13,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.norm_c = norm(affine_sets.c, 2)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
     p.stop_reason_string = "Not optimized"
-    p.target_rank = 1 * ones(length(conic_sets.sdpcone))
-    p.current_rank = 1 * ones(length(conic_sets.sdpcone))
+    p.target_rank = 2 * ones(length(conic_sets.sdpcone))
+    p.current_rank = 2 * ones(length(conic_sets.sdpcone))
     p.min_eig = zeros(length(conic_sets.sdpcone))
     arc_list = [ARPACKAlloc(Float64, sdp.sq_side, opt) for (idx, sdp) in enumerate(conic_sets.sdpcone)]
     ada_count = 0

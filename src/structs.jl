@@ -51,9 +51,9 @@ Base.@kwdef mutable struct Options
 
     # Linesearch parameters
     max_linsearch_steps::Int = 5000
-    delta::Float64 = .999
+    delta::Float64 = .9999
     initial_theta::Float64 = 1.
-    linsearch_decay::Float64 = .9
+    linsearch_decay::Float64 = .75
 
     # Spectral decomposition parameters
     full_eig_decomp::Bool = false
@@ -80,7 +80,7 @@ Base.@kwdef mutable struct Options
     =#
     arpack_resid_init::Int = 3
     arpack_resid_seed::Int = 1234
-    arpack_reset_resid::Bool = true # true for determinism
+    arpack_reset_resid::Bool = false # true for determinism
     arpack_max_iter::Int = 10_000
     arpack_min_lanczos::Int = 25
     # larger is more stable to converge and more deterministic
