@@ -27,15 +27,19 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             a.m[idx][1] = max(0., a.m[idx][1])
             p.min_eig[idx] = a.m[idx][1]
 
-        elseif !opt.full_eig_decomp && p.target_rank[idx] <= opt.max_target_rank_krylov_eigs && sdp.sq_side > opt.min_size_krylov_eigs
+        elseif !opt.full_eig_decomp &&
+            p.target_rank[idx] <= opt.max_target_rank_krylov_eigs &&
+            sdp.sq_side > opt.min_size_krylov_eigs &&
+            mod(p.iter, opt.full_eig_freq) > opt.full_eig_len # for full from time to time
             @timeit "eigs" begin 
                 eig!(arc_list[idx], a.m[idx], p.target_rank[idx], opt)
+                
                 if hasconverged(arc_list[idx])
                     fill!(a.m[idx].data, 0.)
                     for i in 1:p.target_rank[idx]
                         if unsafe_getvalues(arc_list[idx])[i] > 0. 
                             p.current_rank[idx] += 1
-                            vec = unsafe_getvectors(arc_list[idx])[:, i]
+                            vec = view(unsafe_getvectors(arc_list[idx]), :, i)
                             LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc_list[idx])[i], vec, vec, 1., a.m[idx].data)
                         end
                     end
@@ -74,7 +78,8 @@ function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
     fill!(a.m[idx].data, 0.)
     for i in 1:length(fact.values)
         if fact.values[i] > 0.
-            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], fact.vectors[:, i], fact.vectors[:, i], 1., a.m[idx].data)
+            v = view(fact.vectors, :, i)
+            LinearAlgebra.BLAS.gemm!('N', 'T', fact.values[i], v, v, 1., a.m[idx].data)
             if fact.values[i] > opt.tol_psd
                 p.current_rank[idx] += 1
             end

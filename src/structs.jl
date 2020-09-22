@@ -51,9 +51,9 @@ Base.@kwdef mutable struct Options
 
     # Linesearch parameters
     max_linsearch_steps::Int = 5000
-    delta::Float64 = .999
+    delta::Float64 = .9999
     initial_theta::Float64 = 1.
-    linsearch_decay::Float64 = .9
+    linsearch_decay::Float64 = .75
 
     # Spectral decomposition parameters
     full_eig_decomp::Bool = false
@@ -62,6 +62,13 @@ Base.@kwdef mutable struct Options
     warm_start_eig::Bool = true
     rank_increment::Int = 1 # 0=multiply, 1 = add
     rank_increment_factor::Int = 1 # 0 multiply, 1 = add
+
+    # eigsolver selection
+    #=
+        1: Arpack [dsaupd] (tipically non-deterministic)
+        2: KrylovKit [eigsolve/Lanczos] (DEFAULT)
+    =#
+    eigsolver::Int = 2
 
     # Arpack
     arpack_tol::Float64 = 1e-10
@@ -73,7 +80,7 @@ Base.@kwdef mutable struct Options
     =#
     arpack_resid_init::Int = 3
     arpack_resid_seed::Int = 1234
-    arpack_reset_resid::Bool = true # true for determinism
+    arpack_reset_resid::Bool = false # true for determinism
     arpack_max_iter::Int = 10_000
     arpack_min_lanczos::Int = 25
     # larger is more stable to converge and more deterministic
@@ -82,6 +89,9 @@ Base.@kwdef mutable struct Options
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
     rank_slack::Int = 3
+
+    full_eig_freq::Int = 10000000
+    full_eig_len::Int = 0
 
     # equilibration parameters
     equilibration::Bool = true

@@ -1,13 +1,15 @@
 module ProxSDP
 
+    using Arpack
+    using KrylovKit
     using MathOptInterface
     using TimerOutputs
-    using Arpack
+
     using Printf
     using SparseArrays
     using LinearAlgebra
-
     import Random
+
     import LinearAlgebra: BlasInt
 
     include("structs.jl")
