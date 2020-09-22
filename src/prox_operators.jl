@@ -28,29 +28,19 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             p.min_eig[idx] = a.m[idx][1]
 
         elseif !opt.full_eig_decomp &&
-            p.target_rank[idx] <= opt.max_target_rank_krylov_eigs &&
-            sdp.sq_side > opt.min_size_krylov_eigs &&
-            mod(p.iter, opt.full_eig_freq) > opt.full_eig_len # for full from time to time
-            @timeit "eigs" begin 
-                eig!(arc_list[idx], a.m[idx], p.target_rank[idx], opt)
-                
-                if hasconverged(arc_list[idx])
-                    fill!(a.m[idx].data, 0.)
-                    for i in 1:p.target_rank[idx]
-                        if unsafe_getvalues(arc_list[idx])[i] > 0. 
-                            p.current_rank[idx] += 1
-                            vec = view(unsafe_getvectors(arc_list[idx]), :, i)
-                            LinearAlgebra.BLAS.gemm!('N', 'T', unsafe_getvalues(arc_list[idx])[i], vec, vec, 1., a.m[idx].data)
-                        end
-                    end
-                end
+                p.target_rank[idx] <= opt.max_target_rank_krylov_eigs &&
+                sdp.sq_side > opt.min_size_krylov_eigs &&
+                mod(p.iter, opt.full_eig_freq) > opt.full_eig_len # for full from time to time
+            @timeit "eigs" if opt.eigsolver == 1
+                arpack_eig!(arc_list[idx], a, idx, opt, p)
+            else
+
             end
             if hasconverged(arc_list[idx])
-                @timeit "get min eig" p.min_eig[idx] = minimum(unsafe_getvalues(arc_list[idx]))
+                @timeit "get min eig" p.min_eig[idx] = minimum(arpack_getvalues(arc_list[idx]))
             else
                 @timeit "eigfact" full_eig!(a, idx, opt, p)
             end
-
         else
             p.min_eig[idx] = 0.
             @timeit "eigfact" full_eig!(a, idx, opt, p)
@@ -69,6 +59,38 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
         end
     end
 
+    return nothing
+end
+
+function arpack_eig!(solver::EigSolverAlloc, a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
+    arpack_eig!(solver, a.m[idx], p.target_rank[idx], opt)
+    if hasconverged(solver)
+        fill!(a.m[idx].data, 0.)
+        for i in 1:p.target_rank[idx]
+            val = arpack_getvalues(solver)[i]
+            if val > 0. 
+                p.current_rank[idx] += 1
+                vec = view(arpack_getvectors(solver), :, i)
+                LinearAlgebra.BLAS.gemm!('N', 'T', val, vec, vec, 1., a.m[idx].data)
+            end
+        end
+    end
+    return nothing
+end
+
+function krylovkit_eig!(solver::EigSolverAlloc, a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
+    krylovkit_eig!(solver, a.m[idx], p.target_rank[idx], opt)
+    if hasconverged(solver)
+        fill!(a.m[idx].data, 0.)
+        for i in 1:p.target_rank[idx]
+            val = krylovkit_getvalues(solver)[i]
+            if val > 0. 
+                p.current_rank[idx] += 1
+                vec = krylovkit_getvector(solver, i)
+                LinearAlgebra.BLAS.gemm!('N', 'T', val, vec, vec, 1., a.m[idx].data)
+            end
+        end
+    end
     return nothing
 end
 

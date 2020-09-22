@@ -69,22 +69,30 @@ Base.@kwdef mutable struct Options
         2: KrylovKit [eigsolve/Lanczos] (DEFAULT)
     =#
     eigsolver::Int = 2
+    eigsolver_min_lanczos::Int = 25
+    eigsolver_resid_seed::Int = 1234
 
     # Arpack
     arpack_tol::Float64 = 1e-10
     #=
         0: arpack random [usually faster - NON-DETERMINISTIC - slightly]
         1: all ones [???]
-        2: julia random uniform (arpack_resid_seed) [medium for DETERMINISTIC]
-        3: julia normalized random normal (arpack_resid_seed) [best for DETERMINISTIC]
+        2: julia random uniform (eigsolver_resid_seed) [medium for DETERMINISTIC]
+        3: julia normalized random normal (eigsolver_resid_seed) [best for DETERMINISTIC]
     =#
     arpack_resid_init::Int = 3
-    arpack_resid_seed::Int = 1234
-    arpack_reset_resid::Bool = false # true for determinism
-    arpack_max_iter::Int = 10_000
-    arpack_min_lanczos::Int = 25
+    arpack_reset_resid::Bool = true # true for determinism
     # larger is more stable to converge and more deterministic
+    arpack_max_iter::Int = 10_000
     # see remark for of dsaupd
+    
+    # KrylovKit
+    krylovkit_reset_resid::Bool = false
+    krylovkit_resid_init::Int = 3
+    krylovkit_tol::Float64 = 1e-12
+    krylovkit_max_iter::Int = 100
+    krylovkit_eager::Bool = false
+    krylovkit_verbose::Int = 0
 
     # Reduce rank [warning: heuristics]
     reduce_rank::Bool = false
