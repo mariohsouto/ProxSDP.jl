@@ -10,19 +10,19 @@ const MOIU = MOI.Utilities
 const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 
 const optimizer = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(tol_primal = 1e-6, tol_dual = 1e-6, log_verbose = false))
+    ProxSDP.Optimizer(tol_gap = 1e-6, tol_feasibility= 1e-6, log_verbose = false))
 const optimizer_high_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(tol_primal = 1e-7, tol_dual = 1e-7, log_verbose = false))
+    ProxSDP.Optimizer(tol_gap = 1e-7, tol_feasibility = 1e-7, log_verbose = false))
 const optimizer_low_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = true, timer_verbose = true))
+    ProxSDP.Optimizer(tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = true, timer_verbose = true))
 const optimizer_full = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(full_eig_decomp = true, tol_primal = 1e-4, tol_dual = 1e-4))
+    ProxSDP.Optimizer(full_eig_decomp = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
 const optimizer_print = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_primal = 1e-4, tol_dual = 1e-4))
+    ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
 const optimizer_lowacc_arpack = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(eigsolver = 1, tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = false))
+    ProxSDP.Optimizer(eigsolver = 1, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
 const optimizer_lowacc_krylovkit = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(eigsolver = 2, tol_primal = 1e-3, tol_dual = 1e-3, log_verbose = false))
+    ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
 const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
 

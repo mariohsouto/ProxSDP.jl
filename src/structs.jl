@@ -26,6 +26,8 @@ Base.@kwdef mutable struct Options
     time_limit::Float64 = 3600_00. #100 hours
 
     # Default tolerances
+    tol_gap::Float64 = 1e-4
+    tol_feasibility::Float64 = 1e-4
     tol_primal::Float64 = 1e-4
     tol_dual::Float64 = 1e-4
     tol_psd::Float64 = 1e-6
@@ -105,7 +107,7 @@ Base.@kwdef mutable struct Options
     full_eig_len::Int = 0
 
     # equilibration parameters
-    equilibration::Bool = true
+    equilibration::Bool = false
     equilibration_iters::Int = 1000
     equilibration_lb::Float64 = -10.0
     equilibration_ub::Float64 = +10.0

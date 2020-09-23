@@ -144,7 +144,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
       
         # Check convergence
         p.rank_update += 1
-        if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
+        if residuals.dual_gap <= opt.tol_gap && residuals.feasibility <= opt.tol_feasibility
 
             if convergedrank(a, p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
                 p.stop_reason = 1 # Optimal
