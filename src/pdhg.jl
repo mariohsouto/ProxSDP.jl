@@ -308,11 +308,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
-    cont = 0
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
 
     for i in 1:opt.max_linsearch_steps
-        cont += 1
         p.theta = p.primal_step / p.primal_step_old
 
         @timeit "linesearch 1" begin
