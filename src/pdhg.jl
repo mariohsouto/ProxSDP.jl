@@ -144,7 +144,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
       
         # Check convergence
         p.rank_update += 1
-        if residuals.dual_gap <= opt.tol_primal && residuals.equa_feasibility <= opt.tol_primal
+        if residuals.dual_gap <= opt.tol_gap && residuals.feasibility <= opt.tol_feasibility
 
             if convergedrank(a, p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
                 p.stop_reason = 1 # Optimal
@@ -308,11 +308,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 end
 
 function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
-    cont = 0
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
 
     for i in 1:opt.max_linsearch_steps
-        cont += 1
         p.theta = p.primal_step / p.primal_step_old
 
         @timeit "linesearch 1" begin

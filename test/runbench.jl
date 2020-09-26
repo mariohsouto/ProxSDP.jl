@@ -38,7 +38,7 @@ using ProxSDP
 push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(
     log_verbose=true,
     timer_verbose=true,
-    time_limit = 6 * 10.0,
+    time_limit = 5 * 60.0,
     log_freq = 1_000,
     )))
 
