@@ -193,6 +193,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         end
                     end
                 end
+                
+                if full_rank_flag && p.update_cont > 500
+                    p.stop_reason = 4 # Infeasible
+                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
+                    break
+                end
             end
         
         # Adaptive stepsizes
@@ -232,13 +238,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-            if residuals.comb_residual[k - p.window] < residuals.comb_residual[k]
-                p.stop_reason = 4 # Infeasible
-                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
-            else
-                p.stop_reason = 2 # Time limit
-                p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
-            end
+            p.stop_reason = 2 # Time limit
+            p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
             break
         end
 
@@ -247,15 +248,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-
-            if residuals.comb_residual[k - p.window] < residuals.comb_residual[k]
-                p.stop_reason = 4 # Infeasible
-                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
-            else
-                p.stop_reason = 3 # Iteration limit
-                p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
-            end
-            break
+            p.stop_reason = 3 # Iteration limit
+            p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
         end
     end
 
