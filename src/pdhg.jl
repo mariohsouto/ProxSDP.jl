@@ -244,7 +244,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 print_progress(residuals, p)
             end
 
-            if residuals.comb_residual[k - p.window] < residuals.comb_residual[k] && full_rank_flag
+            if residuals.comb_residual[k - p.window] < residuals.comb_residual[k]
                 p.stop_reason = 4 # Infeasible
                 p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
             else
