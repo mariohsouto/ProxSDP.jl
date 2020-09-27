@@ -193,11 +193,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     end
                 end
                 p.rank_update, p.update_cont = 0, 0
-                if full_rank_flag
-                    p.stop_reason = 4 # Infeasible
-                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
-                    break
-                end
             end
         
         # Adaptive stepsizes
