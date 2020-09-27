@@ -181,6 +181,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 for (idx, sdp) in enumerate(conic_sets.sdpcone)
                     if p.target_rank[idx] < sdp.sq_side
                         full_rank_flag = false
+                        p.rank_update, p.update_cont = 0, 0
                     end
                     if p.current_rank[idx] + opt.rank_slack >= p.target_rank[idx]
                         if min_eig(a, idx, p) > opt.tol_psd
@@ -192,8 +193,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         end
                     end
                 end
-                p.rank_update, p.update_cont = 0, 0
-
+                
+                if full_rank_flag && p.update_cont > 500
+                    p.stop_reason = 4 # Infeasible
+                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
+                    break
+                end
             end
         
         # Adaptive stepsizes
@@ -243,15 +248,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-
-            if residuals.comb_residual[k - p.window] < residuals.comb_residual[k]
-                p.stop_reason = 4 # Infeasible
-                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
-            else
-                p.stop_reason = 3 # Iteration limit
-                p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
-            end
-            break
+            p.stop_reason = 3 # Iteration limit
+            p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
         end
     end
 
