@@ -27,7 +27,7 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     if aff.m > 0
         residuals.dual_obj -= dot(aff.h, @view pair.y[aff.p+1:end])
     end
-    residuals.dual_gap = abs(residuals.prim_obj - residuals.dual_obj) / (1. + abs(residuals.prim_obj) + abs(residuals.dual_obj))
+    residuals.dual_gap[p.iter] = abs(residuals.prim_obj - residuals.dual_obj) / (1. + abs(residuals.prim_obj) + abs(residuals.dual_obj))
 
     return nothing
 end

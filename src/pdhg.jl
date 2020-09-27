@@ -144,7 +144,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
       
         # Check convergence
         p.rank_update += 1
-        if residuals.dual_gap <= opt.tol_gap && residuals.feasibility <= opt.tol_feasibility
+        if residuals.dual_gap[p.iter] <= opt.tol_gap && residuals.feasibility <= opt.tol_feasibility
 
             if convergedrank(a, p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
                 p.stop_reason = 1 # Optimal
@@ -193,12 +193,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         end
                     end
                 end
-                
-                if full_rank_flag && p.update_cont > 500
-                    p.stop_reason = 4 # Infeasible
-                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
-                    break
-                end
             end
         
         # Adaptive stepsizes
@@ -238,9 +232,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-            p.stop_reason = 2 # Time limit
-            p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
-            break
+            println((residuals.dual_gap[k - p.window], residuals.dual_gap[k]))
+            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-4) || isnan(residuals.dual_gap[k]))
+                p.stop_reason = 4 # Infeasible
+                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
+            else
+                p.stop_reason = 2 # Time limit
+                p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
+                break
+            end
+
         end
 
         # max_iter stop condition
@@ -248,8 +249,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-            p.stop_reason = 3 # Iteration limit
-            p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
+            println((residuals.dual_gap[k - p.window], residuals.dual_gap[k]))
+            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-4) || isnan(residuals.dual_gap[k]))
+                p.stop_reason = 4 # Infeasible
+                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
+            else
+                p.stop_reason = 3 # Iteration limit
+                p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
+            end
+            break
         end
     end
 
@@ -281,7 +289,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         print_result(p.stop_reason,
                      time_,
                      residuals,
-                     length(p.current_rank) > 0 ? maximum(p.current_rank) : 0)
+                     length(p.current_rank) > 0 ? maximum(p.current_rank) : 0,
+                     p)
     end
 
     # Post processing
@@ -302,7 +311,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     residuals.ineq_feasibility,
                     residuals.prim_obj,
                     residuals.dual_obj,
-                    residuals.dual_gap,
+                    residuals.dual_gap[p.iter],
                     time_,
                     sum(p.current_rank)
     )

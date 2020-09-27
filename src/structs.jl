@@ -183,7 +183,7 @@ mutable struct WarmStart
 end
 
 mutable struct Residuals
-    dual_gap::Float64
+    dual_gap::CircularVector{Float64}
     prim_obj::Float64
     dual_obj::Float64
     equa_feasibility::Float64 
@@ -194,7 +194,7 @@ mutable struct Residuals
     comb_residual::CircularVector{Float64}
 
     Residuals(window::Int) = new(
-        .0, .0, .0, .0, .0, .0,
+        CircularVector{Float64}(2*window), .0, .0, .0, .0, .0,
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window)
