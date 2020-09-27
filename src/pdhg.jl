@@ -251,6 +251,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.stop_reason = 3 # Iteration limit
                 p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
             end
+            break
         end
     end
 
