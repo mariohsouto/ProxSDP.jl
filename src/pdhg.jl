@@ -232,8 +232,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-            println((residuals.dual_gap[k - p.window], residuals.dual_gap[k]))
-            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-4) || isnan(residuals.dual_gap[k]))
+            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-6) || isnan(residuals.dual_gap[k]))
                 p.stop_reason = 4 # Infeasible
                 p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
             else
@@ -249,8 +248,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             if opt.log_verbose
                 print_progress(residuals, p)
             end
-            println((residuals.dual_gap[k - p.window], residuals.dual_gap[k]))
-            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-4) || isnan(residuals.dual_gap[k]))
+            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-6) || isnan(residuals.dual_gap[k]))
                 p.stop_reason = 4 # Infeasible
                 p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
             else
