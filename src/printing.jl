@@ -146,10 +146,12 @@ function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, ma
         println("       ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
     elseif stop_reason == 4
         println("       Problem is infeasible or unbounded")
+    elseif stop_reason == 5
+        println("       Problem is unbounded")
     end
     println("       Primal objective = $(round(residuals.prim_obj; digits = 5))")
     println("       Dual objective = $(round(residuals.dual_obj; digits = 5))")
-    println("       Duality gap (%) = $(round(residuals.dual_gap[p.iter]; digits = 2)) %")
+    println("       Duality gap (%) = $(round(100*residuals.dual_gap[p.iter]; digits = 2)) %")
     println("---------------------------------------------------------------------------------------")
     println("    Primal feasibility:")
     println("       ||A(X) - b|| / (1 + ||b||) = $(round(residuals.equa_feasibility; digits = 6))    [linear equalities] ")

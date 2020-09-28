@@ -10,9 +10,18 @@ const MOIU = MOI.Utilities
 const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 
 const optimizer = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(tol_gap = 1e-6, tol_feasibility= 1e-6, log_verbose = false))
+    ProxSDP.Optimizer(
+        tol_gap = 1e-6, tol_feasibility= 1e-6,
+        # max_iter = 100_000,
+        time_limit = 30., #seconds
+        warn_on_limit = true,
+        # log_verbose = true, log_freq = 10000
+        ))
 const optimizer_high_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(tol_gap = 1e-7, tol_feasibility = 1e-7, log_verbose = false))
+    ProxSDP.Optimizer(
+    tol_primal = 1e-7, tol_dual = 1e-7,
+    tol_gap = 1e-7, tol_feasibility = 1e-7,
+    log_verbose = true, log_freq = 10000))
 const optimizer_low_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = true, timer_verbose = true))
 const optimizer_full = MOIU.CachingOptimizer(cache,
@@ -45,11 +54,10 @@ end
         "solve_zero_one_with_bounds_1",
         "solve_zero_one_with_bounds_2",
         "solve_zero_one_with_bounds_3",
-        # `TimeLimitSec` not supported.
-        # "time_limit_sec",
+        # not supported attributes
         "number_threads",
         # ArgumentError: The number of constraints in SCSModel must be greater than 0
-        "solve_unbounded_model",
+        # "solve_unbounded_model", # takes very long becaus only stop by time limit
         ]
     )
 end
@@ -59,16 +67,15 @@ end
     MOIT.contlineartest(bridged, config, [
         # infeasible/unbounded
         # "linear8a", "linear8b", "linear8c", "linear12",
-        # linear10 is poorly conditioned
+        # poorly conditioned
         "linear10",
-        # linear9 is requires precision
-        "linear9",
         "linear5",
+        "linear9",
         # primalstart not accepted
         "partial_start",
         ]
     )
-    # MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear5test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear10test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
 end
@@ -89,8 +96,8 @@ end
         # geomean2v: Test Failed at /home/travis/.julia/dev/MathOptInterface/src/Test/contconic.jl:1328
         # Expression: MOI.get(model, MOI.TerminationStatus()) == config.optimal_status
         #  Evaluated: INFEASIBLE_OR_UNBOUNDED::TerminationStatusCode = 6 == OPTIMAL::TerminationStatusCode = 1
-        "geomean2v", "geomean2f",
-        "soc3", "psdt2", "normone2", "norminf2",#, "rotatedsoc2"
+        # "geomean2v", "geomean2f", , "rotatedsoc2", "psdt2", 
+        "soc3", "normone2", "norminf2",
         ]
     )
 end
@@ -468,6 +475,8 @@ LinearAlgebra.transpose(v::MathOptInterface.VariableIndex) = v
     end
 end
 
+# hitting time limit
+# probably infeasible/unbounded
 @testset "RANDSDP Sizes" begin
     include("base_randsdp.jl")
     include("moi_randsdp.jl")

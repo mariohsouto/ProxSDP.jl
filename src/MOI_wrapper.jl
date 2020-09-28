@@ -724,7 +724,7 @@ end
 # 4 - MOI.INFEASIBLE_OR_UNBOUNDED
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
-    @assert 0 <= s <= 4
+    @assert 0 <= s <= 6
     if s == 0
         return MOI.OPTIMIZE_NOT_CALLED
     elseif s == 1
@@ -735,6 +735,10 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
         return MOI.ITERATION_LIMIT
     elseif s == 4
         return MOI.INFEASIBLE_OR_UNBOUNDED
+    elseif s == 5
+        return MOI.DUAL_INFEASIBLE
+    elseif s == 6
+        return MOI.INFEASIBLE
     end
 end
 
@@ -848,7 +852,12 @@ function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual,
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ResultCount)
-    if MOI.get(optimizer, MOI.TerminationStatus()) in [MOI.INFEASIBLE_OR_UNBOUNDED, MOI.OPTIMIZE_NOT_CALLED]
+    if MOI.get(optimizer, MOI.TerminationStatus()) in [
+                MOI.INFEASIBLE_OR_UNBOUNDED,
+                MOI.INFEASIBLE,
+                MOI.DUAL_INFEASIBLE,
+                MOI.OPTIMIZE_NOT_CALLED
+        ]
         return 0
     else
         return 1

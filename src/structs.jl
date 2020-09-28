@@ -17,7 +17,7 @@ Base.@kwdef mutable struct Options
 
     # Printing options
     log_verbose::Bool = false
-    log_freq::Int = 100
+    log_freq::Int = 1000
     timer_verbose::Bool = false
     timer_file::Bool = false
     disable_julia_logger = true
@@ -25,13 +25,19 @@ Base.@kwdef mutable struct Options
     # time options
     time_limit::Float64 = 3600_00. #100 hours
 
+    warn_on_limit::Bool = false
+
     # Default tolerances
     tol_gap::Float64 = 1e-4
     tol_feasibility::Float64 = 1e-4
     tol_primal::Float64 = 1e-4
     tol_dual::Float64 = 1e-4
-    tol_psd::Float64 = 1e-6
-    tol_soc::Float64 = 1e-6
+    tol_psd::Float64 = 1e-7
+    tol_soc::Float64 = 1e-7
+
+    max_obj::Float64 = 1e20
+    min_iter_max_obj::Int = 10
+    min_iter_time_infeas::Int = 1000
 
     # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
     min_beta::Float64 = 1e-5
@@ -46,9 +52,11 @@ Base.@kwdef mutable struct Options
     # PDHG parameters
     convergence_window::Int = 200
     convergence_check::Int = 50
-    max_iter::Int = Int(1e+5)
+    max_iter::Int = 0
     min_iter::Int = 40
     divergence_min_update::Int = 50
+    max_iter_lp::Int = 10_000_000
+    max_iter_conic::Int = 1_000_000
 
     advanced_initialization::Bool = true
 
