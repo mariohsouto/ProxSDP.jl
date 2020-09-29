@@ -57,6 +57,7 @@ Base.@kwdef mutable struct Options
     divergence_min_update::Int = 50
     max_iter_lp::Int = 10_000_000
     max_iter_conic::Int = 1_000_000
+    max_iter_local::Int = 0 #ignores user setting
 
     advanced_initialization::Bool = true
 

@@ -18,7 +18,7 @@ function print_parameters(opt::Options, conic_sets::ConicSets)
     else
         println("       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) ")
     end
-    println("       max_iter = $(opt.max_iter) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
+    println("       max_iter = $(opt.max_iter_local) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
 
     return nothing
 end

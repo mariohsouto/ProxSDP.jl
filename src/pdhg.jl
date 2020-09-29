@@ -21,10 +21,12 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     if opt.max_iter <= 0
         if length(conic_sets.socone) > 0 || length(conic_sets.sdpcone) > 0
-            opt.max_iter = opt.max_iter_conic
+            opt.max_iter_local = opt.max_iter_conic
         else
-            opt.max_iter = opt.max_iter_lp
+            opt.max_iter_local = opt.max_iter_lp
         end
+    else
+        opt.max_iter_local = opt.max_iter
     end
 
     # Print header
@@ -124,7 +126,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     # Fixed-point loop
-    @timeit "CP loop" for k in 1:opt.max_iter
+    @timeit "CP loop" for k in 1:opt.max_iter_local
 
         # Update iterator
         p.iter = k
@@ -262,7 +264,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
 
         # max_iter stop condition
-        if p.iter >= opt.max_iter
+        if p.iter >= opt.max_iter_local
             if opt.log_verbose
                 print_progress(residuals, p)
             end
@@ -271,7 +273,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
             else
                 p.stop_reason = 3 # Iteration limit
-                p.stop_reason_string = "Iteration limit of $(opt.max_iter) was hit"
+                p.stop_reason_string = "Iteration limit of $(opt.max_iter_local) was hit"
             end
             if opt.warn_on_limit
                 @warn("WARNING: Iteration limit hit.")
