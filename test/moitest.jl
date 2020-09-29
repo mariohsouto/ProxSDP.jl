@@ -15,7 +15,7 @@ const optimizer = MOIU.CachingOptimizer(cache,
         # max_iter = 100_000,
         time_limit = 30., #seconds
         warn_on_limit = true,
-        # log_verbose = true, log_freq = 10000
+        log_verbose = true, log_freq = 10000
         ))
 const optimizer_high_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(

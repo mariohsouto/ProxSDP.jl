@@ -154,7 +154,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Check convergence
         p.rank_update += 1
-        if residuals.dual_gap[p.iter] <= opt.tol_gap && residuals.feasibility <= opt.tol_feasibility
+        if residuals.dual_gap[p.iter] <= opt.tol_gap && residuals.feasibility[p.iter] <= opt.tol_feasibility
             if convergedrank(a, p, conic_sets, opt) && soc_convergence(a, conic_sets, pair, opt, p) && p.iter > opt.min_iter
                 p.stop_reason = 1 # Optimal
                 p.stop_reason_string = "Optimal solution found"
@@ -229,54 +229,57 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             end
         end
 
-        if (p.iter > opt.min_iter_max_obj && residuals.prim_obj < -opt.max_obj) || isnan(residuals.prim_obj)
-            p.stop_reason = 5 # Unbounded
-            p.stop_reason_string = "Unbounded: |Primal objective| = $(residuals.prim_obj) > maximum allowed = $(opt.max_obj)"
-            break
-        end
-        if (p.iter > opt.min_iter_max_obj && residuals.dual_obj >  opt.max_obj) || isnan(residuals.dual_obj)
+        if (p.iter > opt.min_iter_max_obj && residuals.dual_obj[k] >  opt.max_obj) || isnan(residuals.dual_obj[k])
             # dual unbounded
             p.stop_reason = 6 # Infeasible
-            p.stop_reason_string = "Infeasible: |Dual objective| = $(residuals.dual_obj) > maximum allowed = $(opt.max_obj)"
+            p.stop_reason_string = "Infeasible: |Dual objective| = $(residuals.dual_obj[k]) > maximum allowed = $(opt.max_obj)"
             break
         end
+        if (p.iter > opt.min_iter_max_obj && residuals.prim_obj[k] < -opt.max_obj) || isnan(residuals.prim_obj[k])
+            p.stop_reason = 5 # Unbounded
+            p.stop_reason_string = "Unbounded: |Primal objective| = $(residuals.prim_obj[k]) > maximum allowed = $(opt.max_obj)"
+            break
+        end
+        if (p.iter > opt.min_iter_max_obj && residuals.feasibility[k] > 100 * opt.tol_feasibility && max_abs_diff(residuals.feasibility) < 1e-8)
+            p.stop_reason = 6 # Infeasible
+            p.stop_reason_string = "Infeasible: feasibility stalled at $(residuals.feasibility)"
+        end
+        if (p.iter > opt.min_iter_max_obj && residuals.dual_gap[k] > 1-1e-8 && max_abs_diff(residuals.dual_gap) < 1e-8)
+            if abs(residuals.dual_obj[k]) > abs(residuals.prim_obj[k])
+                # dual unbounded
+                p.stop_reason = 6 # Infeasible
+                p.stop_reason_string = "Infeasible: duality gap stalled at 100 % with |Dual objective| >> |Primal objective|"
+            elseif abs(residuals.prim_obj[k]) > abs(residuals.dual_obj[k])
+                p.stop_reason = 5 # Unbounded
+                p.stop_reason_string = "Unbounded: duality gap stalled at 100 % with |Dual objective| << |Primal objective|"
+            end
+        end
 
-        # time_limit stop condition
-        if time() - p.time0 > opt.time_limit
+        # max_iter or time limit stop condition
+        if p.iter >= opt.max_iter_local || time() - p.time0 > opt.time_limit
             if opt.log_verbose
                 print_progress(residuals, p)
             end
             if p.iter > opt.min_iter_time_infeas && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-6) || isnan(residuals.dual_gap[k]))
-                if residuals.feasibility <= opt.tol_feasibility/100
+                if residuals.feasibility[p.iter] <= opt.tol_feasibility/100
                     p.stop_reason = 5 # Infeasible or Unbounded
+                    p.stop_reason_string = "Problem declared unbounded due to lack of improvement"
                 else
                     p.stop_reason = 6 # Infeasible
+                    p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
                 end
-                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
+            elseif p.iter >= opt.max_iter_local
+                p.stop_reason = 3 # Iteration limit
+                p.stop_reason_string = "Iteration limit of $(opt.max_iter_local) was hit"
+                if opt.warn_on_limit
+                    @warn("WARNING: Iteration limit hit.")
+                end
             else
                 p.stop_reason = 2 # Time limit
                 p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
-            end
-            if opt.warn_on_limit
-                println("WARNING: Time limit hit.")
-            end
-            break
-        end
-
-        # max_iter stop condition
-        if p.iter >= opt.max_iter_local
-            if opt.log_verbose
-                print_progress(residuals, p)
-            end
-            if p.iter > 1000 && ((residuals.dual_gap[k - p.window] - residuals.dual_gap[k] <= 1e-6) || isnan(residuals.dual_gap[k]))
-                p.stop_reason = 4 # Infeasible
-                p.stop_reason_string = "Problem declared infeasible due to lack of improvement"
-            else
-                p.stop_reason = 3 # Iteration limit
-                p.stop_reason_string = "Iteration limit of $(opt.max_iter_local) was hit"
-            end
-            if opt.warn_on_limit
-                @warn("WARNING: Iteration limit hit.")
+                if opt.warn_on_limit
+                    println("WARNING: Time limit hit.")
+                end
             end
             break
         end
@@ -330,8 +333,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     slack_ineq,
                     residuals.equa_feasibility,
                     residuals.ineq_feasibility,
-                    residuals.prim_obj,
-                    residuals.dual_obj,
+                    residuals.prim_obj[p.iter],
+                    residuals.dual_obj[p.iter],
                     residuals.dual_gap[p.iter],
                     time_,
                     sum(p.current_rank)

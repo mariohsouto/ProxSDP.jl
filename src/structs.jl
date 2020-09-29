@@ -4,13 +4,29 @@ struct CircularVector{T}
     l::Int
     CircularVector{T}(l::Integer) where T = new(zeros(T, l), l)
 end
+function min_abs_diff(v::CircularVector{T}) where T
+    val = Inf
+    for i in 1:Base.length(v)
+        val = min(val, abs(v[i] - v[i-1]))
+    end
+    return val
+end
+function max_abs_diff(v::CircularVector{T}) where T
+    val = 0.0
+    for i in 1:Base.length(v)
+        val = max(val, abs(v[i] - v[i-1]))
+    end
+    return val
+end
 
 function Base.getindex(V::CircularVector{T}, i::Int) where T
     return V.v[mod1(i, V.l)]
 end
-
 function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
     V.v[mod1(i, V.l)] = val
+end
+function Base.length(V::CircularVector{T}) where T
+    return V.l
 end
 
 Base.@kwdef mutable struct Options
@@ -193,17 +209,22 @@ end
 
 mutable struct Residuals
     dual_gap::CircularVector{Float64}
-    prim_obj::Float64
-    dual_obj::Float64
+    prim_obj::CircularVector{Float64}
+    dual_obj::CircularVector{Float64}
     equa_feasibility::Float64 
     ineq_feasibility::Float64
-    feasibility::Float64
+    feasibility::CircularVector{Float64}
     primal_residual::CircularVector{Float64}
     dual_residual::CircularVector{Float64}
     comb_residual::CircularVector{Float64}
 
     Residuals(window::Int) = new(
-        CircularVector{Float64}(2*window), .0, .0, .0, .0, .0,
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window),
+        .0,
+        .0,
+        CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window)

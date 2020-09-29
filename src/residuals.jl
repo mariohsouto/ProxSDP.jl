@@ -12,22 +12,24 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     if aff.m > 0
         residuals.ineq_feasibility = 0.
         @simd for i in aff.p+1:aff.p+aff.m
-            @inbounds residuals.ineq_feasibility = max(residuals.ineq_feasibility, max(a.Mx[i] - aff.h[i-aff.p], 0.0))
+            @inbounds residuals.ineq_feasibility = max(residuals.ineq_feasibility, a.Mx[i] - aff.h[i-aff.p])
         end
         residuals.ineq_feasibility /= (1. + p.norm_h)
     end
-    residuals.feasibility = max(residuals.equa_feasibility, residuals.ineq_feasibility)
+    residuals.feasibility[p.iter] = max(residuals.equa_feasibility, residuals.ineq_feasibility)
 
     # Primal-dual gap
-    residuals.prim_obj = dot(aff.c, pair.x)
-    residuals.dual_obj = 0.
+    residuals.prim_obj[p.iter] = dot(aff.c, pair.x)
+    residuals.dual_obj[p.iter] = 0.
     if aff.p > 0
-        residuals.dual_obj -= dot(aff.b, @view pair.y[1:aff.p])
+        residuals.dual_obj[p.iter] -= dot(aff.b, @view pair.y[1:aff.p])
     end
     if aff.m > 0
-        residuals.dual_obj -= dot(aff.h, @view pair.y[aff.p+1:end])
+        residuals.dual_obj[p.iter] -= dot(aff.h, @view pair.y[aff.p+1:end])
     end
-    residuals.dual_gap[p.iter] = abs(residuals.prim_obj - residuals.dual_obj) / (1. + abs(residuals.prim_obj) + abs(residuals.dual_obj))
+    residuals.dual_gap[p.iter] =
+        abs(residuals.prim_obj[p.iter] - residuals.dual_obj[p.iter]) /
+            (1. + abs(residuals.prim_obj[p.iter]) + abs(residuals.dual_obj[p.iter]))
 
     return nothing
 end
