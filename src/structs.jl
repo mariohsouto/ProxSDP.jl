@@ -177,6 +177,7 @@ struct CPResult
     status::Int
     status_string::String
     primal::Vector{Float64}
+    dual_cone::Vector{Float64}
     dual_eq::Vector{Float64}
     dual_in::Vector{Float64}
     slack_eq::Vector{Float64}

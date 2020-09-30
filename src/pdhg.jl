@@ -323,10 +323,21 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     dual_eq = pair.y[1:length(b_orig)]
     dual_in = pair.y[length(b_orig)+1:end]
 
+    dual_cone = + c_orig + A_orig' * dual_eq + G_orig' * dual_in
+    cont = 1
+    @inbounds for sdp in conic_sets.sdpcone, j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
+        if i != j
+            dual_cone[cont] /= 2.
+        end
+        cont += 1
+    end
+    dual_cone = dual_cone[var_ordering]
+
     return CPResult(p.stop_reason,
                     p.stop_reason_string,
                     pair.x,
                     # pair.y,
+                    dual_cone,
                     dual_eq,
                     dual_in,
                     equa_error,

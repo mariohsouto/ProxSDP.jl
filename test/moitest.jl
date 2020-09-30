@@ -13,17 +13,21 @@ const optimizer = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
-        time_limit = 30., #seconds
+        time_limit = 10., #seconds
         warn_on_limit = true,
-        log_verbose = true, log_freq = 10000
+        # log_verbose = true, log_freq = 100
         ))
 const optimizer_high_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(
-    tol_primal = 1e-7, tol_dual = 1e-7,
-    tol_gap = 1e-7, tol_feasibility = 1e-7,
-    log_verbose = true, log_freq = 10000))
+        tol_primal = 1e-7, tol_dual = 1e-7,
+        tol_gap = 1e-7, tol_feasibility = 1e-7,
+        # log_verbose = true, log_freq = 10000
+        ))
 const optimizer_low_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = true, timer_verbose = true))
+    ProxSDP.Optimizer(
+        tol_gap = 1e-3, tol_feasibility = 1e-3,
+        # log_verbose = true, timer_verbose = true
+        ))
 const optimizer_full = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(full_eig_decomp = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
 const optimizer_print = MOIU.CachingOptimizer(cache,
@@ -33,7 +37,8 @@ const optimizer_lowacc_arpack = MOIU.CachingOptimizer(cache,
 const optimizer_lowacc_krylovkit = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
 const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
-const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
+const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = true, infeas_certificates = false)
+const config_conic_nodual = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
@@ -97,9 +102,14 @@ end
         # Expression: MOI.get(model, MOI.TerminationStatus()) == config.optimal_status
         #  Evaluated: INFEASIBLE_OR_UNBOUNDED::TerminationStatusCode = 6 == OPTIMAL::TerminationStatusCode = 1
         # "geomean2v", "geomean2f", , "rotatedsoc2", "psdt2", 
-        "soc3", "normone2", "norminf2",
+        "normone2", "norminf2", "rotatedsoc2"#
         ]
     )
+    # these fail due to infeasibility certificate not being disabled
+    MOIT.norminf2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
+    MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
+    # requires certificates always
+    MOIT.rotatedsoc2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
 end
 
 @testset "Simple LP" begin
@@ -285,9 +295,6 @@ end
 
     c1_d = MOI.get(optimizer, MOI.ConstraintDual(), c1)
     c2_d = MOI.get(optimizer, MOI.ConstraintDual(), c2)
-
-    # SDP duasl error
-    @test_throws ErrorException c2_d = MOI.get(optimizer, MOI.ConstraintDual(), cX)
 
 end
 
