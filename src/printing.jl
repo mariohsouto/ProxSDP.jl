@@ -18,7 +18,7 @@ function print_parameters(opt::Options, conic_sets::ConicSets)
     else
         println("       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) ")
     end
-    println("       max_iter = $(opt.max_iter) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
+    println("       max_iter = $(opt.max_iter_local) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
 
     return nothing
 end
@@ -99,11 +99,11 @@ function print_progress(residuals::Residuals, p::Params)
     dual_res = residuals.dual_residual[p.iter]
     s_k = @sprintf("%d", p.iter)
     s_k *= " |"
-    s_s = @sprintf("%.5f", residuals.dual_gap)
+    s_s = @sprintf("%.5f", residuals.dual_gap[p.iter])
     s_s *= " |"
-    s_o = @sprintf("%.3f", residuals.prim_obj)
+    s_o = @sprintf("%.3f", residuals.prim_obj[p.iter])
     s_o *= " |"
-    s_f = @sprintf("%.5f", residuals.feasibility)
+    s_f = @sprintf("%.5f", residuals.feasibility[p.iter])
     s_f *= " |"
     s_p = @sprintf("%.5f", primal_res)
     s_p *= " |"
@@ -135,7 +135,7 @@ function print_progress(residuals::Residuals, p::Params)
     return nothing
 end
 
-function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, max_rank::Int)
+function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, max_rank::Int,  p::Params)
     println("---------------------------------------------------------------------------------------")
     println("    Solver status:")
     if stop_reason == 1
@@ -146,10 +146,12 @@ function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, ma
         println("       ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
     elseif stop_reason == 4
         println("       Problem is infeasible or unbounded")
+    elseif stop_reason == 5
+        println("       Problem is unbounded")
     end
-    println("       Primal objective = $(round(residuals.prim_obj; digits = 5))")
-    println("       Dual objective = $(round(residuals.dual_obj; digits = 5))")
-    println("       Duality gap (%) = $(round(residuals.dual_gap; digits = 2)) %")
+    println("       Primal objective = $(round(residuals.prim_obj[p.iter]; digits = 5))")
+    println("       Dual objective   = $(round(residuals.dual_obj[p.iter]; digits = 5))")
+    println("       Duality gap      = $(round(100*residuals.dual_gap[p.iter]; digits = 2)) %")
     println("---------------------------------------------------------------------------------------")
     println("    Primal feasibility:")
     println("       ||A(X) - b|| / (1 + ||b||) = $(round(residuals.equa_feasibility; digits = 6))    [linear equalities] ")

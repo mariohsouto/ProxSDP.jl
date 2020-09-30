@@ -11,8 +11,7 @@ Base.@kwdef mutable struct MOISolution
     primal::Vector{Float64} = Float64[] # primal of variables
     dual_eq::Vector{Float64} = Float64[] # dual of constraints
     dual_in::Vector{Float64} = Float64[] # dual of constraints
-    # dual_sd::Vector{Vector{Float64}}
-    # dual_so::Vector{Vector{Float64}}
+    dual_cone::Vector{Float64} = Float64[] # dual of constraints
     slack_eq::Vector{Float64} = Float64[]
     slack_in::Vector{Float64} = Float64[]
     # slack_sd::Vector{Vector{Float64}}
@@ -580,6 +579,7 @@ function MOI.optimize!(optimizer::Optimizer)
 
     ret_val = sol.status
     primal = sol.primal[1:aff.n-aff.extra]
+    dual_cone = sol.dual_cone[1:aff.n-aff.extra]
     dual_eq = sol.dual_eq[1:aff.p-aff.extra]
     slack_eq = sol.slack_eq[1:aff.p-aff.extra]
     objval = sol.objval
@@ -604,6 +604,7 @@ function MOI.optimize!(optimizer::Optimizer)
                                 primal,
                                 dual_eq,
                                 sol.dual_in,
+                                dual_cone,
                                 slack_eq,
                                 sol.slack_in,
                                 sol.primal_residual,
@@ -724,7 +725,7 @@ end
 # 4 - MOI.INFEASIBLE_OR_UNBOUNDED
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     s = optimizer.sol.ret_val
-    @assert 0 <= s <= 4
+    @assert 0 <= s <= 6
     if s == 0
         return MOI.OPTIMIZE_NOT_CALLED
     elseif s == 1
@@ -735,6 +736,10 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
         return MOI.ITERATION_LIMIT
     elseif s == 4
         return MOI.INFEASIBLE_OR_UNBOUNDED
+    elseif s == 5
+        return MOI.DUAL_INFEASIBLE
+    elseif s == 6
+        return MOI.INFEASIBLE
     end
 end
 
@@ -841,14 +846,24 @@ ci::CI{<:MOI.AbstractFunction, MOI.Nonpositives})
     return -optimizer.sol.dual_in[inds]
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual,
-    ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.PositiveSemidefiniteConeTriangle
-    error("ProxSDP does not return duals for nonlinear Conic constraints."*
-          " Only linear constraints (equalities and inequalities) can be queried.")
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
+    ci::CI{MOI.VectorOfVariables, MOI.PositiveSemidefiniteConeTriangle})
+    result_count_err(optimizer, attr)
+    optimizer.sol.dual_cone[optimizer.cone.sdc[ci.value]]
+end
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
+    ci::CI{MOI.VectorOfVariables, MOI.SecondOrderCone})
+    result_count_err(optimizer, attr)
+    optimizer.sol.dual_cone[optimizer.cone.soc[ci.value]]
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ResultCount)
-    if MOI.get(optimizer, MOI.TerminationStatus()) in [MOI.INFEASIBLE_OR_UNBOUNDED, MOI.OPTIMIZE_NOT_CALLED]
+    if MOI.get(optimizer, MOI.TerminationStatus()) in [
+                MOI.INFEASIBLE_OR_UNBOUNDED,
+                MOI.INFEASIBLE,
+                MOI.DUAL_INFEASIBLE,
+                MOI.OPTIMIZE_NOT_CALLED
+        ]
         return 0
     else
         return 1

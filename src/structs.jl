@@ -4,20 +4,36 @@ struct CircularVector{T}
     l::Int
     CircularVector{T}(l::Integer) where T = new(zeros(T, l), l)
 end
+function min_abs_diff(v::CircularVector{T}) where T
+    val = Inf
+    for i in 1:Base.length(v)
+        val = min(val, abs(v[i] - v[i-1]))
+    end
+    return val
+end
+function max_abs_diff(v::CircularVector{T}) where T
+    val = 0.0
+    for i in 1:Base.length(v)
+        val = max(val, abs(v[i] - v[i-1]))
+    end
+    return val
+end
 
 function Base.getindex(V::CircularVector{T}, i::Int) where T
     return V.v[mod1(i, V.l)]
 end
-
 function Base.setindex!(V::CircularVector{T}, val::T, i::Int) where T
     V.v[mod1(i, V.l)] = val
+end
+function Base.length(V::CircularVector{T}) where T
+    return V.l
 end
 
 Base.@kwdef mutable struct Options
 
     # Printing options
     log_verbose::Bool = false
-    log_freq::Int = 100
+    log_freq::Int = 1000
     timer_verbose::Bool = false
     timer_file::Bool = false
     disable_julia_logger = true
@@ -25,13 +41,19 @@ Base.@kwdef mutable struct Options
     # time options
     time_limit::Float64 = 3600_00. #100 hours
 
+    warn_on_limit::Bool = false
+
     # Default tolerances
     tol_gap::Float64 = 1e-4
     tol_feasibility::Float64 = 1e-4
     tol_primal::Float64 = 1e-4
     tol_dual::Float64 = 1e-4
-    tol_psd::Float64 = 1e-6
-    tol_soc::Float64 = 1e-6
+    tol_psd::Float64 = 1e-7
+    tol_soc::Float64 = 1e-7
+
+    max_obj::Float64 = 1e20
+    min_iter_max_obj::Int = 10
+    min_iter_time_infeas::Int = 1000
 
     # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
     min_beta::Float64 = 1e-5
@@ -46,9 +68,12 @@ Base.@kwdef mutable struct Options
     # PDHG parameters
     convergence_window::Int = 200
     convergence_check::Int = 50
-    max_iter::Int = Int(1e+5)
+    max_iter::Int = 0
     min_iter::Int = 40
     divergence_min_update::Int = 50
+    max_iter_lp::Int = 10_000_000
+    max_iter_conic::Int = 1_000_000
+    max_iter_local::Int = 0 #ignores user setting
 
     advanced_initialization::Bool = true
 
@@ -152,6 +177,7 @@ struct CPResult
     status::Int
     status_string::String
     primal::Vector{Float64}
+    dual_cone::Vector{Float64}
     dual_eq::Vector{Float64}
     dual_in::Vector{Float64}
     slack_eq::Vector{Float64}
@@ -183,18 +209,23 @@ mutable struct WarmStart
 end
 
 mutable struct Residuals
-    dual_gap::Float64
-    prim_obj::Float64
-    dual_obj::Float64
+    dual_gap::CircularVector{Float64}
+    prim_obj::CircularVector{Float64}
+    dual_obj::CircularVector{Float64}
     equa_feasibility::Float64 
     ineq_feasibility::Float64
-    feasibility::Float64
+    feasibility::CircularVector{Float64}
     primal_residual::CircularVector{Float64}
     dual_residual::CircularVector{Float64}
     comb_residual::CircularVector{Float64}
 
     Residuals(window::Int) = new(
-        .0, .0, .0, .0, .0, .0,
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window),
+        CircularVector{Float64}(2*window),
+        .0,
+        .0,
+        CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window)
