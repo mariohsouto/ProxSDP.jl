@@ -53,7 +53,13 @@ Base.@kwdef mutable struct Options
 
     max_obj::Float64 = 1e20
     min_iter_max_obj::Int = 10
+
+    # infeasibility check
     min_iter_time_infeas::Int = 1000
+    infeas_gap_tol::Float64 = 1e-4
+    infeas_limit_gap_tol::Float64 = 1e-1
+    infeas_stable_gap_tol::Float64 = 1e-4
+    infeas_feasibility_tol::Float64 = 1e-4
 
     # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
     min_beta::Float64 = 1e-5
@@ -189,6 +195,7 @@ struct CPResult
     gap::Float64
     time::Float64
     final_rank::Int
+    primal_feasible_user_tol::Bool
 end
 
 mutable struct PrimalDual

@@ -24,6 +24,7 @@ Base.@kwdef mutable struct MOISolution
     gap::Float64 = NaN
     time::Float64 = NaN
     final_rank::Int = -1
+    primal_feasible_user_tol::Bool = false
 end
 
 # `ModelData` struct is discarded
@@ -613,7 +614,9 @@ function MOI.optimize!(optimizer::Optimizer)
                                 (optimizer.maxsense ? -1 : 1) * sol.dual_objval+objective_constant,
                                 sol.gap,
                                 sol.time,
-                                sol.final_rank)
+                                sol.final_rank,
+                                sol.primal_feasible_user_tol,
+                                )
 end
 
 function get_indices_cone(A, rows, n_vars, first_ind_local)
@@ -756,10 +759,10 @@ end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
     s = optimizer.sol.ret_val
-    if attr.N > 1 || s ==0
+    if attr.N > 1 || s == 0
         return MOI.NO_SOLUTION
     end
-    if s == 1
+    if optimizer.sol.primal_feasible_user_tol#s == 1
         return MOI.FEASIBLE_POINT
     else
         return MOI.INFEASIBLE_POINT
