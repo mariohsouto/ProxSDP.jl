@@ -42,14 +42,21 @@ Base.@kwdef mutable struct Options
     time_limit::Float64 = 3600_00. #100 hours
 
     warn_on_limit::Bool = false
+    extended_log::Bool = false
+    extended_log2::Bool = false
+    log_repeat_header::Bool = false
 
     # Default tolerances
     tol_gap::Float64 = 1e-4
     tol_feasibility::Float64 = 1e-4
+    tol_feasibility_dual::Float64 = 1e-4
     tol_primal::Float64 = 1e-4
     tol_dual::Float64 = 1e-4
     tol_psd::Float64 = 1e-7
     tol_soc::Float64 = 1e-7
+
+    check_dual_feas::Bool = false
+    check_dual_feas_freq::Int = 1000
 
     max_obj::Float64 = 1e20
     min_iter_max_obj::Int = 10
@@ -60,6 +67,11 @@ Base.@kwdef mutable struct Options
     infeas_limit_gap_tol::Float64 = 1e-1
     infeas_stable_gap_tol::Float64 = 1e-4
     infeas_feasibility_tol::Float64 = 1e-4
+    infeas_stable_feasibility_tol::Float64 = 1e-8
+
+    certificate_search::Bool = true
+    certificate_obj_tol::Float64 = 1e-1
+    certificate_fail_tol::Float64 = 1e-8
 
     # Bounds on beta (dual_step / primal_step) [larger bounds may lead to numerical inaccuracy]
     min_beta::Float64 = 1e-5
@@ -84,6 +96,7 @@ Base.@kwdef mutable struct Options
     advanced_initialization::Bool = true
 
     # Linesearch parameters
+    line_search_flag::Bool = true
     max_linsearch_steps::Int = 5000
     delta::Float64 = .9999
     initial_theta::Float64 = 1.
@@ -179,7 +192,7 @@ mutable struct ConicSets
     socone::Vector{SOCSet}
 end
 
-struct CPResult
+mutable struct CPResult
     status::Int
     status_string::String
     primal::Vector{Float64}
@@ -196,6 +209,8 @@ struct CPResult
     time::Float64
     final_rank::Int
     primal_feasible_user_tol::Bool
+    dual_feasible_user_tol::Bool
+    certificate_found::Bool
 end
 
 mutable struct PrimalDual
@@ -298,6 +313,15 @@ mutable struct Params
     norm_b::Float64
     norm_h::Float64
     sqrt2::Float64
+
+    dual_feasibility::Float64
+    dual_feasibility_check::Bool
+
+    certificate_search::Bool
+    certificate_search_min_iter::Int
+    certificate_found::Bool
+
+    # solution backup
 
     Params() = new()
 end

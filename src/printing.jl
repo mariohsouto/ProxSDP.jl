@@ -32,7 +32,7 @@ function print_constraints(aff::AffineSets)
     return nothing
 end
 
-cone_plural(val::Integer) = ifelse(b != 1, "s", "")
+cone_plural(val::Integer) = ifelse(val != 1, "s", "")
 function print_prob_data(conic_sets::ConicSets)
     soc_dict = Dict()
     for soc in conic_sets.socone
@@ -65,17 +65,34 @@ function print_prob_data(conic_sets::ConicSets)
     return nothing
 end
 
-function print_header_2()
-    println("---------------------------------------------------------------------------------------")
-    println("    Initializing Primal-Dual Hybrid Gradient method                                    ")
-    println("---------------------------------------------------------------------------------------")
-    println("|  iter  | prim obj | rel. gap |  feasb.  | prim res | dual res | tg. rank |  time(s) |")
-    println("---------------------------------------------------------------------------------------")
+function print_header_2(opt, beg = true)
+    bar  = "---------------------------------------------------------------------------------------"
+    name = "    Initializing Primal-Dual Hybrid Gradient method"
+    cols = "|  iter  | prim obj | rel. gap |  feasb.  | prim res | dual res | tg. rank |  time(s) |"
+
+    if opt.extended_log || opt.extended_log2
+        bar  *= "-----------"
+        cols *= " dual obj |"
+    end
+    if opt.extended_log2
+        bar  *= "-----------"
+        cols *= " d feasb. |"
+    end
+
+    if beg
+        println(bar)
+        println(name)
+        println(bar)
+    end
+    println(cols)
+    if beg
+        println(bar)
+    end
 
     return nothing
 end
 
-function print_progress(residuals::Residuals, p::Params)
+function print_progress(residuals::Residuals, p::Params, opt, val = -1.0)
     primal_res = residuals.primal_residual[p.iter]
     dual_res = residuals.dual_residual[p.iter]
     s_k = @sprintf("%d", p.iter)
@@ -111,6 +128,21 @@ function print_progress(residuals::Residuals, p::Params)
     a *= s_target_rank
     a *= " "^max(0, 11 - length(s_time))
     a *= s_time
+
+    if opt.extended_log || opt.extended_log2
+        str = @sprintf("%.3f", residuals.dual_obj[p.iter]) * " |"
+        str = " "^max(0, 11 - length(str)) * str
+        a *= str
+    end
+    if opt.extended_log2
+        str = @sprintf("%.5f", val) * " |"
+        str = " "^max(0, 11 - length(str)) * str
+        a *= str
+    end
+    if opt.log_repeat_header
+        print_header_2(opt, false)
+    end
+
     println(a)
 
     return nothing

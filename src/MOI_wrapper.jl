@@ -25,6 +25,8 @@ Base.@kwdef mutable struct MOISolution
     time::Float64 = NaN
     final_rank::Int = -1
     primal_feasible_user_tol::Bool = false
+    dual_feasible_user_tol::Bool = false
+    certificate_found::Bool = false
 end
 
 # `ModelData` struct is discarded
@@ -600,23 +602,26 @@ function MOI.optimize!(optimizer::Optimizer)
         close(f)
     end
 
-    optimizer.sol = MOISolution(ret_val,
-                                sol.status_string,
-                                primal,
-                                dual_eq,
-                                sol.dual_in,
-                                dual_cone,
-                                slack_eq,
-                                sol.slack_in,
-                                sol.primal_residual,
-                                sol.dual_residual,
-                                (optimizer.maxsense ? -1 : 1) * objval+objective_constant,
-                                (optimizer.maxsense ? -1 : 1) * sol.dual_objval+objective_constant,
-                                sol.gap,
-                                sol.time,
-                                sol.final_rank,
-                                sol.primal_feasible_user_tol,
-                                )
+    optimizer.sol = MOISolution(
+        ret_val,
+        sol.status_string,
+        primal,
+        dual_eq,
+        sol.dual_in,
+        dual_cone,
+        slack_eq,
+        sol.slack_in,
+        sol.primal_residual,
+        sol.dual_residual,
+        (optimizer.maxsense ? -1 : 1) * objval+objective_constant,
+        (optimizer.maxsense ? -1 : 1) * sol.dual_objval+objective_constant,
+        sol.gap,
+        sol.time,
+        sol.final_rank,
+        sol.primal_feasible_user_tol,
+        sol.dual_feasible_user_tol,
+        sol.certificate_found,
+        )
 end
 
 function get_indices_cone(A, rows, n_vars, first_ind_local)
@@ -762,6 +767,9 @@ function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
     if attr.N > 1 || s == 0
         return MOI.NO_SOLUTION
     end
+    if s == 5 && optimizer.sol.certificate_found
+        return MOI.INFEASIBILITY_CERTIFICATE
+    end
     if optimizer.sol.primal_feasible_user_tol#s == 1
         return MOI.FEASIBLE_POINT
     else
@@ -773,7 +781,10 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
     if attr.N > 1 || s ==0
         return MOI.NO_SOLUTION
     end
-    if s == 1
+    if s == 6 && optimizer.sol.certificate_found
+        return MOI.INFEASIBILITY_CERTIFICATE
+    end
+    if optimizer.sol.dual_feasible_user_tol
         return MOI.FEASIBLE_POINT
     else
         return MOI.INFEASIBLE_POINT
@@ -862,9 +873,9 @@ end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ResultCount)
     if MOI.get(optimizer, MOI.TerminationStatus()) in [
-                MOI.INFEASIBLE_OR_UNBOUNDED,
-                MOI.INFEASIBLE,
-                MOI.DUAL_INFEASIBLE,
+                # MOI.INFEASIBLE_OR_UNBOUNDED,
+                # MOI.INFEASIBLE,
+                # MOI.DUAL_INFEASIBLE,
                 MOI.OPTIMIZE_NOT_CALLED
         ]
         return 0

@@ -1,7 +1,4 @@
-function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
-
-    p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
-
+function psd_vec_to_square(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, sqrt_2::Float64 = sqrt(2))
     # Build symmetric matrix(es) X
     @timeit "reshape1" begin
         cont = 1
@@ -15,6 +12,29 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
             cont += 1
         end
     end
+    return cont
+end
+function psd_square_to_vec(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, sqrt_2::Float64 = sqrt(2))
+    # Build symmetric matrix(es) X
+    @timeit "reshape2" begin
+        cont = 1
+        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
+            if i != j
+                v[cont] = a.m[idx].data[i, j] * sqrt_2
+            else
+                v[cont] = a.m[idx].data[i, j]
+            end
+            cont += 1
+        end
+    end
+    return cont
+end
+
+function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
+
+    p.min_eig, current_rank, sqrt_2 = zeros(length(cones.sdpcone)), 0, sqrt(2.)
+
+    psd_vec_to_square(v, a, cones)
 
     # Project onto the p.s.d. cone
     for (idx, sdp) in enumerate(cones.sdpcone)
@@ -40,17 +60,7 @@ function psd_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
         end
     end
 
-    @timeit "reshape2" begin
-        cont = 1
-        @inbounds for (idx, sdp) in enumerate(cones.sdpcone), j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
-            if i != j
-                v[cont] = a.m[idx].data[i, j] * sqrt_2
-            else
-                v[cont] = a.m[idx].data[i, j]
-            end
-            cont += 1
-        end
-    end
+    psd_square_to_vec(v, a, cones)
 
     return nothing
 end
