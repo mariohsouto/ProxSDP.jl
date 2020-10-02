@@ -194,6 +194,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         if opt.log_verbose
                             println("Dual ray found.")
                         end
+                        p.stop_reason_string *= " [Dual ray found]"
                         # println("\n\n\nGood for infeas\n\n\n")
                         break
                     end
@@ -210,6 +211,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                         end
                         # println("\n\n\nGood for unbounded\n\n\n")
                         break
+                        p.stop_reason_string *= " [Primal ray found]"
                     end
                 end
             end
