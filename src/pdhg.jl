@@ -1,5 +1,4 @@
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult#,
-    # warm::WarmStart)::CPResult
+function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
 
     # Initialize parameters
     p = Params()
@@ -105,7 +104,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 try
                     spectral_norm = Arpack.svds(M, nsv=1)[1].S[1]
                 catch
-                    println("WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
+                    println("    WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
                     spectral_norm = norm(M)
                 end
             else
@@ -167,14 +166,6 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         # Print progress
         if opt.log_verbose && mod(k, opt.log_freq) == 0
             print_progress(residuals, p, opt, p.dual_feasibility)
-            # @show val
-            # # stable feasibility and gap
-            # @show max_abs_diff(residuals.feasibility)
-            # @show max_abs_diff(residuals.dual_gap)
-            # @show min_abs_diff(residuals.dual_gap)
-            # # growing obj
-            # @show min_abs_diff(residuals.prim_obj)
-            # @show min_abs_diff(residuals.dual_obj)
         end
 
         if p.iter < p.certificate_search_min_iter
@@ -182,48 +173,63 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
         end
 
         if opt.certificate_search && p.certificate_search
-            if p.stop_reason == 6 # infeasible
-                # dual ray
-                # @show residuals.dual_obj[k]
+
+            if p.stop_reason == 6 # Infeasible
+
                 if residuals.dual_obj[k] > +opt.certificate_obj_tol
+
                     p.dual_feasibility = dual_feas(pair.y, conic_sets, affine_sets, 0*c_orig, A_orig, G_orig, a)
                     p.dual_feasibility_check = true
-                    # @show tol
+
                     if p.dual_feasibility < opt.tol_feasibility_dual
-                        p.certificate_found = true
+                        
                         if opt.log_verbose
-                            println("Dual ray found.")
+                            println("---------------------------------------------------------------------------------------")
+                            println("    Dual ray found")
+                            println("---------------------------------------------------------------------------------------")
                         end
+
+                        p.certificate_found = true
                         p.stop_reason_string *= " [Dual ray found]"
-                        # println("\n\n\nGood for infeas\n\n\n")
+
                         break
                     end
                 end
-            else p.stop_reason == 5 # unbounded
-                # primal ray
-                # @show residuals.prim_obj[k]
+
+            else p.stop_reason == 5 # Unbounded
+
                 if residuals.prim_obj[k] < -opt.certificate_obj_tol
-                    # @show tol = residuals.feasibility[p.iter]
+
                     if residuals.feasibility[p.iter] < opt.tol_feasibility
-                        p.certificate_found = true
+
                         if opt.log_verbose
-                        println("Primal ray found")
+                            println("---------------------------------------------------------------------------------------")
+                            println("    Primal ray found")
+                            println("---------------------------------------------------------------------------------------")
                         end
-                        # println("\n\n\nGood for unbounded\n\n\n")
-                        break
+
+                        p.certificate_found = true
                         p.stop_reason_string *= " [Primal ray found]"
+
+                        break
                     end
                 end
             end
-            if (residuals.prim_obj[k] < -opt.certificate_fail_tol &&
-                    residuals.dual_obj[k] < -opt.certificate_fail_tol &&
-                    residuals.feasibility[p.iter] < -opt.certificate_fail_tol
-                    ) ||
-                    isnan(residuals.comb_residual[k])
+
+            if (
+                residuals.prim_obj[k] < -opt.certificate_fail_tol &&
+                residuals.dual_obj[k] < -opt.certificate_fail_tol &&
+                residuals.feasibility[p.iter] < -opt.certificate_fail_tol
+                ) || isnan(residuals.comb_residual[k])
+
                 if opt.log_verbose
-                    println("Failed to finds certificate.")
+                    println("---------------------------------------------------------------------------------------")
+                    println("    Failed to finds certificate")
+                    println("---------------------------------------------------------------------------------------")
                 end
+
                 p.stop_reason_string *= " [Failed to find certificate]"
+
                 break
             end
         end
@@ -236,10 +242,16 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 if !p.certificate_search
                     p.stop_reason = 1 # Optimal
                     p.stop_reason_string = "Optimal solution found"
+
                 else
-                    # error("Certificate problem")
-                    println("Failed to finds certificate - type 2.")
+                    if opt.log_verbose
+                        println("---------------------------------------------------------------------------------------")
+                        println("    Failed to finds certificate - type 2")
+                        println("---------------------------------------------------------------------------------------")
+                    end
+
                     p.stop_reason_string *= " [Failed to find certificate - type 2]"
+
                     break
                 end
                 break
@@ -346,13 +358,13 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 p.stop_reason = 3 # Iteration limit
                 p.stop_reason_string = "Iteration limit of $(opt.max_iter_local) was hit"
                 if opt.warn_on_limit
-                    @warn("WARNING: Iteration limit hit.")
+                    @warn("    WARNING: Iteration limit hit.")
                 end
             else
                 p.stop_reason = 2 # Time limit
                 p.stop_reason_string = "Time limit hit, limit: $(opt.time_limit) time: $(time() - p.time0)"
                 if opt.warn_on_limit
-                    println("WARNING: Time limit hit.")
+                    println("    WARNING: Time limit hit.")
                 end
             end
             if p.iter >= opt.max_iter_local || time() - p.time0 > opt.time_limit
@@ -367,67 +379,94 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
         # Dual obj growing too much
         if (p.iter > opt.min_iter_max_obj && residuals.dual_obj[k] >  opt.max_obj) || isnan(residuals.dual_obj[k])
-            # dual unbounded
+            
+            # Dual unbounded
             p.stop_reason = 6 # Infeasible
             p.stop_reason_string = "Infeasible: |Dual objective| = $(residuals.dual_obj[k]) > maximum allowed = $(opt.max_obj)"
+            
             if opt.certificate_search && !p.certificate_search
+
                 certificate_infeasibility(affine_sets, p, opt)
                 push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
                     c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
+
             else
                 break
             end
         end
+
         # Primal obj growing too much
         if (p.iter > opt.min_iter_max_obj && residuals.prim_obj[k] < -opt.max_obj) || isnan(residuals.prim_obj[k])
+            
             p.stop_reason = 5 # Unbounded
             p.stop_reason_string = "Unbounded: |Primal objective| = $(residuals.prim_obj[k]) > maximum allowed = $(opt.max_obj)"
+            
             if opt.certificate_search && !p.certificate_search
+
                 certificate_dual_infeasibility(affine_sets, p, opt)
                 push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
                     c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
+
             else
                 break
             end
         end
-        # stalled feasibility with meaningful gap
-        if p.iter > opt.min_iter_max_obj &&
-                residuals.dual_gap[k] > opt.infeas_limit_gap_tol && # low gap but far from zero, say 10% 
-                residuals.feasibility[p.iter] > opt.infeas_feasibility_tol &&
-                max_abs_diff(residuals.feasibility) < opt.infeas_stable_feasibility_tol
+
+        # Stalled feasibility with meaningful gap
+        if (
+            p.iter > opt.min_iter_max_obj &&
+            residuals.dual_gap[k] > opt.infeas_limit_gap_tol && # Low gap but far from zero (~10%)
+            residuals.feasibility[p.iter] > opt.infeas_feasibility_tol &&
+            max_abs_diff(residuals.feasibility) < opt.infeas_stable_feasibility_tol
+            )
             
             p.stop_reason = 6 # Infeasible
             p.stop_reason_string = "Infeasible: feasibility stalled at $(residuals.feasibility[p.iter])"
+
             if opt.certificate_search && !p.certificate_search
+                
                 certificate_infeasibility(affine_sets, p, opt)
                 push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
                     c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
+
             else
                 break
             end
         end
-        # stalled gap at 100%
-        if p.iter > opt.min_iter_max_obj &&
-                residuals.dual_gap[k] > 1-opt.infeas_gap_tol &&
-                max_abs_diff(residuals.dual_gap) < opt.infeas_stable_gap_tol
+
+        # Stalled gap at 100%
+        if (
+            p.iter > opt.min_iter_max_obj &&
+            residuals.dual_gap[k] > 1-opt.infeas_gap_tol &&
+            max_abs_diff(residuals.dual_gap) < opt.infeas_stable_gap_tol
+            )
+
             if abs(residuals.dual_obj[k]) > abs(residuals.prim_obj[k]) && residuals.feasibility[p.iter] > opt.infeas_feasibility_tol
-                # dual unbounded
+                
+                # Dual unbounded
                 p.stop_reason = 6 # Infeasible
                 p.stop_reason_string = "Infeasible: duality gap stalled at 100 % with |Dual objective| >> |Primal objective|"
+                
                 if opt.certificate_search && !p.certificate_search
+
                     certificate_infeasibility(affine_sets, p, opt)
                     push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
                         c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
                 else
                     break
                 end
+
             elseif abs(residuals.prim_obj[k]) > abs(residuals.dual_obj[k]) && residuals.feasibility[p.iter] <= opt.tol_feasibility
+                
                 p.stop_reason = 5 # Unbounded
                 p.stop_reason_string = "Unbounded: duality gap stalled at 100 % with |Dual objective| << |Primal objective|"
+                
                 if opt.certificate_search && !p.certificate_search
+                    
                     certificate_dual_infeasibility(affine_sets, p, opt)
                     push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
                         c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
+                
                 else
                     break
                 end
@@ -440,11 +479,14 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
     # Print result
     if opt.log_verbose
+
         val = -1.0
+
         if opt.extended_log2
             cc = ifelse(p.stop_reason == 6, 0.0, 1.0)*c_orig
             val = dual_feas(pair.y, conic_sets, affine_sets, cc, A_orig, G_orig, a)
         end
+
         print_progress(residuals, p, opt, val)
         print_result(
             p.stop_reason,
@@ -455,15 +497,20 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     end
 
     if opt.certificate_search && p.certificate_search
+
         @assert length(sol) == 1
+        
         if p.certificate_found
+
             if p.stop_reason == 6
                 c_orig .*= 0.0
             end
+
             pop!(sol)
             push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
-                c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
+                c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))    
         end
+
     else
         @assert length(sol) == 0
         push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
@@ -557,24 +604,37 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
 end
 
 function certificate_dual_infeasibility(affine_sets, p, opt)
+
     if opt.log_verbose
-        println("Begin search for dual infeasibility certificate")
+        println("---------------------------------------------------------------------------------------")
+        println("    Begin search for dual infeasibility certificate")
+        println("---------------------------------------------------------------------------------------")
     end
+
     fill!(affine_sets.b, 0.0)
     fill!(affine_sets.h, 0.0)
+
     certificate_parameters(p, opt)
+
     return nothing
 end
+
 function certificate_infeasibility(affine_sets, p, opt)
+
     if opt.log_verbose
-        println("Begin search for infeasibility certificate")
+        println("---------------------------------------------------------------------------------------")
+        println("    Begin search for infeasibility certificate")
+        println("---------------------------------------------------------------------------------------")
     end
+
     fill!(affine_sets.c, 0.0)
+
     certificate_parameters(p, opt)
+
     return nothing
 end
+
 function certificate_parameters(p, opt)
-    # println("\n\n\n")
     p.certificate_search_min_iter = p.iter + 2 * opt.convergence_window + div(p.iter, 5) + 1000
     p.certificate_search = true
     opt.time_limit *= 1.1
@@ -624,8 +684,6 @@ function dual_feas(dual_in::Vector{T}, dual_cone::Vector{T}, cones, a) where T
 
     ineq_viol = 0.0
     if length(dual_in) > 0
-        # @show minimum(dual_in)
-        # @show maximum(dual_in)
         ineq_viol = -min(0.0, minimum(dual_in))
     end
 
@@ -636,7 +694,7 @@ function dual_feas(dual_in::Vector{T}, dual_cone::Vector{T}, cones, a) where T
     if length(dual_zr) > 0
         zero_viol = maximum(abs.(dual_zr))
     end
-    # @show cone_viol, ineq_viol, zero_viol
+
     return max(cone_viol, ineq_viol, zero_viol)
 end
 
@@ -671,15 +729,10 @@ function cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
 
     dual_feasibility = dual_feas(dual_in, dual_cone, conic_sets, a)
 
-    # Post processing
-    # pair.x = pair.x[var_ordering]
-    # dual_cone = dual_cone[var_ordering]
-
     return CPResult(
         p.stop_reason,
         p.stop_reason_string,
         pair.x[var_ordering],
-        # pair.y,
         dual_cone[var_ordering],
         dual_eq,
         dual_in,
