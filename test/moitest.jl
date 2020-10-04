@@ -15,30 +15,31 @@ const optimizer = MOIU.CachingOptimizer(cache,
         # max_iter = 100_000,
         time_limit = 10., #seconds
         warn_on_limit = true,
-        # log_verbose = true, log_freq = 100
+        # log_verbose = true, log_freq = 100000
         ))
 const optimizer_high_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(
         tol_primal = 1e-7, tol_dual = 1e-7,
         tol_gap = 1e-7, tol_feasibility = 1e-7,
-        # log_verbose = true, log_freq = 10000
+        # log_verbose = true, log_freq = 1000
         ))
 const optimizer_low_acc = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(
         tol_gap = 1e-3, tol_feasibility = 1e-3,
-        # log_verbose = true, timer_verbose = true
+        # log_verbose = true, log_freq = 1000
         ))
 const optimizer_full = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(full_eig_decomp = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
 const optimizer_print = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
+    ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, extended_log = true, extended_log2 = true,
+    tol_gap = 1e-4, tol_feasibility = 1e-4))
 const optimizer_lowacc_arpack = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(eigsolver = 1, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
 const optimizer_lowacc_krylovkit = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
-const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = false)
-const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = true, infeas_certificates = false)
-const config_conic_nodual = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = false)
+const config = MOIT.TestConfig(atol=1e-3, rtol=1e-3, infeas_certificates = true)
+const config_conic = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = true, infeas_certificates = true)
+# const config_conic_nodual = MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals = false, infeas_certificates = true)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
@@ -69,6 +70,10 @@ end
 
 @testset "MOI Continuous Linear" begin
     bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
+    # MOIT.linear8atest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    # MOIT.linear8btest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    # MOIT.linear8ctest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    # MOIT.linear12test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.contlineartest(bridged, config, [
         # infeasible/unbounded
         # "linear8a", "linear8b", "linear8c", "linear12",
@@ -102,14 +107,14 @@ end
         # Expression: MOI.get(model, MOI.TerminationStatus()) == config.optimal_status
         #  Evaluated: INFEASIBLE_OR_UNBOUNDED::TerminationStatusCode = 6 == OPTIMAL::TerminationStatusCode = 1
         # "geomean2v", "geomean2f", , "rotatedsoc2", "psdt2", 
-        "normone2", "norminf2", "rotatedsoc2"#
+        # "normone2", "norminf2", "rotatedsoc2"#
         ]
     )
-    # these fail due to infeasibility certificate not being disabled
-    MOIT.norminf2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
-    MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
-    # requires certificates always
-    MOIT.rotatedsoc2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
+    # # these fail due to infeasibility certificate not being disabled
+    # MOIT.norminf2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
+    # MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
+    # # requires certificates always
+    # MOIT.rotatedsoc2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
 end
 
 @testset "Simple LP" begin

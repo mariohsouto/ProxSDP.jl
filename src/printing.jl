@@ -3,47 +3,36 @@ function print_header_1()
     println("=======================================================================================")
     println("                  ProxSDP : Proximal Semidefinite Programming Solver                   ")
     println("                         (c) Mario Souto and Joaquim D. Garcia, 2020                   ")
-    println("                                                              v1.5.1                   ")
+    println("                                                              v1.6.0                   ")
     println("---------------------------------------------------------------------------------------")
 end
 
 function print_parameters(opt::Options, conic_sets::ConicSets)
     println("    Solver parameters:")
-    if length(conic_sets.socone) >= 1 && length(conic_sets.sdpcone) >= 1
-        println("       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) tol_soc = $(opt.tol_soc) tol_psd = $(opt.tol_psd) ")
-    elseif length(conic_sets.socone) >= 1
-        println("       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) tol_soc = $(opt.tol_soc)")
-    elseif length(conic_sets.sdpcone) >= 1
-        println("       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) tol_psd = $(opt.tol_psd) ")
-    else
-        println("       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual) ")
+    tol_str = "       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual)"
+    if length(conic_sets.socone) >= 1
+        tol_str *= " tol_soc = $(opt.tol_soc)"
     end
+    if length(conic_sets.sdpcone) >= 1
+        tol_str *= " tol_psd = $(opt.tol_psd)"
+    end
+    println(tol_str)
+
     println("       max_iter = $(opt.max_iter_local) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
 
     return nothing
 end
 
+eq_plural(val::Integer) = ifelse(val != 1, "ies", "y")
+eqs(val::Integer) = val > 0 ? "$(val) linear equalit$(eq_plural(val))" : ""
+ineqs(val::Integer) = val > 0 ? "$(val) linear inequalit$(eq_plural(val))" : ""
 function print_constraints(aff::AffineSets)
     println("    Constraints:")
-    if aff.p >= 1 && aff.m >= 1
-        println("       $(aff.p) linear equalities and $(aff.m) linear inequalities")
-    elseif aff.p == 1 && aff.m >= 1
-        println("       $(aff.p) linear equality and $(aff.m) linear inequalities")
-    elseif aff.p >= 1 && aff.m == 1
-        println("       $(aff.p) linear equalities and $(aff.m) linear inequality")
-    elseif aff.p == 1
-        println("       $(aff.p) linear equality ")
-    elseif aff.p >= 1
-        println("       $(aff.p) linear equalities ")
-    elseif aff.m == 1
-        println("       $(aff.m) linear inequality ")
-    else
-        println("       $(aff.m) linear inequalities ")
-    end
-
+    println("       $(eqs(aff.p)) and $(eqs(aff.m))")
     return nothing
 end
 
+cone_plural(val::Integer) = ifelse(val != 1, "s", "")
 function print_prob_data(conic_sets::ConicSets)
     soc_dict = Dict()
     for soc in conic_sets.socone
@@ -64,37 +53,46 @@ function print_prob_data(conic_sets::ConicSets)
     println("    Cones:")
     if length(conic_sets.socone) > 0
         for (k, v) in soc_dict
-            if v == 1
-                println("       1 second order cone of size $k")
-            else
-                println("       $v second order cones of size $k")
-            end
+            println("       $v second order cone$(cone_plural(v)) of size $k")
         end
     end
     if length(conic_sets.sdpcone) > 0
         for (k, v) in psd_dict
-            if v == 1
-                println("       1 psd cone of size $(k)x$(k)")
-            else
-                println("       $v psd cones of size $(k)x$(k)")
-            end
+            println("       $v psd cone$(cone_plural(v)) of size $k")
         end
     end
 
     return nothing
 end
 
-function print_header_2()
-    println("---------------------------------------------------------------------------------------")
-    println("    Initializing Primal-Dual Hybrid Gradient method                                    ")
-    println("---------------------------------------------------------------------------------------")
-    println("|  iter  | prim obj | rel. gap |  feasb.  | prim res | dual res | tg. rank |  time(s) |")
-    println("---------------------------------------------------------------------------------------")
+function print_header_2(opt, beg = true)
+    bar  = "---------------------------------------------------------------------------------------"
+    name = "    Initializing Primal-Dual Hybrid Gradient method"
+    cols = "|  iter  | prim obj | rel. gap |  feasb.  | prim res | dual res | tg. rank |  time(s) |"
+
+    if opt.extended_log || opt.extended_log2
+        bar  *= "-----------"
+        cols *= " dual obj |"
+    end
+    if opt.extended_log2
+        bar  *= "-----------"
+        cols *= " d feasb. |"
+    end
+
+    if beg
+        println(bar)
+        println(name)
+        println(bar)
+    end
+    println(cols)
+    if beg
+        println(bar)
+    end
 
     return nothing
 end
 
-function print_progress(residuals::Residuals, p::Params)
+function print_progress(residuals::Residuals, p::Params, opt, val = -1.0)
     primal_res = residuals.primal_residual[p.iter]
     dual_res = residuals.dual_residual[p.iter]
     s_k = @sprintf("%d", p.iter)
@@ -130,6 +128,21 @@ function print_progress(residuals::Residuals, p::Params)
     a *= s_target_rank
     a *= " "^max(0, 11 - length(s_time))
     a *= s_time
+
+    if opt.extended_log || opt.extended_log2
+        str = @sprintf("%.3f", residuals.dual_obj[p.iter]) * " |"
+        str = " "^max(0, 11 - length(str)) * str
+        a *= str
+    end
+    if opt.extended_log2
+        str = @sprintf("%.5f", val) * " |"
+        str = " "^max(0, 11 - length(str)) * str
+        a *= str
+    end
+    if opt.log_repeat_header
+        print_header_2(opt, false)
+    end
+
     println(a)
 
     return nothing
@@ -138,17 +151,8 @@ end
 function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, max_rank::Int,  p::Params)
     println("---------------------------------------------------------------------------------------")
     println("    Solver status:")
-    if stop_reason == 1
-        println("       Optimal solution found in $(round(time_; digits = 2)) seconds")
-    elseif stop_reason == 2
-        println("       ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, time_limit reached")
-    elseif stop_reason == 3
-        println("       ProxSDP failed to converge in $(round(time_; digits = 2)) seconds, max_iter reached")
-    elseif stop_reason == 4
-        println("       Problem is infeasible or unbounded")
-    elseif stop_reason == 5
-        println("       Problem is unbounded")
-    end
+    println("       "*p.stop_reason_string)
+    println("       Time elapsed     = $(round(time_; digits = 2)) seconds")
     println("       Primal objective = $(round(residuals.prim_obj[p.iter]; digits = 5))")
     println("       Dual objective   = $(round(residuals.dual_obj[p.iter]; digits = 5))")
     println("       Duality gap      = $(round(100*residuals.dual_gap[p.iter]; digits = 2)) %")
