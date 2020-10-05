@@ -9,7 +9,8 @@ end
 
 function print_parameters(opt::Options, conic_sets::ConicSets)
     println("    Solver parameters:")
-    tol_str = "       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual)"
+    tol_str = "       tol_gap = $(opt.tol_gap) tol_feasibility = $(opt.tol_feasibility)\n"
+    tol_str *= "       tol_primal = $(opt.tol_primal) tol_dual = $(opt.tol_dual)"
     if length(conic_sets.socone) >= 1
         tol_str *= " tol_soc = $(opt.tol_soc)"
     end
@@ -18,7 +19,7 @@ function print_parameters(opt::Options, conic_sets::ConicSets)
     end
     println(tol_str)
 
-    println("       max_iter = $(opt.max_iter_local) max_beta = $(opt.max_beta) min_beta = $(opt.min_beta)")
+    println("       max_iter = $(opt.max_iter_local) time_limit = $(opt.time_limit)s")
 
     return nothing
 end
