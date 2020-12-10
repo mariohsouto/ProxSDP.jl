@@ -64,22 +64,30 @@ Xsol = JuMP.value.(X)
 
 ## Citing this package
 
-The preprint version of the paper can be found [here](https://arxiv.org/abs/1810.05231).
+The published version of the paper can be found [here](https://doi.org/10.1080/02331934.2020.1823387).
 
-```
-@article{souto2018exploiting,
-  title={Exploiting Low-Rank Structure in Semidefinite Programming by Approximate Operator Splitting},
-  author={Souto, Mario and Garcia, Joaquim D and Veiga, {\'A}lvaro},
-  journal={arXiv preprint arXiv:1810.05231},
-  year={2018}
+We kindly request that you cite the the paper as:
+
+```bibtex
+@article{souto2020exploiting,
+  author = {Mario Souto and Joaquim D. Garcia and \'Alvaro Veiga},
+  title = {Exploiting low-rank structure in semidefinite programming by approximate operator splitting},
+  journal = {Optimization},
+  pages = {1-28},
+  year  = {2020},
+  publisher = {Taylor & Francis},
+  doi = {10.1080/02331934.2020.1823387},
+  URL = {https://doi.org/10.1080/02331934.2020.1823387}
 }
 ```
+
+The preprint version of the paper can be found [here](https://arxiv.org/abs/1810.05231).
 
 ## Disclaimer
 
 * ProxSDP is a research software, therefore it should not be used in production.
 * Please open an issue if you find any problems, developers will try to fix and find alternatives.
-* ProxSDP assumes primal and dual feasibility. Currently, it is not able to reliably identify infeasibility and unboundedness.
+* ProxSDP assumes primal and dual feasibility.
 
 ## ROAD MAP
 
