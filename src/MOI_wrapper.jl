@@ -428,6 +428,10 @@ end
 matindices(n::Integer) = (LinearIndices(tril(trues(n,n))))[findall(tril(trues(n,n)))]
 
 function MOI.optimize!(optimizer::Optimizer)
+    if optimizer.data === nothing
+        # optimize! has already been called and no new model has been copied
+        return
+    end
 
     # @show "in opt"
 
