@@ -60,12 +60,16 @@ end
         "solve_zero_one_with_bounds_1",
         "solve_zero_one_with_bounds_2",
         "solve_zero_one_with_bounds_3",
+        "solve_farkas_interval_upper",
+        "solve_farkas_equalto_upper",
         # not supported attributes
         "number_threads",
         # ArgumentError: The number of constraints in SCSModel must be greater than 0
         # "solve_unbounded_model", # takes very long becaus only stop by time limit
         ]
     )
+    MOIT.solve_farkas_interval_upper(bridged, config)
+    MOIT.solve_farkas_equalto_upper(bridged, config)
 end
 
 @testset "MOI Continuous Linear" begin
@@ -76,7 +80,8 @@ end
     # MOIT.linear12test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.contlineartest(bridged, config, [
         # infeasible/unbounded
-        # "linear8a", "linear8b", "linear8c", "linear12",
+        "linear8a",
+        #"linear8b", "linear8c", "linear12",
         # poorly conditioned
         "linear10",
         "linear5",
@@ -85,6 +90,7 @@ end
         "partial_start",
         ]
     )
+    MOIT.linear8atest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear5test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear10test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
