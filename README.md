@@ -87,7 +87,7 @@ The preprint version of the paper can be found [here](https://arxiv.org/abs/1810
 
 * ProxSDP is a research software, therefore it should not be used in production.
 * Please open an issue if you find any problems, developers will try to fix and find alternatives.
-* There is no support for 32-bit systems, the package should work, but might reach some issues.
+* There is no continuous development for 32-bit systems, the package should work, but might reach some issues.
 * ProxSDP assumes primal and dual feasibility.
 
 ## ROAD MAP
