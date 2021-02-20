@@ -60,14 +60,17 @@ end
         "solve_zero_one_with_bounds_1",
         "solve_zero_one_with_bounds_2",
         "solve_zero_one_with_bounds_3",
+        # farkas proof
         "solve_farkas_interval_upper",
         "solve_farkas_equalto_upper",
+        "solve_farkas_variable_lessthan_max",
         # not supported attributes
         "number_threads",
         # ArgumentError: The number of constraints in SCSModel must be greater than 0
         # "solve_unbounded_model", # takes very long becaus only stop by time limit
         ]
     )
+    MOIT.solve_farkas_variable_lessthan_max(bridged, config)
     MOIT.solve_farkas_interval_upper(bridged, config)
     MOIT.solve_farkas_equalto_upper(bridged, config)
 end
