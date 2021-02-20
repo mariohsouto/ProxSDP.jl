@@ -5,8 +5,8 @@
 |:-----------------:|
 | [![Build Status][build-img]][build-url] [![Codecov branch][codecov-img]][codecov-url] [![][docs-img]][docs-url]|
 
-[build-img]: https://travis-ci.org/mariohsouto/ProxSDP.jl.svg?branch=master
-[build-url]: https://travis-ci.org/mariohsouto/ProxSDP.jl
+[build-img]: https://github.com/mariohsouto/ProxSDP.jl/workflows/CI/badge.svg?branch=master
+[build-url]: https://github.com/mariohsouto/ProxSDP.jl/actions?query=workflow%3ACI
 [codecov-img]: http://codecov.io/github/mariohsouto/ProxSDP.jl/coverage.svg?branch=master
 [codecov-url]: http://codecov.io/github/mariohsouto/ProxSDP.jl?branch=master
 [docs-img]: https://img.shields.io/badge/docs-latest-blue.svg
@@ -87,6 +87,7 @@ The preprint version of the paper can be found [here](https://arxiv.org/abs/1810
 
 * ProxSDP is a research software, therefore it should not be used in production.
 * Please open an issue if you find any problems, developers will try to fix and find alternatives.
+* There is no continuous development for 32-bit systems, the package should work, but might reach some issues.
 * ProxSDP assumes primal and dual feasibility.
 
 ## ROAD MAP
