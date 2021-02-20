@@ -20,9 +20,6 @@ jobs:
           - version: '1.0'
             os: ubuntu-latest
             arch: x64
-          - version: '1.0'
-            os: ubuntu-latest
-            arch: x86
           - version: '1'
             os: windows-latest
             arch: x64
