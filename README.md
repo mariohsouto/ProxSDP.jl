@@ -66,7 +66,7 @@ Xsol = JuMP.value.(X)
 
 The published version of the paper can be found [here](https://doi.org/10.1080/02331934.2020.1823387).
 
-We kindly request that you cite the the paper as:
+We kindly request that you cite the paper as:
 
 ```bibtex
 @article{souto2020exploiting,
