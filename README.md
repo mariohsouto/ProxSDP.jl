@@ -28,14 +28,16 @@ You can install **ProxSDP** through the [Julia package manager](https://docs.jul
 ] add ProxSDP
 ```
 
-## Using ProxSDP with JuMP
+## Usage
 
-For example, consider the semidefinite programming relaxation of the [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf) problem
+Let's consider the semidefinite programming relaxation of the [max-cut](http://www-math.mit.edu/~goemans/PAPERS/maxcut-jacm.pdf) problem as in
 ```
     max   0.25 * W•X
     s.t.  diag(X) = 1,
           X ≽ 0,
 ```
+
+### JuMP
 This problem can be solved by the following code using **ProxSDP** and [JuMP](https://github.com/JuliaOpt/JuMP.jl).
 ```julia
 # Load packages
@@ -60,6 +62,33 @@ JuMP.optimize!(model)
 
 # Retrieve solution
 Xsol = JuMP.value.(X)
+```
+### Convex.jl
+Another alternative is to use **ProxSDP** via [Convex.jl](https://github.com/jump-dev/Convex.jl) as the following
+```julia
+# Load packages
+using Convex, ProxSDP
+
+# Number of vertices
+n = 4
+# Graph weights
+W = [18.0  -5.0  -7.0  -6.0
+     -5.0   6.0   0.0  -1.0
+     -7.0   0.0   8.0  -1.0
+     -6.0  -1.0  -1.0   8.0]
+     
+# Define optimization problem
+X = Semidefinite(n)
+problem = maximize(0.25 * dot(W, X), diag(X) == 1)
+
+# Solve optimization problem with ProxSDP
+solve!(problem, ProxSDP.Optimizer(log_verbose=true, tol_gap=1e-4, tol_feasibility=1e-4))
+
+# Get the objective value
+problem.optval
+
+# Retrieve solution
+evaluate(X)
 ```
 
 ## Citing this package
