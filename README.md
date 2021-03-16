@@ -93,7 +93,7 @@ evaluate(X)
 
 ## Citing this package
 
-The published version of the paper can be found [here](https://doi.org/10.1080/02331934.2020.1823387).
+The published version of the paper can be found [here](https://doi.org/10.1080/02331934.2020.1823387) and the arXiv version [here](https://arxiv.org/pdf/1810.05231.pdf).
 
 We kindly request that you cite the paper as:
 
