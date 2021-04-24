@@ -2,6 +2,11 @@ push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
 
 using ProxSDP, MathOptInterface, Test, LinearAlgebra, Random, SparseArrays, DelimitedFiles
 
+using LinearAlgebra
+LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
+LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
+LinearAlgebra.transpose(v::MathOptInterface.VariableIndex) = v
+
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIB = MOI.Bridges
@@ -13,7 +18,15 @@ const optimizer = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
-        time_limit = 10., #seconds
+        time_limit = 3., #seconds FAST
+        warn_on_limit = true,
+        # log_verbose = true, log_freq = 100000
+        ))
+const optimizer_slow = MOIU.CachingOptimizer(cache,
+    ProxSDP.Optimizer(
+        tol_gap = 1e-6, tol_feasibility= 1e-6,
+        # max_iter = 100_000,
+        time_limit = 30., #seconds
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         ))
@@ -53,6 +66,8 @@ end
 @testset "Unit" begin
     bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOIT.unittest(bridged, config,[
+        # not supported attributes
+        "number_threads",
         # Quadratic functions are not supported
         "solve_qcp_edge_cases", "solve_qp_edge_cases",
         # Integer and ZeroOne sets are not supported
@@ -62,17 +77,25 @@ end
         "solve_zero_one_with_bounds_3",
         # farkas proof
         "solve_farkas_interval_upper",
+        "solve_farkas_interval_lower",
         "solve_farkas_equalto_upper",
+        "solve_farkas_equalto_lower",
         "solve_farkas_variable_lessthan_max",
-        # not supported attributes
-        "number_threads",
-        # ArgumentError: The number of constraints in SCSModel must be greater than 0
-        # "solve_unbounded_model", # takes very long becaus only stop by time limit
+        "solve_farkas_variable_lessthan",
+        "solve_farkas_lessthan",
+        "solve_farkas_greaterthan",
         ]
     )
-    MOIT.solve_farkas_variable_lessthan_max(bridged, config)
-    MOIT.solve_farkas_interval_upper(bridged, config)
-    MOIT.solve_farkas_equalto_upper(bridged, config)
+    # TODO:
+    bridged_slow = MOIB.full_bridge_optimizer(optimizer_slow, Float64)
+    # MOIT.solve_farkas_interval_upper(bridged_slow, config)
+    # MOIT.solve_farkas_interval_lower(bridged, config)
+    # MOIT.solve_farkas_equalto_upper(bridged_slow, config)
+    # MOIT.solve_farkas_equalto_lower(bridged, config)
+    # MOIT.solve_farkas_variable_lessthan_max(bridged_slow, config)
+    MOIT.solve_farkas_variable_lessthan(bridged_slow, config)
+    # MOIT.solve_farkas_lessthan(bridged_slow, config)
+    # MOIT.solve_farkas_greaterthan(bridged, config)
 end
 
 @testset "MOI Continuous Linear" begin
@@ -117,11 +140,13 @@ end
         #  Evaluated: INFEASIBLE_OR_UNBOUNDED::TerminationStatusCode = 6 == OPTIMAL::TerminationStatusCode = 1
         # "geomean2v", "geomean2f", , "rotatedsoc2", "psdt2", 
         # "normone2", "norminf2", "rotatedsoc2"#
+        # slow to find certificate
+        "normone2",
         ]
     )
     # # these fail due to infeasibility certificate not being disabled
     # MOIT.norminf2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
-    # MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
+    MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer_slow, Float64), config_conic)
     # # requires certificates always
     # MOIT.rotatedsoc2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
 end
@@ -403,12 +428,6 @@ end
 
 @testset "SDP with duplicates from MOI" begin
 
-    using MathOptInterface
-    # using SCS,ProxSDP
-    MOI = MathOptInterface
-    MOIU = MathOptInterface.Utilities
-    MOIB = MathOptInterface.Bridges
-
     cache = MOIU.UniversalFallback(MOIU.Model{Float64}());
     #optimizer0 = SCS.Optimizer(linear_solver=SCS.Direct, eps=1e-8);
     optimizer0 = ProxSDP.Optimizer()#linear_solver=SCS.Direct, eps=1e-8);
@@ -480,11 +499,6 @@ end
     @test obj ≈ 0.872 atol=1e-2
 
 end
-
-using LinearAlgebra
-LinearAlgebra.symmetric_type(::Type{MathOptInterface.VariableIndex}) = MathOptInterface.VariableIndex
-LinearAlgebra.symmetric(v::MathOptInterface.VariableIndex, ::Symbol) = v
-LinearAlgebra.transpose(v::MathOptInterface.VariableIndex) = v
 
 @testset "MIMO Sizes" begin
     include("base_mimo.jl")

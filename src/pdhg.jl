@@ -246,7 +246,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 else
                     if opt.log_verbose
                         println("---------------------------------------------------------------------------------------")
-                        println("    Failed to finds certificate - type 2")
+                        println("    Failed to find certificate - type 2")
                         println("---------------------------------------------------------------------------------------")
                     end
 
