@@ -55,8 +55,10 @@ Base.@kwdef mutable struct Options
     tol_psd::Float64 = 1e-7
     tol_soc::Float64 = 1e-7
 
-    check_dual_feas::Bool = false
-    check_dual_feas_freq::Int = 1000
+    check_dual_feas::Bool = true
+    check_dual_feas_freq::Int = 50
+    check_primal_feas_freq::Int = 50
+    check_dualility_gap_freq::Int = 100
 
     max_obj::Float64 = 1e20
     min_iter_max_obj::Int = 10
@@ -68,6 +70,7 @@ Base.@kwdef mutable struct Options
     infeas_stable_gap_tol::Float64 = 1e-4
     infeas_feasibility_tol::Float64 = 1e-4
     infeas_stable_feasibility_tol::Float64 = 1e-8
+    optimality_norm = "L2"
 
     certificate_search::Bool = true
     certificate_obj_tol::Float64 = 1e-1
@@ -231,12 +234,13 @@ mutable struct WarmStart
 end
 
 mutable struct Residuals
-    dual_gap::CircularVector{Float64}
+    duality_gap::CircularVector{Float64}
     prim_obj::CircularVector{Float64}
     dual_obj::CircularVector{Float64}
     equa_feasibility::Float64 
     ineq_feasibility::Float64
-    feasibility::CircularVector{Float64}
+    primal_feasibility::CircularVector{Float64}
+    dual_feasibility::CircularVector{Float64}
     primal_residual::CircularVector{Float64}
     dual_residual::CircularVector{Float64}
     comb_residual::CircularVector{Float64}
@@ -247,6 +251,7 @@ mutable struct Residuals
         CircularVector{Float64}(2*window),
         .0,
         .0,
+        CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),
         CircularVector{Float64}(2*window),

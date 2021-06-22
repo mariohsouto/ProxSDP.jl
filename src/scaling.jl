@@ -1,3 +1,13 @@
+function fix_diag_scaling(v, cones, num)
+    # Remove diag scaling
+    cont = 1
+    @inbounds for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in 1:j#j:sdp.sq_side
+        if i != j
+            v[cont] /= num
+        end
+        cont += 1
+    end
+end
 
 function preprocess!(aff::AffineSets, conic_sets::ConicSets)
     c_orig = zeros(1)

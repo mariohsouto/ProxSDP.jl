@@ -98,11 +98,11 @@ function print_progress(residuals::Residuals, p::Params, opt, val = -1.0)
     dual_res = residuals.dual_residual[p.iter]
     s_k = @sprintf("%d", p.iter)
     s_k *= " |"
-    s_s = @sprintf("%.5f", residuals.dual_gap[p.iter])
+    s_s = @sprintf("%.5f", residuals.duality_gap[p.iter])
     s_s *= " |"
     s_o = @sprintf("%.3f", residuals.prim_obj[p.iter])
     s_o *= " |"
-    s_f = @sprintf("%.5f", residuals.feasibility[p.iter])
+    s_f = @sprintf("%.5f", residuals.primal_feasibility[p.iter])
     s_f *= " |"
     s_p = @sprintf("%.5f", primal_res)
     s_p *= " |"
@@ -156,7 +156,7 @@ function print_result(stop_reason::Int, time_::Float64, residuals::Residuals, ma
     println("       Time elapsed     = $(round(time_; digits = 2)) seconds")
     println("       Primal objective = $(round(residuals.prim_obj[p.iter]; digits = 5))")
     println("       Dual objective   = $(round(residuals.dual_obj[p.iter]; digits = 5))")
-    println("       Duality gap      = $(round(100*residuals.dual_gap[p.iter]; digits = 2)) %")
+    println("       Duality gap      = $(round(100*residuals.duality_gap[p.iter]; digits = 2)) %")
     println("---------------------------------------------------------------------------------------")
     println("    Primal feasibility:")
     println("       ||A(X) - b|| / (1 + ||b||) = $(round(residuals.equa_feasibility; digits = 6))    [linear equalities] ")

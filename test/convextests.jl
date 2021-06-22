@@ -11,7 +11,11 @@
 #             )
 #     end
 # end
+path = joinpath(dirname(@__FILE__), "..", "..")
+push!(Base.LOAD_PATH, path)
+datapath = joinpath(dirname(@__FILE__), "data")
 
+using ProxSDP
 # Convex.jl and SumOfSquares.jl tests
 using ConvexTests, ProxSDP
 @info "Starting ProxSDP tests"
