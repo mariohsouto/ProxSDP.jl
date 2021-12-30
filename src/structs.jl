@@ -134,7 +134,7 @@ Base.@kwdef mutable struct Options
     # larger is more stable to converge and more deterministic
     arpack_max_iter::Int = 10_000
     # see remark for of dsaupd
-    
+
     # KrylovKit
     krylovkit_reset_resid::Bool = false
     krylovkit_resid_init::Int = 3
@@ -147,7 +147,7 @@ Base.@kwdef mutable struct Options
     reduce_rank::Bool = false
     rank_slack::Int = 3
 
-    full_eig_freq::Int = 10000000
+    full_eig_freq::Int = 10_000_000
     full_eig_len::Int = 0
 
     # equilibration parameters

@@ -1,4 +1,8 @@
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
+function chambolle_pock(
+    affine_sets::AffineSets,
+    conic_sets::ConicSets,
+    opt
+)::CPResult
 
     # Initialize parameters
     p = Params()
@@ -21,7 +25,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.certificate_search_min_iter = 0
     p.certificate_found = false
     sol = Array{CPResult}(undef, 0)
-    arc_list = [EigSolverAlloc(Float64, sdp.sq_side, opt) for (idx, sdp) in enumerate(conic_sets.sdpcone)]
+    arc_list = [
+        EigSolverAlloc(Float64, sdp.sq_side, opt)
+            for (idx, sdp) in enumerate(conic_sets.sdpcone)]
     ada_count = 0
 
     if opt.max_iter <= 0
@@ -69,8 +75,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 opt.equilibration = true
             end
             if opt.equilibration
-                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
-                @timeit "equilibrate scaling" begin
+                @timeit "equilib inner" E, D = equilibrate!(M, affine_sets, opt)
+                @timeit "equilib scaling" begin
                     M = E * M * D
                     affine_sets.A = M[1:affine_sets.p, :]
                     affine_sets.G = M[affine_sets.p + 1:end, :]
@@ -419,7 +425,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             residuals.feasibility[p.iter] > opt.infeas_feasibility_tol &&
             max_abs_diff(residuals.feasibility) < opt.infeas_stable_feasibility_tol
             )
-            
+
             p.stop_reason = 6 # Infeasible
             p.stop_reason_string = "Infeasible: feasibility stalled at $(residuals.feasibility[p.iter])"
 
@@ -499,7 +505,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     if opt.certificate_search && p.certificate_search
 
         @assert length(sol) == 1
-        
+
         if p.certificate_found
 
             if p.stop_reason == 6
@@ -508,7 +514,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
             pop!(sol)
             push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
-                c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))    
+                c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
         end
 
     else
@@ -606,9 +612,9 @@ end
 function certificate_dual_infeasibility(affine_sets, p, opt)
 
     if opt.log_verbose
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
         println("    Begin search for dual infeasibility certificate")
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
     end
 
     fill!(affine_sets.b, 0.0)
@@ -622,9 +628,9 @@ end
 function certificate_infeasibility(affine_sets, p, opt)
 
     if opt.log_verbose
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
         println("    Begin search for infeasibility certificate")
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
     end
 
     fill!(affine_sets.c, 0.0)
