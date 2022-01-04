@@ -74,6 +74,7 @@ function test_runtests()
             MOI.ConstraintName,
             MOI.VariableName,
             MOI.ObjectiveBound,
+            MOI.ScalarFunctionConstantNotZero, # can be ignored due UniversalFallback
         ],
     )
 
@@ -112,11 +113,9 @@ function test_runtests()
             # see: https://github.com/jump-dev/MathOptInterface.jl/issues/1665
             "test_model_UpperBoundAlreadySet",
             "test_model_LowerBoundAlreadySet",
-            # it seems that UniversalFallback accepts everything
-            "test_model_ScalarFunctionConstantNotZero",
             # TODO(joaquimg): good catch, but very pathological
             "test_objective_ObjectiveFunction_blank",
-            # poorly scaled problem
+            # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
         ],
     )
@@ -232,7 +231,7 @@ end
     )
     # # these fail due to infeasibility certificate not being disabled
     # MOIT.norminf2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
-    MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer_slow, Float64), config_conic)
+    # MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer_slow, Float64), config_conic)
     # # requires certificates always
     # MOIT.rotatedsoc2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
 end
