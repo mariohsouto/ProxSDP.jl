@@ -32,8 +32,8 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false, scalar = fa
     end
 
     Xsq = Matrix{MOI.VariableIndex}(undef, n+1,n+1)
-    ivech!(Xsq, X)
-    Xsq = Matrix(Symmetric(Xsq,:U))
+    ProxSDP.ivech!(Xsq, X)
+    Xsq = Matrix(LinearAlgebra.Symmetric(Xsq,:U))
 
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n+1))
@@ -61,7 +61,7 @@ function moi_mimo(optimizer, seed, n; verbose = false, test = false, scalar = fa
 
     stime = -1.0
     try
-        stime = MOI.get(optimizer, MOI.SolveTime())
+        stime = MOI.get(optimizer, MOI.SolveTimeSec())
     catch
         println("could not query time")
     end

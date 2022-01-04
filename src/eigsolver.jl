@@ -354,7 +354,7 @@ mutable struct EigSolverAlloc{T}
     bmat::String
     which::String
     mode::Int
-    Amat::Symmetric{T,Matrix{T}}
+    Amat::LinearAlgebra.Symmetric{T,Matrix{T}}
     lworkl::Int
     TOL::Base.RefValue{T}
     v::Matrix{T}
@@ -384,7 +384,8 @@ hasconverged(arc::EigSolverAlloc) = arc.converged
 
 function EigSolverAlloc(T::DataType, n::Int64, opt::Options)::EigSolverAlloc
     arc = EigSolverAlloc{T}()
-    @timeit "init_arc" _init_eigsolver!(arc, Symmetric(Matrix{T}(I, n, n), :U), 1, n, opt)
+    @timeit "init_arc" _init_eigsolver!(
+        arc, LinearAlgebra.Symmetric(Matrix{T}(LinearAlgebra.I, n, n), :U), 1, n, opt)
     return arc
 end
 
@@ -409,7 +410,7 @@ function eigsolver_update_resid!(arc, opt, init)
     return nothing
 end
 
-function _init_eigsolver!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
+function _init_eigsolver!(arc::EigSolverAlloc{T}, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
     if opt.eigsolver == 1
         arpack_init!(arc, A, nev, n, opt)
     else
@@ -426,7 +427,7 @@ function arpack_getvectors(arc::EigSolverAlloc)
     return arc.v
 end
 
-function arpack_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
+function arpack_init!(arc::EigSolverAlloc{T}, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
 
     # IDO - Integer.  (INPUT/OUTPUT)  (in julia its is a integer vector)
     # Reverse communication flag.
@@ -568,7 +569,7 @@ function arpack_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::In
     return nothing
 end
 
-function arpack_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options, up_ncv::Bool) where T
+function arpack_update!(arc::EigSolverAlloc{T}, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Int64, opt::Options, up_ncv::Bool) where T
 
     need_resize = up_ncv
     if !need_resize
@@ -674,14 +675,14 @@ function _saupd!(arc::EigSolverAlloc{T})::Nothing where T
             @simd for i in 1:arc.n
                 @inbounds arc.x[i] = arc.workd[i-1+arc.ipntr[1]]
             end
-            mul!(arc.y, arc.Amat, arc.x)
+            LinearAlgebra.mul!(arc.y, arc.Amat, arc.x)
             @simd for i in 1:arc.n
                  @inbounds arc.workd[i-1+arc.ipntr[2]] = arc.y[i]
             end
             # using views
             # x = view(arc.workd, arc.ipntr[1] .+ arc.zernm1)
             # y = view(arc.workd, arc.ipntr[2] .+ arc.zernm1)
-            # mul!(y, arc.Amat, x)
+            # LinearAlgebra.mul!(y, arc.Amat, x)
         elseif arc.ido[] == 99
             # In this case, don't call _EUPD! (according to https://help.scilab.org/docs/5.3.3/en_US/dseupd.html)
             break
@@ -744,7 +745,7 @@ function _seupd!(arc::EigSolverAlloc{T})::Nothing where T
     return nothing
 end
 
-function arpack_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
+function arpack_eig!(arc::EigSolverAlloc, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
 
     up_ncv = false
     for i in 1:1
@@ -776,7 +777,7 @@ function krylovkit_getvector(arc::EigSolverAlloc, i)
     return arc.vecs[i]
 end
 
-function krylovkit_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
+function krylovkit_init!(arc::EigSolverAlloc{T}, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Int64, n::Int64, opt::Options) where T
     arc.n = n
     arc.nev = nev
     eigsolver_init_resid!(arc, opt, n)
@@ -785,7 +786,7 @@ function krylovkit_init!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev:
     return nothing
 end
 
-function krylovkit_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, nev::Int64, opt::Options) where T
+function krylovkit_update!(arc::EigSolverAlloc{T}, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Int64, opt::Options) where T
     arc.nev = nev
     if opt.krylovkit_reset_resid
         eigsolver_update_resid!(arc, opt, opt.krylovkit_resid_init)
@@ -794,7 +795,7 @@ function krylovkit_update!(arc::EigSolverAlloc{T}, A::Symmetric{T,Matrix{T}}, ne
     return nothing
 end
 
-function krylovkit_eig!(arc::EigSolverAlloc, A::Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
+function krylovkit_eig!(arc::EigSolverAlloc, A::LinearAlgebra.Symmetric{T,Matrix{T}}, nev::Integer, opt::Options)::Nothing where T
     arc.converged = true
     @timeit "update_arc" krylovkit_update!(arc, A, nev, opt)::Nothing
     @timeit "krylovkit" begin

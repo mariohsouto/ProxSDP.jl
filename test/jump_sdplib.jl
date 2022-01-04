@@ -11,12 +11,12 @@ function jump_sdplib(solver, path; verbose = false, test = false)
 
     # Objective function
     @objective(model, Min, sum(F[0][idx...] * X[idx...] 
-        for idx in zip(findnz(F[0])[1:end-1]...)))
+        for idx in zip(SparseArrays.findnz(F[0])[1:end-1]...)))
 
     # Linear equality constraints
     for k = 1:m
         @constraint(model, sum(F[k][idx...] * X[idx...]
-            for idx in zip(findnz(F[k])[1:end-1]...)) == c[k])
+            for idx in zip(SparseArrays.findnz(F[k])[1:end-1]...)) == c[k])
     end
     
     teste = @time optimize!(model)
@@ -26,7 +26,7 @@ function jump_sdplib(solver, path; verbose = false, test = false)
     verbose && sdplib_eval(F,c,n,m,XX)
 
     objval = objective_value(model)
-    stime = MOI.get(model, MOI.SolveTime())
+    stime = MOI.get(model, MOI.SolveTimeSec())
 
 
     # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
@@ -48,7 +48,7 @@ function jump_sdplib(solver, path; verbose = false, test = false)
     max_lin_viol = 0.0
     for k = 1:m
         val = abs(sum(F[k][idx...] * XX[idx...]
-            for idx in zip(findnz(F[k])[1:end-1]...)) - c[k])
+            for idx in zip(SparseArrays.findnz(F[k])[1:end-1]...)) - c[k])
         if val > 0.0
             if val > max_lin_viol
                 max_lin_viol = val

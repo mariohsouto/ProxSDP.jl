@@ -19,13 +19,13 @@ function compute_gap!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryData, 
     residuals.feasibility[p.iter] = max(residuals.equa_feasibility, residuals.ineq_feasibility)
 
     # Primal-dual gap
-    residuals.prim_obj[p.iter] = dot(aff.c, pair.x)
+    residuals.prim_obj[p.iter] = LinearAlgebra.dot(aff.c, pair.x)
     residuals.dual_obj[p.iter] = 0.
     if aff.p > 0
-        residuals.dual_obj[p.iter] -= dot(aff.b, @view pair.y[1:aff.p])
+        residuals.dual_obj[p.iter] -= LinearAlgebra.dot(aff.b, @view pair.y[1:aff.p])
     end
     if aff.m > 0
-        residuals.dual_obj[p.iter] -= dot(aff.h, @view pair.y[aff.p+1:end])
+        residuals.dual_obj[p.iter] -= LinearAlgebra.dot(aff.h, @view pair.y[aff.p+1:end])
     end
     residuals.dual_gap[p.iter] =
         abs(residuals.prim_obj[p.iter] - residuals.dual_obj[p.iter]) /
@@ -43,7 +43,9 @@ function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryD
     pair.x_old .= pair.x .- p.primal_step .* a.Mty
     # Px - Px_old
     pair.x_old .-= a.Mty_old 
-    residuals.primal_residual[p.iter] = sqrt(aff.n) * norm(pair.x_old, Inf) / max(norm(a.Mty_old, Inf), p.norm_b, p.norm_h, 1.)
+    residuals.primal_residual[p.iter] =
+        sqrt(aff.n) * LinearAlgebra.norm(pair.x_old, Inf) /
+            max(LinearAlgebra.norm(a.Mty_old, Inf), p.norm_b, p.norm_h, 1.)
 
     # Dual residual
     # Py_old
@@ -52,7 +54,9 @@ function compute_residual!(residuals::Residuals, pair::PrimalDual, a::AuxiliaryD
     pair.y_old .= pair.y .- p.dual_step .* a.Mx
     # Py - Py_old
     pair.y_old .-= a.Mx_old
-    residuals.dual_residual[p.iter] = sqrt(aff.m + aff.p) * norm(pair.y_old, Inf) / max(norm(a.Mx_old, Inf), p.norm_c, 1.)
+    residuals.dual_residual[p.iter] =
+        sqrt(aff.m + aff.p) * LinearAlgebra.norm(pair.y_old, Inf) /
+            max(LinearAlgebra.norm(a.Mx_old, Inf), p.norm_c, 1.)
 
     # Compute combined residual
     residuals.comb_residual[p.iter] = max(residuals.primal_residual[p.iter], residuals.dual_residual[p.iter])
@@ -78,7 +82,7 @@ end
 
 function soc_gap(v::ViewVector, s::ViewScalar)
 
-    return norm(v, 2) - s[]
+    return LinearAlgebra.norm(v, 2) - s[]
 end
 
 function convergedrank(a, p::Params, cones::ConicSets, opt::Options)::Bool

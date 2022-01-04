@@ -11,9 +11,9 @@ function chambolle_pock(
     p.window = opt.convergence_window
     p.beta = opt.initial_beta
     p.time0 = time()
-    p.norm_b = norm(affine_sets.b, 2)
-    p.norm_h = norm(affine_sets.h, 2)
-    p.norm_c = norm(affine_sets.c, 2)
+    p.norm_b = LinearAlgebra.norm(affine_sets.b, 2)
+    p.norm_h = LinearAlgebra.norm(affine_sets.h, 2)
+    p.norm_c = LinearAlgebra.norm(affine_sets.c, 2)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
     p.stop_reason_string = "Not optimized"
     p.target_rank = 2 * ones(length(conic_sets.sdpcone))
@@ -86,8 +86,8 @@ function chambolle_pock(
                     affine_sets.c = D * affine_sets.c
                 end
             else
-                E = Diagonal(zeros(affine_sets.m + affine_sets.p))
-                D = Diagonal(zeros(affine_sets.n))
+                E = LinearAlgebra.Diagonal(zeros(affine_sets.m + affine_sets.p))
+                D = LinearAlgebra.Diagonal(zeros(affine_sets.n))
             end
         end
         
@@ -111,14 +111,14 @@ function chambolle_pock(
                     spectral_norm = Arpack.svds(M, nsv=1)[1].S[1]
                 catch
                     println("    WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
-                    spectral_norm = norm(M)
+                    spectral_norm = LinearAlgebra.norm(M)
                 end
             else
                 F = LinearAlgebra.svd!(Matrix(M))
                 spectral_norm = maximum(F.S)
             end
         else
-            spectral_norm = norm(M)
+            spectral_norm = LinearAlgebra.norm(M)
         end
 
         # Build struct for storing matrices
@@ -134,8 +134,8 @@ function chambolle_pock(
     # Initialization
     if opt.advanced_initialization
         pair.x .= p.primal_step .* mat.c
-        mul!(a.Mx, mat.M, pair.x)
-        mul!(a.Mx_old, mat.M, pair.x_old)
+        LinearAlgebra.mul!(a.Mx, mat.M, pair.x)
+        LinearAlgebra.mul!(a.Mx_old, mat.M, pair.x_old)
     end
 
     # Fixed-point loop
@@ -526,7 +526,15 @@ function chambolle_pock(
     return sol[1]
 end
 
-function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
+function linesearch!(
+    pair::PrimalDual,
+    a::AuxiliaryData,
+    affine_sets::AffineSets,
+    mat::Matrices,
+    opt::Options,
+    p::Params
+)::Nothing
+
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
 
     for i in 1:opt.max_linsearch_steps
@@ -542,14 +550,14 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
         end
 
-        @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
+        @timeit "linesearch 3" LinearAlgebra.mul!(a.Mty, mat.Mt, a.y_temp)
         
         # In-place norm
         @timeit "linesearch 4" begin
             a.Mty .-= a.Mty_old
             a.y_temp .-= pair.y_old
-            y_norm = norm(a.y_temp)
-            Mty_norm = norm(a.Mty)
+            y_norm = LinearAlgebra.norm(a.y_temp)
+            Mty_norm = LinearAlgebra.norm(a.Mty)
         end
 
         if sqrt(p.beta) * p.primal_step * Mty_norm <= opt.delta * y_norm
@@ -570,7 +578,14 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     return nothing
 end
 
-function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
+function dual_step!(
+    pair::PrimalDual,
+    a::AuxiliaryData,
+    affine_sets::AffineSets,
+    mat::Matrices,
+    opt::Options,
+    p::Params
+)::Nothing
 
     @timeit "dual step 1" begin
         a.y_half .= pair.y .+ p.dual_step * (2. * a.Mx .- a.Mx_old)
@@ -582,7 +597,7 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets,
         a.y_temp .-= p.dual_step * a.y_half
     end
 
-    @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
+    @timeit "linesearch 3" LinearAlgebra.mul!(a.Mty, mat.Mt, a.y_temp)
 
     copyto!(pair.y, a.y_temp)
     p.primal_step_old = p.primal_step
@@ -590,7 +605,16 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets,
     return nothing
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
+function primal_step!(
+    pair::PrimalDual,
+    a::AuxiliaryData,
+    cones::ConicSets,
+    mat::Matrices,
+    opt::Options,
+    p::Params,
+    arc_list,
+    iter::Int64,
+)::Nothing
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
@@ -604,7 +628,7 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
         @timeit "soc proj" soc_projection!(pair.x, a, cones, opt, p)
     end
 
-    @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
+    @timeit "linesearch -1" LinearAlgebra.mul!(a.Mx, mat.M, pair.x)
 
     return nothing
 end
@@ -655,7 +679,7 @@ function cone_feas(v, cones, a, num = sqrt(2))
         if sdp.sq_side == 1
             sdp_viol = max(sdp_viol, -min(0.0, a.m[idx][1]))
         else
-            fact = eigen!(a.m[idx])
+            fact = LinearAlgebra.eigen!(a.m[idx])
             sdp_viol = max(sdp_viol, -min(0.0, minimum(fact.values)))
         end
     end
@@ -665,7 +689,7 @@ function cone_feas(v, cones, a, num = sqrt(2))
         len = soc.len
         push!(a.soc_s, view(v, cont + 1))
         s = v[cont+1]
-        sdp_viol = max(sdp_viol, -min(0.0, s - norm(view(v, cont + 2:cont + len))))
+        sdp_viol = max(sdp_viol, -min(0.0, s - LinearAlgebra.norm(view(v, cont + 2:cont + len))))
         cont += len
     end
     return max(sdp_viol, soc_viol), cont

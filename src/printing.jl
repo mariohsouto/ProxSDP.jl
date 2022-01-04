@@ -96,21 +96,21 @@ end
 function print_progress(residuals::Residuals, p::Params, opt, val = -1.0)
     primal_res = residuals.primal_residual[p.iter]
     dual_res = residuals.dual_residual[p.iter]
-    s_k = @sprintf("%d", p.iter)
+    s_k = Printf.@sprintf("%d", p.iter)
     s_k *= " |"
-    s_s = @sprintf("%.5f", residuals.dual_gap[p.iter])
+    s_s = Printf.@sprintf("%.5f", residuals.dual_gap[p.iter])
     s_s *= " |"
-    s_o = @sprintf("%.3f", residuals.prim_obj[p.iter])
+    s_o = Printf.@sprintf("%.3f", residuals.prim_obj[p.iter])
     s_o *= " |"
-    s_f = @sprintf("%.5f", residuals.feasibility[p.iter])
+    s_f = Printf.@sprintf("%.5f", residuals.feasibility[p.iter])
     s_f *= " |"
-    s_p = @sprintf("%.5f", primal_res)
+    s_p = Printf.@sprintf("%.5f", primal_res)
     s_p *= " |"
-    s_d = @sprintf("%.5f", dual_res)
+    s_d = Printf.@sprintf("%.5f", dual_res)
     s_d *= " |"
-    s_target_rank = @sprintf("%.0f", sum(p.target_rank))
+    s_target_rank = Printf.@sprintf("%.0f", sum(p.target_rank))
     s_target_rank *= " |"
-    s_time = @sprintf("%.4f", time() - p.time0)
+    s_time = Printf.@sprintf("%.4f", time() - p.time0)
     s_time *= " |"
     a = "|"
     a *= " "^max(0, 9 - length(s_k))
@@ -131,12 +131,12 @@ function print_progress(residuals::Residuals, p::Params, opt, val = -1.0)
     a *= s_time
 
     if opt.extended_log || opt.extended_log2
-        str = @sprintf("%.3f", residuals.dual_obj[p.iter]) * " |"
+        str = Printf.@sprintf("%.3f", residuals.dual_obj[p.iter]) * " |"
         str = " "^max(0, 11 - length(str)) * str
         a *= str
     end
     if opt.extended_log2
-        str = @sprintf("%.5f", val) * " |"
+        str = Printf.@sprintf("%.5f", val) * " |"
         str = " "^max(0, 11 - length(str)) * str
         a *= str
     end

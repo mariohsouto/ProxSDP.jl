@@ -17,19 +17,19 @@ function moi_sdplib(optimizer, path; verbose = false, test = false, scalar = fal
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n))
 
     Xsq = Matrix{MOI.VariableIndex}(undef, n,n)
-    ivech!(Xsq, X)
-    Xsq = Matrix(Symmetric(Xsq,:U))
+    ProxSDP.ivech!(Xsq, X)
+    Xsq = Matrix(LinearAlgebra.Symmetric(Xsq,:U))
 
     # Objective function
     objf_t = [MOI.ScalarAffineTerm(F[0][idx...], Xsq[idx...])
-        for idx in zip(findnz(F[0])[1:end-1]...)]
+        for idx in zip(SparseArrays.findnz(F[0])[1:end-1]...)]
     MOI.set(optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarAffineFunction(objf_t, 0.0))
     MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
     # Linear equality constraints
     for k in 1:m
         ctr_k = [MOI.ScalarAffineTerm(F[k][idx...], Xsq[idx...]) 
-            for idx in zip(findnz(F[k])[1:end-1]...)]
+            for idx in zip(SparseArrays.findnz(F[k])[1:end-1]...)]
         if scalar
             MOI.add_constraint(optimizer, MOI.ScalarAffineFunction(ctr_k, 0.0), MOI.EqualTo(c[k]))
         else
@@ -44,13 +44,13 @@ function moi_sdplib(optimizer, path; verbose = false, test = false, scalar = fal
 
     stime = -1.0
     try
-        stime = MOI.get(optimizer, MOI.SolveTime())
+        stime = MOI.get(optimizer, MOI.SolveTimeSec())
     catch
         println("could not query time")
     end
 
     Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
-    minus_rank = length([eig for eig in eigen(Xsq_s).values if eig < -1e-4])
+    minus_rank = length([eig for eig in LinearAlgebra.eigen(Xsq_s).values if eig < -1e-4])
     if test
         @test minus_rank == 0
     end

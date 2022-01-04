@@ -110,7 +110,7 @@ end
 
 function full_eig!(a::AuxiliaryData, idx::Int, opt::Options, p::Params)::Nothing
     p.current_rank[idx] = 0
-    fact = eigen!(a.m[idx])
+    fact = LinearAlgebra.eigen!(a.m[idx])
     p.min_eig[idx] = 0.0 #minimum(fact.values)
     fill!(a.m[idx].data, 0.)
     for i in 1:length(fact.values)
@@ -128,7 +128,7 @@ end
 function min_eig(a::AuxiliaryData, idx::Int, p::Params)
     # if p.min_eig[idx] == -Inf
     #     @timeit "bad min eig" begin
-    #         fact = eigen!(a.m[idx])
+    #         fact = LinearAlgebra.eigen!(a.m[idx])
     #         p.min_eig[idx] = minimum(fact.values)
     #     end
     # end
@@ -143,7 +143,7 @@ function soc_projection!(v::Vector{Float64}, a::AuxiliaryData, cones::ConicSets,
 end
 
 function soc_projection!(v::ViewVector, s::ViewScalar)::Nothing
-    nv = norm(v, 2)
+    nv = LinearAlgebra.norm(v, 2)
     if nv <= -s[]
         s[] = 0.
         v .= 0.

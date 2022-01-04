@@ -12,8 +12,8 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
     X = MOI.add_variables(optimizer, nvars)
 
     Xsq = Matrix{MOI.VariableIndex}(undef,n,n)
-    ivech!(Xsq, X)
-    Xsq = Matrix(Symmetric(Xsq,:U))
+    ProxSDP.ivech!(Xsq, X)
+    Xsq = Matrix(LinearAlgebra.Symmetric(Xsq,:U))
 
     for k in 1:m
         ctr_k = vec([MOI.ScalarAffineTerm(A[k][i,j], Xsq[i,j]) for j in 1:n, i in 1:n])
@@ -58,7 +58,7 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
     objval = Inf
     stime = -1.0
     try
-        stime = MOI.get(optimizer, MOI.SolveTime())
+        stime = MOI.get(optimizer, MOI.SolveTimeSec())
     catch
         println("could not query time")
     end
@@ -67,11 +67,11 @@ function moi_randsdp(optimizer, seed, n, m; verbose = false, test = false, atol 
 
         Xsq_s = MOI.get.(optimizer, MOI.VariablePrimal(), Xsq)
 
-        minus_rank = length([eig for eig in eigen(Xsq_s).values if eig < -1e-4])
+        minus_rank = length([eig for eig in LinearAlgebra.eigen(Xsq_s).values if eig < -1e-4])
         if test
             @test minus_rank == 0
         end
-        # rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
+        # rank = length([eig for eig in LinearAlgebra.eigen(XX).values if eig > 1e-10])
         # @show rank
         if test
             @test tr(C * Xsq_s) - objval < atol

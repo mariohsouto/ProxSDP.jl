@@ -1,7 +1,7 @@
 name = "ProxSDP"
 uuid = "65e78d25-6039-50a4-9445-38022e3d2eb3"
 repo = "https://github.com/mariohsouto/ProxSDP.jl.git"
-version = "1.6.2"
+version = "1.7.0"
 
 [deps]
 Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
@@ -18,7 +18,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 julia = "1"
 Arpack = "0.3.2, 0.5.1"
 KrylovKit = "0.5.2"
-MathOptInterface = "0.9.14"
+MathOptInterface = "0.10.6"
 TimerOutputs = "0.5.0"
 
 [extras]

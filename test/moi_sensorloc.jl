@@ -13,8 +13,8 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar
     nvars = ProxSDP.sympackedlen(n + 2) 
     X = MOI.add_variables(optimizer, nvars)
     Xsq = Matrix{MOI.VariableIndex}(undef, n + 2, n + 2)
-    ivech!(Xsq, X)
-    Xsq = Matrix(Symmetric(Xsq, :U))
+    ProxSDP.ivech!(Xsq, X)
+    Xsq = Matrix(LinearAlgebra.Symmetric(Xsq, :U))
     vov = MOI.VectorOfVariables(X)
     cX = MOI.add_constraint(optimizer, vov, MOI.PositiveSemidefiniteConeTriangle(n + 2))
 
@@ -103,7 +103,7 @@ function moi_sensorloc(optimizer, seed, n; verbose = false, test = false, scalar
 
     stime = -1.0
     try
-        stime = MOI.get(optimizer, MOI.SolveTime())
+        stime = MOI.get(optimizer, MOI.SolveTimeSec())
     catch
         println("could not query time")
     end

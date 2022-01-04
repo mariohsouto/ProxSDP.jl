@@ -15,7 +15,7 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
     verbose && randsdp_eval(A,b,C,n,m,XX)
     
     objval = objective_value(model)
-    stime = MOI.get(model, MOI.SolveTime())
+    stime = MOI.get(model, MOI.SolveTimeSec())
 
     # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
     # @show fieldnames(tp)

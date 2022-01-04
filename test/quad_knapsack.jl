@@ -1,4 +1,4 @@
-using StatsBase
+import StatsBase
 
 function quad_knapsack(solver, seed)
     rng = Random.MersenneTwister(seed)
@@ -28,7 +28,7 @@ function quad_knapsack(solver, seed)
     C = zeros((n, n))
     for i in 1:n
         for j in 1:n
-            if sample(rng, [1, 0],Weights([delta, 1.0 - delta])) == 1
+            if StatsBase.sample(rng, [1, 0], StatsBase.Weights([delta, 1.0 - delta])) == 1
                 c_ = - Random.rand(rng, 1:100)
                 C[i, j] = c_
                 C[j, i] = c_
@@ -64,7 +64,7 @@ function quad_knapsack(solver, seed)
     else
         XX = getvalue.(X)
     end
-    rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
+    rank = length([eig for eig in LinearAlgebra.eigen(XX).values if eig > 1e-10])
     @show rank
     @show diag(XX)
 end
