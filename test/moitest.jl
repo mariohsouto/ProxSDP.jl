@@ -63,7 +63,92 @@ end
     @test MOI.get(optimizer, MOI.SolverVersion()) == ver
 end
 
-@testset "Unit" begin
+function test_runtests()
+
+    config = MOI.Test.Config(
+        atol = 1e-4,
+        rtol = 1e-3,
+        exclude = Any[
+            MOI.ConstraintBasisStatus,
+            MOI.VariableBasisStatus,
+            MOI.ConstraintName,
+            MOI.VariableName,
+            MOI.ObjectiveBound,
+        ],
+    )
+
+    opt = ProxSDP.Optimizer(
+        tol_gap = 1e-6, tol_feasibility= 1e-6,
+        # max_iter = 100_000,
+        time_limit = 1.0, #seconds FAST
+        warn_on_limit = true,
+        # log_verbose = true, log_freq = 100000
+        )
+
+    MOI.set(opt, MOI.Silent(), true)
+    model = MOI.Bridges.full_bridge_optimizer(
+        MOI.Utilities.CachingOptimizer(
+            MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+            opt,
+        ),
+        Float64,
+    )
+    @testset "fixme" begin
+        obj_attr = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+        @test MOI.supports(model, obj_attr)
+        x = MOI.add_variable(model)
+        f = MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(0.0, x)], 0.0)
+        MOI.set(model, obj_attr, f)
+        MOI.optimize!(model)
+        @test_broken MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+        @test_broken MOI.get(model, MOI.ObjectiveValue()) == 0.0
+    end
+    MOI.Test.runtests(
+        model,
+        config,
+        exclude = String[
+            # unexpected failure. But this is probably in the bridge
+            # layer, not ProxSDP.
+            # see: https://github.com/jump-dev/MathOptInterface.jl/issues/1665
+            "test_model_UpperBoundAlreadySet",
+            "test_model_LowerBoundAlreadySet",
+            # it seems that UniversalFallback accepts everything
+            "test_model_ScalarFunctionConstantNotZero",
+            # TODO(joaquimg): good catch, but very pathological
+            "test_objective_ObjectiveFunction_blank",
+            # poorly scaled problem
+            "test_linear_add_constraints",
+        ],
+    )
+
+    opt = ProxSDP.Optimizer(
+        tol_primal = 1e-7, tol_dual = 1e-7,
+        tol_gap = 1e-7, tol_feasibility = 1e-7,
+        time_limit = 5.0,
+        warn_on_limit = true,
+        )
+    MOI.set(opt, MOI.Silent(), true)
+    model = MOI.Bridges.full_bridge_optimizer(
+        MOI.Utilities.CachingOptimizer(
+            MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+            opt,
+        ),
+        Float64,
+    )
+    MOI.empty!(model)
+    MOI.Test.test_linear_add_constraints(
+        model,
+        config,
+    )
+
+    return
+end
+
+@testset "MOI Unit" begin
+    test_runtests()
+end
+
+@testset "Old MOI Unit" begin
     bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOIT.unittest(bridged, config,[
         # not supported attributes

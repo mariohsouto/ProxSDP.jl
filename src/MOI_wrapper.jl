@@ -161,7 +161,8 @@ MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
 function MOI.is_empty(optimizer::Optimizer)
     return optimizer.cones === nothing &&
     optimizer.zeros === nothing &&
-    optimizer.nonps === nothing
+    optimizer.nonps === nothing &&
+    optimizer.sol.ret_val == 0
 end
 
 function MOI.empty!(optimizer::Optimizer)
