@@ -278,8 +278,20 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     end
     dest.zeros = deepcopy(Ab.sets) # TODO copy(Ab.sets)
     dest.nonps = deepcopy(Gh.sets) # TODO copy(Gh.sets)
+    # TODO: simply this after
+    # https://github.com/jump-dev/MathOptInterface.jl/issues/1711
+    _A = if A.m == 0
+        SparseArrays.sparse(Int64[], Int64[], Float64[], 0, A.n)
+    else
+        convert(SparseArrays.SparseMatrixCSC{Float64,Int64}, A)
+    end
+    _G = if G.m == 0
+        SparseArrays.sparse(Int64[], Int64[], Float64[], 0, G.n)
+    else
+        convert(SparseArrays.SparseMatrixCSC{Float64,Int64}, G)
+    end
     aff = AffineSets(A.n, A.m, G.m, 0,
-        A, G, b, h, c)
+        _A, _G, b, h, c)
     #=
         Cones
     =#

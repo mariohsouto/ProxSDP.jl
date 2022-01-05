@@ -34,7 +34,7 @@ mutable struct AffineSets
     p::Int  # Number of linear equalities
     m::Int  # Number of linear inequalities
     extra::Int  # Number of adition linear equalities (for disjoint cones)
-    A::SparseArrays.SparseMatrixCSC{Float64,Int64} 
+    A::SparseArrays.SparseMatrixCSC{Float64,Int64}
     G::SparseArrays.SparseMatrixCSC{Float64,Int64}
     b::Vector{Float64}
     h::Vector{Float64}

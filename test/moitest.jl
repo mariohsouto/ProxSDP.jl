@@ -74,7 +74,7 @@ function test_runtests()
             MOI.ConstraintName,
             MOI.VariableName,
             MOI.ObjectiveBound,
-            MOI.ScalarFunctionConstantNotZero, # can be ignored due UniversalFallback
+            MOI.ScalarFunctionConstantNotZero, # ignored by UniversalFallback
         ],
     )
 
