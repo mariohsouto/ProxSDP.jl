@@ -85,7 +85,6 @@ function test_runtests()
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         )
-
     MOI.set(opt, MOI.Silent(), true)
     model = MOI.Bridges.full_bridge_optimizer(
         MOI.Utilities.CachingOptimizer(
@@ -94,16 +93,6 @@ function test_runtests()
         ),
         Float64,
     )
-    @testset "fixme" begin
-        obj_attr = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-        @test MOI.supports(model, obj_attr)
-        x = MOI.add_variable(model)
-        f = MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(0.0, x)], 0.0)
-        MOI.set(model, obj_attr, f)
-        MOI.optimize!(model)
-        @test_broken MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
-        @test_broken MOI.get(model, MOI.ObjectiveValue()) == 0.0
-    end
     MOI.Test.runtests(
         model,
         config,
@@ -113,8 +102,8 @@ function test_runtests()
             # see: https://github.com/jump-dev/MathOptInterface.jl/issues/1665
             "test_model_UpperBoundAlreadySet",
             "test_model_LowerBoundAlreadySet",
-            # TODO(joaquimg): good catch, but very pathological
-            "test_objective_ObjectiveFunction_blank",
+            # # TODO(joaquimg): good catch, but very pathological
+            # "test_objective_ObjectiveFunction_blank",
             # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
         ],

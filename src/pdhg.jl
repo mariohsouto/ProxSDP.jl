@@ -120,6 +120,9 @@ function chambolle_pock(
         else
             spectral_norm = LinearAlgebra.norm(M)
         end
+        if spectral_norm < 1e-10
+            spectral_norm = 1.0
+        end
 
         # Build struct for storing matrices
         mat = Matrices(M, Mt, affine_sets.c)
