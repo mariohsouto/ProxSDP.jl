@@ -1,6 +1,6 @@
 function sdplib_data(path)
     # Read data from file
-    data = readdlm(path, use_mmap=true)
+    data = DelimitedFiles.readdlm(path, use_mmap=true)
 
     # Parse SDPLIB data
     m = data[1, 1]
@@ -23,7 +23,7 @@ function sdplib_data(path)
     end
     n = abs(cum_blks[end])
     n = length(c)
-    F = Dict(i => spzeros(n, n) for i = 0:m)
+    F = Dict(i => SparseArrays.spzeros(n, n) for i = 0:m)
     for k=5:size(data)[1]
         idx = cum_blks[data[k, 2]]
         # if data[k, 2] == 1
@@ -44,7 +44,7 @@ function sdplib_data(path)
     return n, m, F, c
 end
 function sdplib_eval(F,c,n,m,XX)
-    rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
+    rank = length([eig for eig in LinearAlgebra.eigen(XX).values if eig > 1e-10])
     @show rank
     @show tr(F[0] * XX)
     nothing

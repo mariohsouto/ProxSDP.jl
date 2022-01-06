@@ -1,5 +1,5 @@
-using Random
-using LinearAlgebra
+import Random
+import LinearAlgebra
 
 function randsdp_data(seed, m, n)
     rng = Random.MersenneTwister(seed)
@@ -22,9 +22,9 @@ function randsdp_data(seed, m, n)
     return A, b, C
 end
 function randsdp_eval(A,b,C,n,m,XX)
-    @show minus_rank = length([eig for eig in eigen(XX).values if eig < -1e-10])
+    @show minus_rank = length([eig for eig in LinearAlgebra.eigen(XX).values if eig < -1e-10])
 
-    @show rank = length([eig for eig in eigen(XX).values if eig > 1e-10])
+    @show rank = length([eig for eig in LinearAlgebra.eigen(XX).values if eig > 1e-10])
 
     @show tr(C * XX)
     for i in 1:m

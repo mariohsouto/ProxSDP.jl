@@ -1,4 +1,8 @@
-function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CPResult
+function chambolle_pock(
+    affine_sets::AffineSets,
+    conic_sets::ConicSets,
+    opt
+)::Result
 
     # Initialize parameters
     p = Params()
@@ -7,9 +11,9 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.window = opt.convergence_window
     p.beta = opt.initial_beta
     p.time0 = time()
-    p.norm_b = norm(affine_sets.b, 2)
-    p.norm_h = norm(affine_sets.h, 2)
-    p.norm_c = norm(affine_sets.c, 2)
+    p.norm_b = LinearAlgebra.norm(affine_sets.b, 2)
+    p.norm_h = LinearAlgebra.norm(affine_sets.h, 2)
+    p.norm_c = LinearAlgebra.norm(affine_sets.c, 2)
     p.rank_update, p.stop_reason, p.update_cont = 0, 0, 0
     p.stop_reason_string = "Not optimized"
     p.target_rank = 2 * ones(length(conic_sets.sdpcone))
@@ -20,8 +24,10 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     p.certificate_search = false
     p.certificate_search_min_iter = 0
     p.certificate_found = false
-    sol = Array{CPResult}(undef, 0)
-    arc_list = [EigSolverAlloc(Float64, sdp.sq_side, opt) for (idx, sdp) in enumerate(conic_sets.sdpcone)]
+    sol = Array{Result}(undef, 0)
+    arc_list = [
+        EigSolverAlloc(Float64, sdp.sq_side, opt)
+            for (idx, sdp) in enumerate(conic_sets.sdpcone)]
     ada_count = 0
 
     if opt.max_iter <= 0
@@ -69,8 +75,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                 opt.equilibration = true
             end
             if opt.equilibration
-                @timeit "equilibrate inner" E, D = equilibrate!(M, affine_sets, opt)
-                @timeit "equilibrate scaling" begin
+                @timeit "equilib inner" E, D = equilibrate!(M, affine_sets, opt)
+                @timeit "equilib scaling" begin
                     M = E * M * D
                     affine_sets.A = M[1:affine_sets.p, :]
                     affine_sets.G = M[affine_sets.p + 1:end, :]
@@ -80,8 +86,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     affine_sets.c = D * affine_sets.c
                 end
             else
-                E = Diagonal(zeros(affine_sets.m + affine_sets.p))
-                D = Diagonal(zeros(affine_sets.n))
+                E = LinearAlgebra.Diagonal(zeros(affine_sets.m + affine_sets.p))
+                D = LinearAlgebra.Diagonal(zeros(affine_sets.n))
             end
         end
         
@@ -105,14 +111,17 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
                     spectral_norm = Arpack.svds(M, nsv=1)[1].S[1]
                 catch
                     println("    WARNING: Failed to compute spectral norm of M, shifting to Frobenius norm")
-                    spectral_norm = norm(M)
+                    spectral_norm = LinearAlgebra.norm(M)
                 end
             else
                 F = LinearAlgebra.svd!(Matrix(M))
                 spectral_norm = maximum(F.S)
             end
         else
-            spectral_norm = norm(M)
+            spectral_norm = LinearAlgebra.norm(M)
+        end
+        if spectral_norm < 1e-10
+            spectral_norm = 1.0
         end
 
         # Build struct for storing matrices
@@ -128,8 +137,8 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     # Initialization
     if opt.advanced_initialization
         pair.x .= p.primal_step .* mat.c
-        mul!(a.Mx, mat.M, pair.x)
-        mul!(a.Mx_old, mat.M, pair.x_old)
+        LinearAlgebra.mul!(a.Mx, mat.M, pair.x)
+        LinearAlgebra.mul!(a.Mx_old, mat.M, pair.x_old)
     end
 
     # Fixed-point loop
@@ -419,7 +428,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
             residuals.feasibility[p.iter] > opt.infeas_feasibility_tol &&
             max_abs_diff(residuals.feasibility) < opt.infeas_stable_feasibility_tol
             )
-            
+
             p.stop_reason = 6 # Infeasible
             p.stop_reason_string = "Infeasible: feasibility stalled at $(residuals.feasibility[p.iter])"
 
@@ -499,7 +508,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     if opt.certificate_search && p.certificate_search
 
         @assert length(sol) == 1
-        
+
         if p.certificate_found
 
             if p.stop_reason == 6
@@ -508,7 +517,7 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
 
             pop!(sol)
             push!(sol, cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
-                c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))    
+                c_orig, A_orig, b_orig, G_orig, h_orig, D, E, var_ordering, a))
         end
 
     else
@@ -520,7 +529,15 @@ function chambolle_pock(affine_sets::AffineSets, conic_sets::ConicSets, opt)::CP
     return sol[1]
 end
 
-function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
+function linesearch!(
+    pair::PrimalDual,
+    a::AuxiliaryData,
+    affine_sets::AffineSets,
+    mat::Matrices,
+    opt::Options,
+    p::Params
+)::Nothing
+
     p.primal_step = p.primal_step * sqrt(1. + p.theta)
 
     for i in 1:opt.max_linsearch_steps
@@ -536,14 +553,14 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
             a.y_temp .-= (p.beta * p.primal_step) .* a.y_half
         end
 
-        @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
+        @timeit "linesearch 3" LinearAlgebra.mul!(a.Mty, mat.Mt, a.y_temp)
         
         # In-place norm
         @timeit "linesearch 4" begin
             a.Mty .-= a.Mty_old
             a.y_temp .-= pair.y_old
-            y_norm = norm(a.y_temp)
-            Mty_norm = norm(a.Mty)
+            y_norm = LinearAlgebra.norm(a.y_temp)
+            Mty_norm = LinearAlgebra.norm(a.Mty)
         end
 
         if sqrt(p.beta) * p.primal_step * Mty_norm <= opt.delta * y_norm
@@ -564,7 +581,14 @@ function linesearch!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets
     return nothing
 end
 
-function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets, mat::Matrices, opt::Options, p::Params)::Nothing
+function dual_step!(
+    pair::PrimalDual,
+    a::AuxiliaryData,
+    affine_sets::AffineSets,
+    mat::Matrices,
+    opt::Options,
+    p::Params
+)::Nothing
 
     @timeit "dual step 1" begin
         a.y_half .= pair.y .+ p.dual_step * (2. * a.Mx .- a.Mx_old)
@@ -576,7 +600,7 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets,
         a.y_temp .-= p.dual_step * a.y_half
     end
 
-    @timeit "linesearch 3" mul!(a.Mty, mat.Mt, a.y_temp)
+    @timeit "linesearch 3" LinearAlgebra.mul!(a.Mty, mat.Mt, a.y_temp)
 
     copyto!(pair.y, a.y_temp)
     p.primal_step_old = p.primal_step
@@ -584,7 +608,16 @@ function dual_step!(pair::PrimalDual, a::AuxiliaryData, affine_sets::AffineSets,
     return nothing
 end
 
-function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat::Matrices, opt::Options, p::Params, arc_list, iter::Int64)::Nothing
+function primal_step!(
+    pair::PrimalDual,
+    a::AuxiliaryData,
+    cones::ConicSets,
+    mat::Matrices,
+    opt::Options,
+    p::Params,
+    arc_list,
+    iter::Int64,
+)::Nothing
 
     pair.x .-= p.primal_step .* (a.Mty .+ mat.c)
 
@@ -598,7 +631,7 @@ function primal_step!(pair::PrimalDual, a::AuxiliaryData, cones::ConicSets, mat:
         @timeit "soc proj" soc_projection!(pair.x, a, cones, opt, p)
     end
 
-    @timeit "linesearch -1" mul!(a.Mx, mat.M, pair.x)
+    @timeit "linesearch -1" LinearAlgebra.mul!(a.Mx, mat.M, pair.x)
 
     return nothing
 end
@@ -606,9 +639,9 @@ end
 function certificate_dual_infeasibility(affine_sets, p, opt)
 
     if opt.log_verbose
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
         println("    Begin search for dual infeasibility certificate")
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
     end
 
     fill!(affine_sets.b, 0.0)
@@ -622,9 +655,9 @@ end
 function certificate_infeasibility(affine_sets, p, opt)
 
     if opt.log_verbose
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
         println("    Begin search for infeasibility certificate")
-        println("---------------------------------------------------------------------------------------")
+        println("-"^87)
     end
 
     fill!(affine_sets.c, 0.0)
@@ -649,7 +682,7 @@ function cone_feas(v, cones, a, num = sqrt(2))
         if sdp.sq_side == 1
             sdp_viol = max(sdp_viol, -min(0.0, a.m[idx][1]))
         else
-            fact = eigen!(a.m[idx])
+            fact = LinearAlgebra.eigen!(a.m[idx])
             sdp_viol = max(sdp_viol, -min(0.0, minimum(fact.values)))
         end
     end
@@ -659,7 +692,7 @@ function cone_feas(v, cones, a, num = sqrt(2))
         len = soc.len
         push!(a.soc_s, view(v, cont + 1))
         s = v[cont+1]
-        sdp_viol = max(sdp_viol, -min(0.0, s - norm(view(v, cont + 2:cont + len))))
+        sdp_viol = max(sdp_viol, -min(0.0, s - LinearAlgebra.norm(view(v, cont + 2:cont + len))))
         cont += len
     end
     return max(sdp_viol, soc_viol), cont
@@ -729,7 +762,7 @@ function cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
 
     dual_feasibility = dual_feas(dual_in, dual_cone, conic_sets, a)
 
-    return CPResult(
+    return Result(
         p.stop_reason,
         p.stop_reason_string,
         pair.x[var_ordering],
@@ -744,9 +777,11 @@ function cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
         residuals.dual_obj[p.iter],
         residuals.dual_gap[p.iter],
         time() - p.time0,
+        p.iter,
         sum(p.current_rank),
         residuals.feasibility[p.iter] <= opt.tol_feasibility,
         dual_feasibility <= opt.tol_feasibility_dual,
         p.certificate_found,
+        1,
     )
 end

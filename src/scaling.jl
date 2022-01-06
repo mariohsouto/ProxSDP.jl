@@ -10,7 +10,7 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
             for i in eachindex(iv)
                 M[im[i]] = iv[i]
             end
-            X = Symmetric(M, :L)
+            X = LinearAlgebra.Symmetric(M, :L)
 
             n = size(X)[1] # columns or line
             cont = 1
@@ -41,21 +41,21 @@ end
 
 function norm_scaling(affine_sets::AffineSets, cones::ConicSets)
     cte = (sqrt(2.) / 2.)
-    rows = rowvals(affine_sets.A)
+    rows = SparseArrays.rowvals(affine_sets.A)
     cont = 1
     for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in 1:j
         if i != j
-            for line in nzrange(affine_sets.A, cont)
+            for line in SparseArrays.nzrange(affine_sets.A, cont)
                 affine_sets.A[rows[line], cont] *= cte
             end
         end
         cont += 1
     end
-    rows = rowvals(affine_sets.G)
+    rows = SparseArrays.rowvals(affine_sets.G)
     cont = 1
     for sdp in cones.sdpcone, j in 1:sdp.sq_side, i in 1:j
         if i != j
-            for line in nzrange(affine_sets.G, cont)
+            for line in SparseArrays.nzrange(affine_sets.G, cont)
                 affine_sets.G[rows[line], cont] *= cte
             end
         end

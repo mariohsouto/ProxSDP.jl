@@ -1,4 +1,4 @@
-using Random
+import Random
 function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
@@ -59,7 +59,7 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
     verbose && sensorloc_eval(n, m, x_true, XX)
 
     objval = objective_value(model)
-    stime = MOI.get(model, MOI.SolveTime())
+    stime = MOI.get(model, MOI.SolveTimeSec())
 
     # @show tp = typeof(model.moi_backend.optimizer.model.optimizer)
     # @show fieldnames(tp)

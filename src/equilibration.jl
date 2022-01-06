@@ -1,6 +1,3 @@
-
-using LinearAlgebra
-
 function equilibrate!(M, aff, opt)
     max_iters=opt.equilibration_iters
     lb = opt.equilibration_lb
@@ -16,11 +13,11 @@ function equilibrate!(M, aff, opt)
         u_, v_         = zeros(aff.m + aff.p), zeros(aff.n)
         u_grad, v_grad = zeros(aff.m + aff.p), zeros(aff.n)
         row_norms, col_norms = zeros(aff.m + aff.p), zeros(aff.n)
-        E = Diagonal(u)
-        D = Diagonal(v)
+        E = LinearAlgebra.Diagonal(u)
+        D = LinearAlgebra.Diagonal(v)
         M_ = copy(M)
 
-        rows_M_ = rowvals(M_)
+        rows_M_ = SparseArrays.rowvals(M_)
     end
 
     for iter in 1:max_iters
@@ -29,8 +26,8 @@ function equilibrate!(M, aff, opt)
             D.diag .= exp.(v)
         end
         @timeit "M_" begin 
-            mul!(M_, M, D)
-            mul!(M_, E, M_)
+            LinearAlgebra.mul!(M_, M, D)
+            LinearAlgebra.mul!(M_, E, M_)
         end
 
         step_size = 2. / (γ * (iter + 1.))
@@ -40,7 +37,7 @@ function equilibrate!(M, aff, opt)
             fill!(row_norms, 0.0)
             fill!(col_norms, 0.0)
             for col in 1:aff.n
-                for line in nzrange(M_, col)
+                for line in SparseArrays.nzrange(M_, col)
                     row_norms[rows_M_[line]] += abs2(M_[rows_M_[line], col])
                     col_norms[col] += abs2(M_[rows_M_[line], col])
                 end
