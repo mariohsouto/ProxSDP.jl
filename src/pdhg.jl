@@ -2,7 +2,7 @@ function chambolle_pock(
     affine_sets::AffineSets,
     conic_sets::ConicSets,
     opt
-)::CPResult
+)::Result
 
     # Initialize parameters
     p = Params()
@@ -24,7 +24,7 @@ function chambolle_pock(
     p.certificate_search = false
     p.certificate_search_min_iter = 0
     p.certificate_found = false
-    sol = Array{CPResult}(undef, 0)
+    sol = Array{Result}(undef, 0)
     arc_list = [
         EigSolverAlloc(Float64, sdp.sq_side, opt)
             for (idx, sdp) in enumerate(conic_sets.sdpcone)]
@@ -762,7 +762,7 @@ function cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
 
     dual_feasibility = dual_feas(dual_in, dual_cone, conic_sets, a)
 
-    return CPResult(
+    return Result(
         p.stop_reason,
         p.stop_reason_string,
         pair.x[var_ordering],
@@ -777,9 +777,11 @@ function cache_solution(pair, residuals, conic_sets, affine_sets, p, opt,
         residuals.dual_obj[p.iter],
         residuals.dual_gap[p.iter],
         time() - p.time0,
+        p.iter,
         sum(p.current_rank),
         residuals.feasibility[p.iter] <= opt.tol_feasibility,
         dual_feasibility <= opt.tol_feasibility_dual,
         p.certificate_found,
+        1,
     )
 end

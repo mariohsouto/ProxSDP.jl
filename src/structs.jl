@@ -58,25 +58,27 @@ mutable struct ConicSets
     socone::Vector{SOCSet}
 end
 
-mutable struct CPResult
-    status::Int
-    status_string::String
-    primal::Vector{Float64}
-    dual_cone::Vector{Float64}
-    dual_eq::Vector{Float64}
-    dual_in::Vector{Float64}
-    slack_eq::Vector{Float64}
-    slack_in::Vector{Float64}
-    primal_residual::Float64
-    dual_residual::Float64
-    objval::Float64
-    dual_objval::Float64
-    gap::Float64
-    time::Float64
-    final_rank::Int
-    primal_feasible_user_tol::Bool
-    dual_feasible_user_tol::Bool
-    certificate_found::Bool
+Base.@kwdef mutable struct Result
+    status::Int = 0
+    status_string::String = "Problem not solved"
+    primal::Vector{Float64} = Float64[]
+    dual_cone::Vector{Float64} = Float64[]
+    dual_eq::Vector{Float64} = Float64[]
+    dual_in::Vector{Float64} = Float64[]
+    slack_eq::Vector{Float64} = Float64[]
+    slack_in::Vector{Float64} = Float64[]
+    primal_residual::Float64 = NaN
+    dual_residual::Float64 = NaN
+    objval::Float64 = NaN
+    dual_objval::Float64 = NaN
+    gap::Float64 = NaN
+    time::Float64 = NaN
+    iter::Int = -1
+    final_rank::Int = -1
+    primal_feasible_user_tol::Bool = false
+    dual_feasible_user_tol::Bool = false
+    certificate_found::Bool = false
+    result_count::Int = 0
 end
 
 mutable struct PrimalDual

@@ -48,29 +48,6 @@ const OptimizerCache{T} = MOI.Utilities.GenericModel{
     },
 }
 
-Base.@kwdef mutable struct MOISolution
-    ret_val::Int = 0
-    raw_status::String = "Problem not solved"
-    primal::Vector{Float64} = Float64[] # primal of variables
-    dual_eq::Vector{Float64} = Float64[] # dual of constraints
-    dual_in::Vector{Float64} = Float64[] # dual of constraints
-    dual_cone::Vector{Float64} = Float64[] # dual of constraints
-    slack_eq::Vector{Float64} = Float64[]
-    slack_in::Vector{Float64} = Float64[]
-    primal_residual::Float64 = NaN
-    dual_residual::Float64 = NaN
-    objval::Float64 = NaN
-    dual_objval::Float64 = NaN
-    # obj_cte::Float64 = NaN # used in rays - see SCS
-    gap::Float64 = NaN
-    time::Float64 = NaN
-    final_rank::Int = -1
-    primal_feasible_user_tol::Bool = false
-    dual_feasible_user_tol::Bool = false
-    certificate_found::Bool = false
-    result_count::Int = 0
-end
-
 Base.@kwdef mutable struct ConeData
     psc::Vector{Vector{Int}} = Vector{Int}[] # semidefinite
     soc::Vector{Vector{Int}} = Vector{Int}[] # second order
@@ -80,7 +57,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     cones::Union{Nothing, ConeData}
     zeros::Union{Nothing, Zeros{Float64}}
     nonps::Union{Nothing, Nonpositives{Float64}}
-    sol::MOISolution
+    sol::Result
     options::Options
 end
 
@@ -89,7 +66,7 @@ function Optimizer(;kwargs...)
         nothing,
         nothing,
         nothing,
-        MOISolution(),
+        Result(),
         Options()
         )
     for (key, value) in kwargs
@@ -162,17 +139,16 @@ function MOI.is_empty(optimizer::Optimizer)
     return optimizer.cones === nothing &&
     optimizer.zeros === nothing &&
     optimizer.nonps === nothing &&
-    optimizer.sol.ret_val == 0
+    optimizer.sol.status == 0
 end
 
 function MOI.empty!(optimizer::Optimizer)
     optimizer.cones = nothing
     optimizer.zeros = nothing
     optimizer.nonps = nothing
-    optimizer.sol = MOISolution()
+    optimizer.sol = Result()
     return
 end
-
 
 function _rows(
     optimizer::Optimizer,
@@ -338,17 +314,6 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
         Logging.global_logger(global_log)
     end
 
-    #= 
-        Unload solution
-    =#
-
-    ret_val = sol.status
-    primal = sol.primal#[1:aff.n-aff.extra]
-    dual_cone = sol.dual_cone#[1:aff.n-aff.extra]
-    dual_eq = sol.dual_eq#[1:aff.p-aff.extra]
-    slack_eq = sol.slack_eq#[1:aff.p-aff.extra]
-    objval = sol.objval
-
     if options.timer_verbose
         TimerOutputs.print_timer(TimerOutputs.DEFAULT_TIMER)
         print("\n")
@@ -364,27 +329,15 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
         close(f)
     end
 
-    dest.sol = MOISolution(
-        ret_val,
-        sol.status_string,
-        primal,
-        dual_eq,
-        sol.dual_in,
-        dual_cone,
-        slack_eq,
-        sol.slack_in,
-        sol.primal_residual,
-        sol.dual_residual,
-        obj_sign * objval + objective_constant,
-        obj_sign * sol.dual_objval + objective_constant,
-        sol.gap,
-        sol.time,
-        sol.final_rank,
-        sol.primal_feasible_user_tol,
-        sol.dual_feasible_user_tol,
-        sol.certificate_found,
-        1,
-    )
+    #= 
+        Fix solution
+    =#
+
+    sol.objval = obj_sign * sol.objval + objective_constant
+    sol.dual_objval = obj_sign * sol.dual_objval + objective_constant
+
+    dest.sol = sol
+
     return
 end
 
@@ -420,11 +373,11 @@ function MOI.get(optimizer::Optimizer, ::PDHGIterations)
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
-    return optimizer.sol.raw_status
+    return optimizer.sol.status_string
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
-    s = optimizer.sol.ret_val
+    s = optimizer.sol.status
     @assert 0 <= s <= 6
     if s == 0
         return MOI.OPTIMIZE_NOT_CALLED
@@ -456,7 +409,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
 end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
-    s = optimizer.sol.ret_val
+    s = optimizer.sol.status
     if attr.result_index > 1 || s == 0
         return MOI.NO_SOLUTION
     end
@@ -471,7 +424,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
 end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
-    s = optimizer.sol.ret_val
+    s = optimizer.sol.status
     if attr.result_index > 1 || s ==0
         return MOI.NO_SOLUTION
     end
@@ -505,7 +458,7 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},MOI.Zeros},
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Zeros},
 )
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.slack_eq[_rows(optimizer, ci)]
@@ -514,10 +467,28 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Nonpositives},
 )
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.slack_in[_rows(optimizer, ci)]
+end
+
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.PositiveSemidefiniteConeTriangle}
+)
+    MOI.check_result_index_bounds(optimizer, attr)
+    return optimizer.sol.primal[optimizer.cones.psc[ci.value]]
+end
+
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}
+)
+    MOI.check_result_index_bounds(optimizer, attr)
+    return optimizer.sol.primal[optimizer.cones.soc[ci.value]]
 end
 
 function MOI.get(
@@ -544,13 +515,14 @@ function MOI.get(
     ci::MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.PositiveSemidefiniteConeTriangle}
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    optimizer.sol.dual_cone[optimizer.cones.psc[ci.value]]
+    return optimizer.sol.dual_cone[optimizer.cones.psc[ci.value]]
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    optimizer.sol.dual_cone[optimizer.cones.soc[ci.value]]
+    return optimizer.sol.dual_cone[optimizer.cones.soc[ci.value]]
 end

@@ -129,6 +129,8 @@ function test_runtests()
         config,
     )
 
+    @test MOI.get(model, ProxSDP.PDHGIterations()) >= 0
+
     return
 end
 
