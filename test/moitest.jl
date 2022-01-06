@@ -184,17 +184,20 @@ end
         "linear8a",
         #"linear8b", "linear8c", "linear12",
         # poorly conditioned
-        "linear10",
         "linear5",
         "linear9",
+        "linear10",
         # primalstart not accepted
         "partial_start",
+        # certificate
+        "linear12",
         ]
     )
     MOIT.linear8atest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear5test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
     MOIT.linear10test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
+    MOIT.linear12test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
 end
 
 @testset "MOI Continuous Conic" begin
