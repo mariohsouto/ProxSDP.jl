@@ -12,50 +12,23 @@ const MOI = MathOptInterface
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-const optimizer = MOI.instantiate(
+const optimizer_bridged = MOI.instantiate(
     ()->ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
         time_limit = 3., #seconds FAST
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
-        ))
-const optimizer_slow = MOI.instantiate(
-    ()->ProxSDP.Optimizer(
-        tol_gap = 1e-6, tol_feasibility= 1e-6,
-        # max_iter = 100_000,
-        time_limit = 30., #seconds
-        warn_on_limit = true,
-        # log_verbose = true, log_freq = 100000
-        ))
-const optimizer_high_acc = MOI.instantiate(
-    ()->ProxSDP.Optimizer(
-        tol_primal = 1e-7, tol_dual = 1e-7,
-        tol_gap = 1e-7, tol_feasibility = 1e-7,
-        # log_verbose = true, log_freq = 1000
-        ))
-const optimizer_low_acc = MOI.instantiate(
-    ()->ProxSDP.Optimizer(
-        tol_gap = 1e-3, tol_feasibility = 1e-3,
-        # log_verbose = true, log_freq = 1000
-        ))
-const optimizer_full = MOI.instantiate(
-    ()->ProxSDP.Optimizer(full_eig_decomp = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
-const optimizer_print = MOI.instantiate(
-    ()->ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, extended_log = true, extended_log2 = true,
-    tol_gap = 1e-4, tol_feasibility = 1e-4))
-const optimizer_lowacc_arpack = MOI.instantiate(
-    ()->ProxSDP.Optimizer(eigsolver = 1, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
-const optimizer_lowacc_krylovkit = MOI.instantiate(
-    ()->ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
+        ),
+    with_bridge_type = Float64)
 
 @testset "SolverName" begin
-    @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
+    @test MOI.get(optimizer_bridged, MOI.SolverName()) == "ProxSDP"
 end
 
 @testset "SolverVersion" begin
     ver = readlines(joinpath(@__DIR__, "..", "Project.toml"))[4][12:16]
-    @test MOI.get(optimizer, MOI.SolverVersion()) == ver
+    @test MOI.get(optimizer_bridged, MOI.SolverVersion()) == ver
 end
 
 function test_runtests()
@@ -135,7 +108,7 @@ end
     include("moi_mimo.jl")
     for i in 2:5
         @testset "MIMO n = $(i)" begin 
-            moi_mimo(optimizer, 123, i, test = true)
+            moi_mimo(optimizer_bridged, 123, i, test = true)
         end
     end
 end
@@ -153,6 +126,12 @@ end
 # end
 
 # This problems are too large for Travis
+opt_low_acc = ProxSDP.Optimizer(
+    tol_gap = 1e-3, tol_feasibility = 1e-3,
+    # log_verbose = true, log_freq = 1000
+    )
+cache = MOI.default_cache(opt_low_acc, Float64)
+optimizer_low_acc = MOI.Utilities.CachingOptimizer(cache, opt_low_acc)
 @testset "SDPLIB Sizes" begin
     datapath = joinpath(dirname(@__FILE__), "data")
     include("base_sdplib.jl")
@@ -161,15 +140,11 @@ end
         # badly conditioned
         # moi_sdplib(optimizer_low_acc, joinpath(datapath, "gpp124-1.dat-s"), test = true)
         moi_sdplib(optimizer_low_acc, joinpath(datapath, "gpp124-2.dat-s"), test = true)
-        moi_sdplib(optimizer_lowacc_arpack, joinpath(datapath, "gpp124-2.dat-s"), test = true)
-        moi_sdplib(optimizer_lowacc_krylovkit, joinpath(datapath, "gpp124-2.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "gpp124-3.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "gpp124-4.dat-s"), test = true)
     end
     @testset "MAX CUT" begin
         moi_sdplib(optimizer_low_acc, joinpath(datapath, "mcp124-1.dat-s"), test = true)
-        moi_sdplib(optimizer_lowacc_arpack, joinpath(datapath, "mcp124-1.dat-s"), test = true)
-        moi_sdplib(optimizer_lowacc_krylovkit, joinpath(datapath, "mcp124-1.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "mcp124-2.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "mcp124-3.dat-s"), test = true)
         # moi_sdplib(optimizer, joinpath(datapath, "mcp124-4.dat-s"), test = true)
@@ -180,7 +155,7 @@ end
     include("base_sensorloc.jl")
     include("moi_sensorloc.jl")
     for n in 5:5:10
-        moi_sensorloc(optimizer, 0, n, test = true)
+        moi_sensorloc(optimizer_bridged, 0, n, test = true)
     end
 end
 

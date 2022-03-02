@@ -1,4 +1,4 @@
-function build_simple_lp!(pre_opt)
+function build_simple_lp!(optim)
     MOI.empty!(optim)
     @test MOI.is_empty(optim)
 
@@ -38,18 +38,18 @@ function build_simple_lp!(pre_opt)
 end
 
 const optimizer_maxiter = MOI.instantiate(
-    ProxSDP.Optimizer(max_iter = 1, log_verbose = false),
+    ()->ProxSDP.Optimizer(max_iter = 1, log_verbose = false),
     with_bridge_type = Float64)
 const optimizer_timelimit = MOI.instantiate(
-    ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = false),
+    ()->ProxSDP.Optimizer(time_limit = 0.0, log_verbose = false),
     with_bridge_type = Float64)
 
 @testset "MOI status" begin
     @testset "MOI.OPTIMAL" begin
-        build_simple_lp!(optimizer)
-        MOI.optimize!(optimizer)
-        @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
-        MOI.empty!(optimizer)
+        build_simple_lp!(optimizer_bridged)
+        MOI.optimize!(optimizer_bridged)
+        @test MOI.get(optimizer_bridged, MOI.TerminationStatus()) == MOI.OPTIMAL
+        MOI.empty!(optimizer_bridged)
     end
 
     @testset "MOI.ITERATION_LIMIT" begin

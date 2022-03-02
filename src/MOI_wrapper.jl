@@ -353,6 +353,8 @@ function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)
     return index_map, false
 end
 
+MOI.supports_incremental_interface(::Optimizer) = false
+
 #=
     Attributes
 =#
