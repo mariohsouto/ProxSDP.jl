@@ -12,44 +12,42 @@ const MOI = MathOptInterface
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
-
-const optimizer = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(
+const optimizer = MOI.instantiate(
+    ()->ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
         time_limit = 3., #seconds FAST
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         ))
-const optimizer_slow = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(
+const optimizer_slow = MOI.instantiate(
+    ()->ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
         time_limit = 30., #seconds
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         ))
-const optimizer_high_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(
+const optimizer_high_acc = MOI.instantiate(
+    ()->ProxSDP.Optimizer(
         tol_primal = 1e-7, tol_dual = 1e-7,
         tol_gap = 1e-7, tol_feasibility = 1e-7,
         # log_verbose = true, log_freq = 1000
         ))
-const optimizer_low_acc = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(
+const optimizer_low_acc = MOI.instantiate(
+    ()->ProxSDP.Optimizer(
         tol_gap = 1e-3, tol_feasibility = 1e-3,
         # log_verbose = true, log_freq = 1000
         ))
-const optimizer_full = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(full_eig_decomp = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
-const optimizer_print = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, extended_log = true, extended_log2 = true,
+const optimizer_full = MOI.instantiate(
+    ()->ProxSDP.Optimizer(full_eig_decomp = true, tol_gap = 1e-4, tol_feasibility = 1e-4))
+const optimizer_print = MOI.instantiate(
+    ()->ProxSDP.Optimizer(log_freq = 10, log_verbose = true, timer_verbose = true, extended_log = true, extended_log2 = true,
     tol_gap = 1e-4, tol_feasibility = 1e-4))
-const optimizer_lowacc_arpack = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(eigsolver = 1, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
-const optimizer_lowacc_krylovkit = MOIU.CachingOptimizer(cache,
-    ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
+const optimizer_lowacc_arpack = MOI.instantiate(
+    ()->ProxSDP.Optimizer(eigsolver = 1, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
+const optimizer_lowacc_krylovkit = MOI.instantiate(
+    ()->ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
@@ -82,42 +80,37 @@ function test_runtests()
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         )
-    MOI.set(opt, MOI.Silent(), true)
-    model = MOI.Bridges.full_bridge_optimizer(
-        MOI.Utilities.CachingOptimizer(
-            MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
-            opt,
-        ),
-        Float64,
-    )
+    model = MOI.instantiate(()->opt, with_bridge_type = Float64)
+    MOI.set(model, MOI.Silent(), true)
+
     MOI.Test.runtests(
         model,
         config,
         exclude = String[
-            # unexpected failure. But this is probably in the bridge
-            # layer, not ProxSDP.
+            # Not ProxSDP fail.
             # see: https://github.com/jump-dev/MathOptInterface.jl/issues/1665
             "test_model_UpperBoundAlreadySet",
             "test_model_LowerBoundAlreadySet",
             # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
+            # time limit hit
+            "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
         ],
     )
 
-    opt = ProxSDP.Optimizer(
-        tol_primal = 1e-7, tol_dual = 1e-7,
-        tol_gap = 1e-7, tol_feasibility = 1e-7,
-        time_limit = 5.0,
-        warn_on_limit = true,
-        )
-    MOI.set(opt, MOI.Silent(), true)
-    model = MOI.Bridges.full_bridge_optimizer(
-        MOI.Utilities.CachingOptimizer(
-            MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
-            opt,
-        ),
-        Float64,
+    MOI.set(model, MOI.RawOptimizerAttribute("time_limit"), 5.0)
+    MOI.empty!(model)
+    MOI.Test.test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max(
+        model,
+        config,
     )
+
+    MOI.set(model, MOI.RawOptimizerAttribute("tol_primal"), 1e-7)
+    MOI.set(model, MOI.RawOptimizerAttribute("tol_dual"), 1e-7)
+    MOI.set(model, MOI.RawOptimizerAttribute("tol_gap"), 1e-7)
+    MOI.set(model, MOI.RawOptimizerAttribute("tol_feasibility"), 1e-7)
+
+    MOI.set(model, MOI.Silent(), true)
     MOI.empty!(model)
     MOI.Test.test_linear_add_constraints(
         model,
@@ -192,8 +185,7 @@ end
 end
 
 @testset "Unsupported argument" begin
-    MOI.empty!(cache)
-    @test_throws ErrorException optimizer_unsupportedarg = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(unsupportedarg = 10))
+    @test_throws ErrorException optimizer_unsupportedarg = ProxSDP.Optimizer(unsupportedarg = 10)
     # @test_throws ErrorException MOI.optimize!(optimizer_unsupportedarg)
 end
 

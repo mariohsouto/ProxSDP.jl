@@ -1,5 +1,4 @@
-function build_simple_lp!(pre_opt::MOIU.CachingOptimizer)
-    optim = MOIB.full_bridge_optimizer(pre_opt, Float64)
+function build_simple_lp!(pre_opt)
     MOI.empty!(optim)
     @test MOI.is_empty(optim)
 
@@ -38,8 +37,12 @@ function build_simple_lp!(pre_opt::MOIU.CachingOptimizer)
     MOI.set(optim, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 end
 
-const optimizer_maxiter = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(max_iter = 1, log_verbose = false))
-const optimizer_timelimit = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = false))
+const optimizer_maxiter = MOI.instantiate(
+    ProxSDP.Optimizer(max_iter = 1, log_verbose = false),
+    with_bridge_type = Float64)
+const optimizer_timelimit = MOI.instantiate(
+    ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = false),
+    with_bridge_type = Float64)
 
 @testset "MOI status" begin
     @testset "MOI.OPTIMAL" begin
@@ -56,10 +59,10 @@ const optimizer_timelimit = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(time_
         MOI.empty!(optimizer_maxiter)
     end
 
-    # @testset "MOI.TIME_LIMIT" begin
-    #     build_simple_lp!(optimizer_timelimit)
-    #     MOI.optimize!(optimizer_timelimit)
-    #     @test MOI.get(optimizer_timelimit, MOI.TerminationStatus()) == MOI.TIME_LIMIT
-    #     MOI.empty!(optimizer_timelimit)
-    # end
+    @testset "MOI.TIME_LIMIT" begin
+        build_simple_lp!(optimizer_timelimit)
+        MOI.optimize!(optimizer_timelimit)
+        @test MOI.get(optimizer_timelimit, MOI.TerminationStatus()) == MOI.TIME_LIMIT
+        MOI.empty!(optimizer_timelimit)
+    end
 end

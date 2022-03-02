@@ -275,17 +275,6 @@ end
 
 function double_sdp_with_duplicates(optimizer)
 
-    cache = MOIU.UniversalFallback(MOIU.Model{Float64}());
-    optimizer0 = ProxSDP.Optimizer(
-        log_verbose = true,
-        log_freq = 10,
-        check_dual_feas = true,
-        check_dual_feas_freq = 10,
-    )
-    MOI.empty!(cache);
-    optimizer1 = MOIU.CachingOptimizer(cache, optimizer0);
-    optimizer = MOIB.full_bridge_optimizer(optimizer1, Float64);
-
     MOI.empty!(optimizer)
 
     x = MOI.add_variable(optimizer)
