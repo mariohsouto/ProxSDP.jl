@@ -41,7 +41,9 @@ const optimizer_maxiter = MOI.instantiate(
     ()->ProxSDP.Optimizer(max_iter = 1, log_verbose = false),
     with_bridge_type = Float64)
 const optimizer_timelimit = MOI.instantiate(
-    ()->ProxSDP.Optimizer(time_limit = 0.0, log_verbose = false),
+    ()->ProxSDP.Optimizer(
+        tol_gap = 1e-16, tol_feasibility= 1e-16,
+        time_limit = 0.0, log_verbose = false),
     with_bridge_type = Float64)
 
 @testset "MOI status" begin
