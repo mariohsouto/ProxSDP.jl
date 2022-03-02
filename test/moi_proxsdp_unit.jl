@@ -357,10 +357,13 @@ sdp_wiki(optimizer_print)
 
 # eig solvers
 default_solver = MOI.get(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"))
+min_size_krylov_eigs = MOI.get(optimizer_bridged, MOI.RawOptimizerAttribute("min_size_krylov_eigs"))
 MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"), 1)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("min_size_krylov_eigs"), 1)
 sdp_wiki(optimizer_bridged)
 MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"), 2)
 sdp_wiki(optimizer_bridged)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("min_size_krylov_eigs"), min_size_krylov_eigs)
 MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"), default_solver)
 MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("full_eig_decomp"), true)
 sdp_wiki(optimizer_bridged)
