@@ -332,7 +332,7 @@ function chambolle_pock(
         end
 
         # max_iter or time limit stop condition
-        if p.iter >= opt.max_iter_local || time() - p.time0 > opt.time_limit
+        if p.iter >= opt.max_iter_local || time() - p.time0 >= opt.time_limit
             if p.iter > opt.min_iter_time_infeas &&
                 max_abs_diff(residuals.dual_gap) < opt.infeas_stable_gap_tol &&
                 residuals.dual_gap[k] > opt.infeas_limit_gap_tol # low gap but far from zero, say 10%
@@ -376,7 +376,7 @@ function chambolle_pock(
                     println("    WARNING: Time limit hit.")
                 end
             end
-            if p.iter >= opt.max_iter_local || time() - p.time0 > opt.time_limit
+            if p.iter >= opt.max_iter_local || time() - p.time0 >= opt.time_limit
                 break
             end
         end
