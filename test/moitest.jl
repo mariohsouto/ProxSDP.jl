@@ -67,6 +67,7 @@ function test_runtests()
             # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
             # time limit hit
+            "test_linear_INFEASIBLE",
             "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
         ],
     )
@@ -74,6 +75,11 @@ function test_runtests()
     MOI.set(model, MOI.RawOptimizerAttribute("time_limit"), 5.0)
     MOI.empty!(model)
     MOI.Test.test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max(
+        model,
+        config,
+    )
+    MOI.empty!(model)
+    MOI.Test.test_linear_INFEASIBLE(
         model,
         config,
     )
