@@ -9,7 +9,6 @@ import SparseArrays
 import DelimitedFiles
 
 const MOI = MathOptInterface
-const MOIT = MOI.DeprecatedTest
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
@@ -51,8 +50,6 @@ const optimizer_lowacc_arpack = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(eigsolver = 1, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
 const optimizer_lowacc_krylovkit = MOIU.CachingOptimizer(cache,
     ProxSDP.Optimizer(eigsolver = 2, tol_gap = 1e-3, tol_feasibility = 1e-3, log_verbose = false))
-const config = MOIT.Config{Float64}(atol=1e-3, rtol=1e-3, infeas_certificates = true)
-const config_conic = MOIT.Config{Float64}(atol=1e-3, rtol=1e-3, duals = true, infeas_certificates = true)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ProxSDP"
@@ -102,8 +99,6 @@ function test_runtests()
             # see: https://github.com/jump-dev/MathOptInterface.jl/issues/1665
             "test_model_UpperBoundAlreadySet",
             "test_model_LowerBoundAlreadySet",
-            # # TODO(joaquimg): good catch, but very pathological
-            # "test_objective_ObjectiveFunction_blank",
             # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
         ],
@@ -136,98 +131,6 @@ end
 
 @testset "MOI Unit" begin
     test_runtests()
-end
-
-@testset "Old MOI Unit" begin
-    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
-    MOIT.unittest(bridged, config,[
-        # not supported attributes
-        "number_threads",
-        # Quadratic functions are not supported
-        "solve_qcp_edge_cases", "solve_qp_edge_cases",
-        # Integer and ZeroOne sets are not supported
-        "solve_integer_edge_cases", "solve_objbound_edge_cases",
-        "solve_zero_one_with_bounds_1",
-        "solve_zero_one_with_bounds_2",
-        "solve_zero_one_with_bounds_3",
-        # farkas proof
-        "solve_farkas_interval_upper",
-        "solve_farkas_interval_lower",
-        "solve_farkas_equalto_upper",
-        "solve_farkas_equalto_lower",
-        "solve_farkas_variable_lessthan_max",
-        "solve_farkas_variable_lessthan",
-        "solve_farkas_lessthan",
-        "solve_farkas_greaterthan",
-        ]
-    )
-    # TODO:
-    # bridged_slow = MOIB.full_bridge_optimizer(optimizer_slow, Float64)
-    # MOIT.solve_farkas_interval_upper(bridged_slow, config)
-    # MOIT.solve_farkas_interval_lower(bridged, config)
-    # MOIT.solve_farkas_equalto_upper(bridged_slow, config)
-    # MOIT.solve_farkas_equalto_lower(bridged, config)
-    # MOIT.solve_farkas_variable_lessthan_max(bridged_slow, config)
-    # MOIT.solve_farkas_variable_lessthan(bridged_slow, config)
-    # MOIT.solve_farkas_lessthan(bridged_slow, config)
-    # MOIT.solve_farkas_greaterthan(bridged, config)
-end
-
-@testset "MOI Continuous Linear" begin
-    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
-    # MOIT.linear8atest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    # MOIT.linear8btest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    # MOIT.linear8ctest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    # MOIT.linear12test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    MOIT.contlineartest(bridged, config, [
-        # infeasible/unbounded
-        "linear8a",
-        #"linear8b", "linear8c", "linear12",
-        # poorly conditioned
-        "linear5",
-        "linear9",
-        "linear10",
-        # primalstart not accepted
-        "partial_start",
-        # certificate
-        "linear12",
-        ]
-    )
-    MOIT.linear8atest(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    MOIT.linear5test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    MOIT.linear9test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    MOIT.linear10test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-    MOIT.linear12test(MOIB.full_bridge_optimizer(optimizer_high_acc, Float64), config)
-end
-
-@testset "MOI Continuous Conic" begin
-    MOIT.contconictest(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic, [
-        # bridge: some problem with square psd
-        "rootdets",
-        # exp cone
-        "logdet", "exp", "dualexp",
-        # pow cone
-        "pow","dualpow",
-        # other cones
-        "relentr",
-        # infeasible/unbounded
-        # "lin3", "lin4",
-        # See https://travis-ci.com/blegat/SolverTests/jobs/268551133
-        # geomean2v: Test Failed at /home/travis/.julia/dev/MathOptInterface/src/Test/contconic.jl:1328
-        # Expression: MOI.get(model, MOI.TerminationStatus()) == config.optimal_status
-        #  Evaluated: INFEASIBLE_OR_UNBOUNDED::TerminationStatusCode = 6 == OPTIMAL::TerminationStatusCode = 1
-        # "geomean2v", "geomean2f", , "rotatedsoc2", "psdt2", 
-        # "normone2", "norminf2", "rotatedsoc2"#
-        # slow to find certificate
-        "normone2",
-        "norminf2", # new
-        ]
-    )
-    # # these fail due to infeasibility certificate not being disabled
-    # MOIT.norminf2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
-    # MOIT.normone2test(MOIB.full_bridge_optimizer(optimizer_slow, Float64), config_conic)
-    # # requires certificates always
-    # MOIT.rotatedsoc2test(MOIB.full_bridge_optimizer(optimizer, Float64), config_conic_nodual)
 end
 
 @testset "ProxSDP MOI Units tests" begin
@@ -286,17 +189,6 @@ end
     for n in 5:5:10
         moi_sensorloc(optimizer, 0, n, test = true)
     end
-end
-
-@testset "Full eig" begin
-    MOIT.psdt0vtest(
-        MOIB.full_bridge_optimizer(optimizer_full, Float64),
-        MOIT.Config{Float64}(atol=1e-3, rtol=1e-3, duals = false)
-        )
-end
-
-@testset "Print" begin
-    MOIT.linear15test(optimizer_print, MOIT.Config{Float64}(atol=1e-3, rtol=1e-3))
 end
 
 @testset "Unsupported argument" begin
