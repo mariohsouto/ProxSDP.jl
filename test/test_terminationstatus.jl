@@ -1,5 +1,4 @@
-function build_simple_lp!(pre_opt::MOIU.CachingOptimizer)
-    optim = MOIB.full_bridge_optimizer(pre_opt, Float64)
+function build_simple_lp!(optim)
     MOI.empty!(optim)
     @test MOI.is_empty(optim)
 
@@ -38,15 +37,24 @@ function build_simple_lp!(pre_opt::MOIU.CachingOptimizer)
     MOI.set(optim, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 end
 
-const optimizer_maxiter = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(max_iter = 1, log_verbose = false))
-const optimizer_timelimit = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(time_limit = 0.0001, log_verbose = false))
+const optimizer_maxiter = MOI.instantiate(
+    ()->ProxSDP.Optimizer(max_iter = 1, log_verbose = false),
+    with_bridge_type = Float64)
+const optimizer_timelimit = MOI.instantiate(
+    ()->ProxSDP.Optimizer(
+        tol_gap = 1e-16, tol_feasibility = 1e-16,
+        tol_primal = 1e-16, tol_dual = 1e-16,
+        tol_feasibility_dual = 1e-16, tol_psd = 1e-16,
+        time_limit = 0.0, check_dual_feas = false,
+        check_dual_feas_freq = 1),
+    with_bridge_type = Float64)
 
 @testset "MOI status" begin
     @testset "MOI.OPTIMAL" begin
-        build_simple_lp!(optimizer)
-        MOI.optimize!(optimizer)
-        @test MOI.get(optimizer, MOI.TerminationStatus()) == MOI.OPTIMAL
-        MOI.empty!(optimizer)
+        build_simple_lp!(optimizer_bridged)
+        MOI.optimize!(optimizer_bridged)
+        @test MOI.get(optimizer_bridged, MOI.TerminationStatus()) == MOI.OPTIMAL
+        MOI.empty!(optimizer_bridged)
     end
 
     @testset "MOI.ITERATION_LIMIT" begin
@@ -56,10 +64,10 @@ const optimizer_timelimit = MOIU.CachingOptimizer(cache, ProxSDP.Optimizer(time_
         MOI.empty!(optimizer_maxiter)
     end
 
-    # @testset "MOI.TIME_LIMIT" begin
-    #     build_simple_lp!(optimizer_timelimit)
-    #     MOI.optimize!(optimizer_timelimit)
-    #     @test MOI.get(optimizer_timelimit, MOI.TerminationStatus()) == MOI.TIME_LIMIT
-    #     MOI.empty!(optimizer_timelimit)
-    # end
+    @testset "MOI.TIME_LIMIT" begin
+        build_simple_lp!(optimizer_timelimit)
+        MOI.optimize!(optimizer_timelimit)
+        @test MOI.get(optimizer_timelimit, MOI.TerminationStatus()) == MOI.TIME_LIMIT
+        MOI.empty!(optimizer_timelimit)
+    end
 end

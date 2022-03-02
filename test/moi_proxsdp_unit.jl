@@ -1,6 +1,5 @@
-function simple_lp(optimizer)
+function simple_lp(bridged)
 
-    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOI.empty!(bridged)
     @test MOI.is_empty(bridged)
 
@@ -49,9 +48,8 @@ function simple_lp(optimizer)
 
 end
 
-function simple_lp_2_1d_sdp(optimizer)
+function simple_lp_2_1d_sdp(bridged)
 
-    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOI.empty!(bridged)
     @test MOI.is_empty(bridged)
 
@@ -96,9 +94,8 @@ function simple_lp_2_1d_sdp(optimizer)
 
 end
 
-function lp_in_SDP_equality_form(optimizer)
+function lp_in_SDP_equality_form(bridged)
 
-    bridged = MOIB.full_bridge_optimizer(optimizer, Float64)
     MOI.empty!(bridged)
     @test MOI.is_empty(bridged)
 
@@ -275,17 +272,6 @@ end
 
 function double_sdp_with_duplicates(optimizer)
 
-    cache = MOIU.UniversalFallback(MOIU.Model{Float64}());
-    optimizer0 = ProxSDP.Optimizer(
-        log_verbose = true,
-        log_freq = 10,
-        check_dual_feas = true,
-        check_dual_feas_freq = 10,
-    )
-    MOI.empty!(cache);
-    optimizer1 = MOIU.CachingOptimizer(cache, optimizer0);
-    optimizer = MOIB.full_bridge_optimizer(optimizer1, Float64);
-
     MOI.empty!(optimizer)
 
     x = MOI.add_variable(optimizer)
@@ -352,11 +338,33 @@ function sdp_wiki(optimizer)
 end
 
 
-simple_lp(optimizer)
-simple_lp_2_1d_sdp(optimizer)
-lp_in_SDP_equality_form(optimizer)
-lp_in_SDP_inequality_form(optimizer)
-sdp_from_moi(optimizer)
-double_sdp_from_moi(optimizer)
-double_sdp_with_duplicates(optimizer)
-sdp_wiki(optimizer)
+simple_lp(optimizer_bridged)
+simple_lp_2_1d_sdp(optimizer_bridged)
+lp_in_SDP_equality_form(optimizer_bridged)
+lp_in_SDP_inequality_form(optimizer_bridged)
+sdp_from_moi(optimizer_bridged)
+double_sdp_from_moi(optimizer_bridged)
+double_sdp_with_duplicates(optimizer_bridged)
+sdp_wiki(optimizer_bridged)
+
+# print test
+const optimizer_print = MOI.instantiate(
+    ()->ProxSDP.Optimizer(
+        log_freq = 10, log_verbose = true, timer_verbose = true, extended_log = true, extended_log2 = true,
+        tol_gap = 1e-4, tol_feasibility = 1e-4),
+    with_bridge_type = Float64)
+sdp_wiki(optimizer_print)
+
+# eig solvers
+default_solver = MOI.get(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"))
+min_size_krylov_eigs = MOI.get(optimizer_bridged, MOI.RawOptimizerAttribute("min_size_krylov_eigs"))
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"), 1)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("min_size_krylov_eigs"), 1)
+sdp_wiki(optimizer_bridged)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"), 2)
+sdp_wiki(optimizer_bridged)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("min_size_krylov_eigs"), min_size_krylov_eigs)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("eigsolver"), default_solver)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("full_eig_decomp"), true)
+sdp_wiki(optimizer_bridged)
+MOI.set(optimizer_bridged, MOI.RawOptimizerAttribute("full_eig_decomp"), false)

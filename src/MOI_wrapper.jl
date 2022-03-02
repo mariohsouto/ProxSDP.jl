@@ -81,7 +81,7 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ProxSDP"
 
-MOI.get(::Optimizer, ::MOI.SolverVersion) = "1.7.0"
+MOI.get(::Optimizer, ::MOI.SolverVersion) = "1.8.0"
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
     fields = fieldnames(Options)
@@ -352,6 +352,8 @@ function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)
     _optimize!(dest, cache)
     return index_map, false
 end
+
+MOI.supports_incremental_interface(::Optimizer) = false
 
 #=
     Attributes
