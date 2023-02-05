@@ -52,16 +52,20 @@ W = [18.0  -5.0  -7.0  -6.0
      -6.0  -1.0  -1.0   8.0]
 
 # Build Max-Cut SDP relaxation via JuMP
-model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true, tol_gap=1e-4, tol_feasibility=1e-4))
+model = Model(ProxSDP.Optimizer)
+set_optimizer_attribute(model, "log_verbose", true)
+set_optimizer_attribute(model, "tol_gap", 1e-4)
+set_optimizer_attribute(model, "tol_feasibility", 1e-4)
+
 @variable(model, X[1:n, 1:n], PSD)
 @objective(model, Max, 0.25 * dot(W, X))
 @constraint(model, diag(X) .== 1)
 
 # Solve optimization problem with ProxSDP
-JuMP.optimize!(model)
+optimize!(model)
 
 # Retrieve solution
-Xsol = JuMP.value.(X)
+Xsol = value.(X)
 ```
 ### Convex.jl
 Another alternative is to use **ProxSDP** via [Convex.jl](https://github.com/jump-dev/Convex.jl) as the following
