@@ -16,6 +16,7 @@ using Random
 using DelimitedFiles
 using SparseArrays
 using JuMP
+using LinearAlgebra
 
 #=
     select problem types to be tested
