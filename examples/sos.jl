@@ -5,8 +5,11 @@ using DynamicPolynomials
 using ProxSDP, SCS
 
 # Using ProxSDP as the SDP solver
-model = SOSModel(with_optimizer(ProxSDP.Optimizer, log_verbose=true, max_iter=100000, full_eig_decomp=true))
-# model = SOSModel(with_optimizer(SCS.Optimizer, max_iters=100000))
+# model = SOSModel(with_optimizer(ProxSDP.Optimizer, log_verbose=true, max_iter=100000, full_eig_decomp=true))
+model = SOSModel(ProxSDP.Optimizer)
+set_optimizer_attribute(model, "log_verbose", true)
+set_optimizer_attribute(model, "max_iter", 100000)
+set_optimizer_attribute(model, "full_eig_decomp", true)
 
 @polyvar x z
 @variable(model, t)

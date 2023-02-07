@@ -6,7 +6,7 @@ function jump_mimo(solver, seed, n; verbose = false, test = false)
 
     nvars = ProxSDP.sympackedlen(n + 1)
 
-    model = Model(with_optimizer(solver))
+    model = Model(ProxSDP.Optimizer)
     @variable(model, X[1:n+1, 1:n+1], PSD)
     for j in 1:(n+1), i in j:(n+1)
         @constraint(model, X[i, j] <=  1.0)

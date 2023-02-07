@@ -2,7 +2,7 @@ function jump_randsdp(solver, seed, n, m, verbose = false)
 
     A, b, C = randsdp_data(seed, m, n)
 
-    model = Model(with_optimizer(solver))
+    model = Model(ProxSDP.Optimizer)
     @variable(model, X[1:n, 1:n], PSD)
     @objective(model, Min, sum(C[i, j] * X[i, j] for j in 1:n, i in 1:n))
     @constraint(model, ctr[k in 1:m], sum(A[k][i, j] * X[i, j] for j in 1:n, i in 1:n) == b[k])

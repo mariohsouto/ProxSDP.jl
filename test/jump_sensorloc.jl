@@ -3,7 +3,7 @@ function jump_sensorloc(solver, seed, n; verbose = false, test = false)
 
     m, x_true, a, d, d_bar = sensorloc_data(seed, n)
 
-    model = Model(with_optimizer(solver))
+    model = Model(ProxSDP.Optimizer)
 
     # Build SDP problem
     @variable(model, X[1:n+2, 1:n+2], PSD)

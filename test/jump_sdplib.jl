@@ -6,7 +6,7 @@ function jump_sdplib(solver, path; verbose = false, test = false)
     n, m, F, c = sdplib_data(path)
 
     # Build model
-    model = Model(with_optimizer(solver))
+    model = Model(ProxSDP.Optimizer)
     @variable(model, X[1:n, 1:n], PSD)
 
     # Objective function
