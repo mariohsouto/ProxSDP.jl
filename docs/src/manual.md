@@ -35,7 +35,8 @@ A quick JuMP example:
 using ProxSDP, JuMP
 
 # Create a JuMP model using ProxSDP as the solver
-model = Model(with_optimizer(ProxSDP.Optimizer, log_verbose=true))
+model = Model(ProxSDP.Optimizer)
+set_optimizer_attribute(model, "log_verbose", true)
 
 # Create a Positive Semidefinite variable
 @variable(model, X[1:2,1:2], PSD)
