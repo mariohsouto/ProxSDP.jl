@@ -36,7 +36,7 @@ push!(solvers, ("ProxSDP", () -> ProxSDP.Optimizer(
 
 RANDSDP_TEST_SET = 1:1
 SENSORLOC_TEST_SET = [
-    100,
+    50,
 ]
 
 #=
