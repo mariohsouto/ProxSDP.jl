@@ -1,5 +1,7 @@
 module ProxSDP
 
+using PrecompileTools: @setup_workload, @compile_workload
+
 import Arpack
 import KrylovKit
 import MathOptInterface
@@ -24,7 +26,15 @@ include("pdhg.jl")
 include("residuals.jl")
 include("eigsolver.jl")
 include("prox_operators.jl")
-
 include("MOI_wrapper.jl")
+
+# PrecompileTools
+@setup_workload begin
+
+    @compile_workload begin
+        include("../test/run_mini_benchmark.jl")
+    end
+
+end
 
 end
