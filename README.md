@@ -1,4 +1,4 @@
-<img src="https://github.com/mariohsouto/ProxSDP_aux/blob/master/logo_proxSDP.png?raw=true" alt="logo"/>
+<img src="https://raw.githubusercontent.com/mariohsouto/ProxSDP_aux/19f261a912e29c77cb68ee2957a5b41128824f22/logo_proxSDP.png" alt="logo"/>
 
 [![](https://github.com/mariohsouto/ProxSDP.jl/workflows/CI/badge.svg?branch=master)](https://github.com/mariohsouto/ProxSDP.jl/actions?query=workflow%3ACI)
 [![](http://codecov.io/github/mariohsouto/ProxSDP.jl/coverage.svg?branch=master)](http://codecov.io/github/mariohsouto/ProxSDP.jl?branch=master)
