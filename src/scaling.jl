@@ -5,21 +5,7 @@ function preprocess!(aff::AffineSets, conic_sets::ConicSets)
         all_cone_vars = Int[]
         for (idx, sdp) in enumerate(conic_sets.sdpcone)
             M = zeros(Int, sdp.sq_side, sdp.sq_side)
-            iv = conic_sets.sdpcone[idx].vec_i
-            im = conic_sets.sdpcone[idx].mat_i
-            for i in eachindex(iv)
-                M[im[i]] = iv[i]
-            end
-            X = LinearAlgebra.Symmetric(M, :L)
-
-            n = size(X)[1] # columns or line
-            cont = 1
-            sdp_vars = zeros(Int, div(sdp.sq_side*(sdp.sq_side+1), 2))
-            for j in 1:n, i in j:n
-                sdp_vars[cont] = X[i, j]
-                cont += 1
-            end
-            append!(all_cone_vars, sdp_vars)
+            append!(all_cone_vars, conic_sets.sdpcone[idx].vec_i)
         end
         for (idx, soc) in enumerate(conic_sets.socone)
             soc_vars = copy(soc.idx)
