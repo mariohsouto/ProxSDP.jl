@@ -16,7 +16,7 @@ function map_socs!(v::Vector{Float64}, cones::ConicSets, a::AuxiliaryData)
 end
 
 function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
-    n = sympackeddim(length(v))
+    n = MOI.Utilities.side_dimension_for_vectorized_dimension(length(v))
     n1, n2 = size(out)
     @assert n == n1 == n2
     c = 0
@@ -28,7 +28,7 @@ function ivech!(out::AbstractMatrix{T}, v::AbstractVector{T}) where T
 end
 
 function ivech(v::AbstractVector{T}) where T
-    n = sympackeddim(length(v))
+    n = MOI.Utilities.side_dimension_for_vectorized_dimension(length(v))
     out = zeros(n, n)
     ivech!(out, v)
     

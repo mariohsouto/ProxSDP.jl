@@ -211,8 +211,6 @@ end
 
 # Vectorized length for matrix dimension n
 sympackedlen(n) = div(n * (n + 1), 2)
-# Matrix dimension for vectorized length n
-sympackeddim(n) = div(isqrt(1 + 8n) - 1, 2)
 
 matindices(n::Integer) = LinearIndices(trues(n,n))[findall(LinearAlgebra.tril(trues(n,n)))]
 
@@ -282,7 +280,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     psc_s = cone_data(src, MOI.PositiveSemidefiniteConeTriangle)
     for psc in psc_s
         tri_len = length(psc)
-        sq_side = sympackeddim(tri_len)
+        sq_side = MOI.Utilities.side_dimension_for_vectorized_dimension(tri_len)
         mat_inds = matindices(sq_side)
         push!(con.sdpcone, SDPSet(psc, mat_inds, tri_len, sq_side))
     end
