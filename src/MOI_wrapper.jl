@@ -125,12 +125,19 @@ end
 
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 
-function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, value)
+function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, value::Real)
     optimizer.options.time_limit = value
+    return
+end
+
+function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, ::Nothing)
+    optimizer.options.time_limit = 3600_00.0
+    return
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.TimeLimitSec)
-    return optimizer.options.time_limit
+    value = optimizer.options.time_limit
+    return value == 3600_00.0 ? nothing : value
 end
 
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
@@ -291,7 +298,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     #
     end # timeit
 
-    #= 
+    #=
         Solve modified problem
     =#
 
@@ -327,7 +334,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
         close(f)
     end
 
-    #= 
+    #=
         Fix solution
     =#
 

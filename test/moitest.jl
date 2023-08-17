@@ -113,7 +113,7 @@ end
     include("base_mimo.jl")
     include("moi_mimo.jl")
     for i in 2:5
-        @testset "MIMO n = $(i)" begin 
+        @testset "MIMO n = $(i)" begin
             moi_mimo(optimizer_bridged, 123, i, test = true)
         end
     end
@@ -125,7 +125,7 @@ end
 #     include("base_randsdp.jl")
 #     include("moi_randsdp.jl")
 #     for n in 10:11, m in 10:11
-#         @testset "RANDSDP n=$n, m=$m" begin 
+#         @testset "RANDSDP n=$n, m=$m" begin
 #             moi_randsdp(optimizer, 123, n, m, test = true, atol = 1e-1)
 #         end
 #     end
@@ -171,3 +171,16 @@ end
 end
 
 include("test_terminationstatus.jl")
+
+@testset "test_attribute_TimeLimitSec" begin
+    model = ProxSDP.Optimizer()
+    @test MOI.supports(model, MOI.TimeLimitSec())
+    @test MOI.get(model, MOI.TimeLimitSec()) === nothing
+    MOI.set(model, MOI.TimeLimitSec(), 0.0)
+    @test MOI.get(model, MOI.TimeLimitSec()) == 0.0
+    MOI.set(model, MOI.TimeLimitSec(), nothing)
+    @test MOI.get(model, MOI.TimeLimitSec()) === nothing
+    MOI.set(model, MOI.TimeLimitSec(), 1.0)
+    @test MOI.get(model, MOI.TimeLimitSec()) == 1.0
+    return
+end
