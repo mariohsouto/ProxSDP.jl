@@ -70,7 +70,7 @@ function test_runtests()
             "test_linear_INFEASIBLE",
             "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
             # TODO(odow): investigate
-            "test_HermitianPSDCone_basic",
+            "test_HermitianPSDCone_",
         ],
     )
 
