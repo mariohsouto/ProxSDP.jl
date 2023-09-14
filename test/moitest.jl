@@ -49,7 +49,7 @@ function test_runtests()
     opt = ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
-        time_limit = 1.0, #seconds FAST
+        time_limit = 5.0, #seconds FAST
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         )
@@ -69,9 +69,6 @@ function test_runtests()
             # time limit hit
             "test_linear_INFEASIBLE",
             "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
-            # TODO(odow): investigate
-            "test_HermitianPSDCone_",
-            "test_NormNuclearCone_VectorAffineFunction_with_transform",
         ],
     )
 
