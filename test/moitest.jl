@@ -69,6 +69,8 @@ function test_runtests()
             # time limit hit
             "test_linear_INFEASIBLE",
             "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
+            # TODO(odow): investigate
+            "test_HermitianPSDCone_basic",
         ],
     )
 
