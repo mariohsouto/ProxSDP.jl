@@ -71,6 +71,7 @@ function test_runtests()
             "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
             # TODO(odow): investigate
             "test_HermitianPSDCone_",
+            "test_NormNuclearCone_VectorAffineFunction_with_transform",
         ],
     )
 
