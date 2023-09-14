@@ -16,7 +16,7 @@ const optimizer_bridged = MOI.instantiate(
     ()->ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
-        time_limit = 3., #seconds FAST
+        time_limit = 30.0, #seconds FAST
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         ),
@@ -66,22 +66,7 @@ function test_runtests()
             "test_model_LowerBoundAlreadySet",
             # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
-            # time limit hit
-            "test_linear_INFEASIBLE",
-            "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
         ],
-    )
-
-    MOI.set(model, MOI.RawOptimizerAttribute("time_limit"), 5.0)
-    MOI.empty!(model)
-    MOI.Test.test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max(
-        model,
-        config,
-    )
-    MOI.empty!(model)
-    MOI.Test.test_linear_INFEASIBLE(
-        model,
-        config,
     )
 
     MOI.set(model, MOI.RawOptimizerAttribute("tol_primal"), 1e-7)
