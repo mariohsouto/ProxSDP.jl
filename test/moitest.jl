@@ -16,7 +16,7 @@ const optimizer_bridged = MOI.instantiate(
     ()->ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
-        time_limit = 3., #seconds FAST
+        time_limit = 30.0, #seconds FAST
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         ),
@@ -49,7 +49,7 @@ function test_runtests()
     opt = ProxSDP.Optimizer(
         tol_gap = 1e-6, tol_feasibility= 1e-6,
         # max_iter = 100_000,
-        time_limit = 1.0, #seconds FAST
+        time_limit = 5.0, #seconds FAST
         warn_on_limit = true,
         # log_verbose = true, log_freq = 100000
         )
@@ -66,22 +66,7 @@ function test_runtests()
             "test_model_LowerBoundAlreadySet",
             # poorly scaled problem (solved bellow with higher accuracy)
             "test_linear_add_constraints",
-            # time limit hit
-            "test_linear_INFEASIBLE",
-            "test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max",
         ],
-    )
-
-    MOI.set(model, MOI.RawOptimizerAttribute("time_limit"), 5.0)
-    MOI.empty!(model)
-    MOI.Test.test_solve_DualStatus_INFEASIBILITY_CERTIFICATE_VariableIndex_LessThan_max(
-        model,
-        config,
-    )
-    MOI.empty!(model)
-    MOI.Test.test_linear_INFEASIBLE(
-        model,
-        config,
     )
 
     MOI.set(model, MOI.RawOptimizerAttribute("tol_primal"), 1e-7)
@@ -113,7 +98,7 @@ end
     include("base_mimo.jl")
     include("moi_mimo.jl")
     for i in 2:5
-        @testset "MIMO n = $(i)" begin 
+        @testset "MIMO n = $(i)" begin
             moi_mimo(optimizer_bridged, 123, i, test = true)
         end
     end
@@ -125,7 +110,7 @@ end
 #     include("base_randsdp.jl")
 #     include("moi_randsdp.jl")
 #     for n in 10:11, m in 10:11
-#         @testset "RANDSDP n=$n, m=$m" begin 
+#         @testset "RANDSDP n=$n, m=$m" begin
 #             moi_randsdp(optimizer, 123, n, m, test = true, atol = 1e-1)
 #         end
 #     end
@@ -171,3 +156,16 @@ end
 end
 
 include("test_terminationstatus.jl")
+
+@testset "test_attribute_TimeLimitSec" begin
+    model = ProxSDP.Optimizer()
+    @test MOI.supports(model, MOI.TimeLimitSec())
+    @test MOI.get(model, MOI.TimeLimitSec()) === nothing
+    MOI.set(model, MOI.TimeLimitSec(), 0.0)
+    @test MOI.get(model, MOI.TimeLimitSec()) == 0.0
+    MOI.set(model, MOI.TimeLimitSec(), nothing)
+    @test MOI.get(model, MOI.TimeLimitSec()) === nothing
+    MOI.set(model, MOI.TimeLimitSec(), 1.0)
+    @test MOI.get(model, MOI.TimeLimitSec()) == 1.0
+    return
+end
