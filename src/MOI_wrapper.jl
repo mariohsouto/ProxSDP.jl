@@ -1,8 +1,6 @@
-const MOI = MathOptInterface
+MOI.Utilities.@product_of_sets(_Zeros, MOI.Zeros)
 
-MOI.Utilities.@product_of_sets(Zeros, MOI.Zeros)
-
-MOI.Utilities.@product_of_sets(Nonpositives, MOI.Nonpositives)
+MOI.Utilities.@product_of_sets(_Nonpositives, MOI.Nonpositives)
 
 MOI.Utilities.@struct_of_constraints_by_set_types(
     StructCache,
@@ -25,7 +23,7 @@ const OptimizerCache{T} = MOI.Utilities.GenericModel{
                 MOI.Utilities.OneBasedIndexing,
             },
             Vector{T},
-            Zeros{T},
+            _Zeros{T},
         },
         MOI.Utilities.MatrixOfConstraints{
             T,
@@ -35,7 +33,7 @@ const OptimizerCache{T} = MOI.Utilities.GenericModel{
                 MOI.Utilities.OneBasedIndexing,
             },
             Vector{T},
-            Nonpositives{T},
+            _Nonpositives{T},
         },
         MOI.Utilities.VectorOfConstraints{
             MOI.VectorOfVariables,
@@ -55,8 +53,8 @@ end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     cones::Union{Nothing, ConeData}
-    zeros::Union{Nothing, Zeros{Float64}}
-    nonps::Union{Nothing, Nonpositives{Float64}}
+    zeros::Union{Nothing, _Zeros{Float64}}
+    nonps::Union{Nothing, _Nonpositives{Float64}}
     sol::Result
     options::Options
 end
