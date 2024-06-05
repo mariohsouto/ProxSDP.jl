@@ -4,7 +4,7 @@ using PrecompileTools: @setup_workload, @compile_workload
 
 import Arpack
 import KrylovKit
-import MathOptInterface
+import MathOptInterface as MOI
 import TimerOutputs
 import TimerOutputs: @timeit
 
