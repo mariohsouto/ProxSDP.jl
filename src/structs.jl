@@ -43,7 +43,6 @@ end
 
 mutable struct SDPSet
     vec_i::Vector{Int}
-    mat_i::Vector{Int}
     tri_len::Int
     sq_side::Int
 end
