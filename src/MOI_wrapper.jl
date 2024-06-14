@@ -79,7 +79,7 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ProxSDP"
 
-MOI.get(::Optimizer, ::MOI.SolverVersion) = "1.8.3"
+MOI.get(::Optimizer, ::MOI.SolverVersion) = "1.8.4"
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
     fields = fieldnames(Options)
