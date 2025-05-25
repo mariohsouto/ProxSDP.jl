@@ -11,7 +11,7 @@ In the test folder one can find MOI implementations of some problems: MIMO, Sens
 Argument | Description | Type | Values (default)
 --- | --- | --- |  ---
 log_verbose | print evolution of the process | `Bool` |  `false`
-log_freq | print evoluition of the process every n iterations | `Int` |  `100`
+log_freq | print evolution of the process every n iterations | `Int` |  `100`
 timer_verbose | Outputs a time logger | `Bool` |  `false`
 time_limit | Maximum time the algorithm can try to solve in seconds | `Float64` |  `360000.0`
 max_iter | Maximum number of iterations | `Int` |  `1000000`
