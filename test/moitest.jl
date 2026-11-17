@@ -73,6 +73,10 @@ function test_runtests()
     MOI.set(model, MOI.RawOptimizerAttribute("tol_dual"), 1e-7)
     MOI.set(model, MOI.RawOptimizerAttribute("tol_gap"), 1e-7)
     MOI.set(model, MOI.RawOptimizerAttribute("tol_feasibility"), 1e-7)
+    # For the poorly scaled test_linear_add_constraints, a small gap can occur
+    # before the dual solution is feasible, so also check dual feasibility.
+    MOI.set(model, MOI.RawOptimizerAttribute("check_dual_feas"), true)
+    MOI.set(model, MOI.RawOptimizerAttribute("tol_feasibility_dual"), 1e-7)
 
     MOI.set(model, MOI.Silent(), true)
     MOI.empty!(model)
